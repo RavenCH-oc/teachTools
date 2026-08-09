@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+
+# Node / TypeScript
+node_modules/
+dist/
+.vite/
+coverage/
+
+# Rust
+target/
+src-tauri/target/
+
+# Environment / credentials
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Local runtime databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Local app state
+.local/
+data/
