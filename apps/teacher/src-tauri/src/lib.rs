@@ -1,11 +1,14 @@
 mod application;
 mod error;
+mod grading;
 mod infrastructure;
+mod question_domain;
 
 use application::{
-    CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateStudentRequest,
-    LocalDatabaseStatus, PersistenceService, UpdateClassroomRequest, UpdateCourseRequest,
-    UpdateLessonRequest, UpdateStudentRequest,
+    CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateQuestionRequest,
+    CreateQuestionSetRequest, CreateStudentRequest, LocalDatabaseStatus, PersistenceService,
+    UpdateClassroomRequest, UpdateCourseRequest, UpdateLessonRequest, UpdateQuestionRequest,
+    UpdateQuestionSetRequest, UpdateStudentRequest,
 };
 use error::AppError;
 use serde::Serialize;
@@ -21,7 +24,7 @@ pub struct RuntimeInfo {
 fn get_app_runtime_info() -> RuntimeInfo {
     RuntimeInfo {
         app_name: "Classroom",
-        phase: "Phase 2",
+        phase: "Phase 4",
     }
 }
 
@@ -138,6 +141,78 @@ fn delete_lesson(state: tauri::State<'_, PersistenceService>, id: String) -> Res
     state.delete_lesson(id)
 }
 
+#[tauri::command]
+fn list_question_sets(
+    state: tauri::State<'_, PersistenceService>,
+) -> Result<Vec<application::QuestionSetDto>, AppError> {
+    state.list_question_sets()
+}
+#[tauri::command]
+fn get_question_set(
+    state: tauri::State<'_, PersistenceService>,
+    id: String,
+) -> Result<application::QuestionSetDto, AppError> {
+    state.get_question_set(id)
+}
+#[tauri::command]
+fn create_question_set(
+    state: tauri::State<'_, PersistenceService>,
+    request: CreateQuestionSetRequest,
+) -> Result<application::QuestionSetDto, AppError> {
+    state.create_question_set(request)
+}
+#[tauri::command]
+fn update_question_set(
+    state: tauri::State<'_, PersistenceService>,
+    id: String,
+    request: UpdateQuestionSetRequest,
+) -> Result<application::QuestionSetDto, AppError> {
+    state.update_question_set(id, request)
+}
+#[tauri::command]
+fn delete_question_set(
+    state: tauri::State<'_, PersistenceService>,
+    id: String,
+) -> Result<(), AppError> {
+    state.delete_question_set(id)
+}
+#[tauri::command]
+fn list_questions(
+    state: tauri::State<'_, PersistenceService>,
+    question_set_id: String,
+) -> Result<Vec<application::QuestionDto>, AppError> {
+    state.list_questions(question_set_id)
+}
+#[tauri::command]
+fn get_question(
+    state: tauri::State<'_, PersistenceService>,
+    id: String,
+) -> Result<application::QuestionDto, AppError> {
+    state.get_question(id)
+}
+#[tauri::command]
+fn create_question(
+    state: tauri::State<'_, PersistenceService>,
+    request: CreateQuestionRequest,
+) -> Result<application::QuestionDto, AppError> {
+    state.create_question(request)
+}
+#[tauri::command]
+fn update_question(
+    state: tauri::State<'_, PersistenceService>,
+    id: String,
+    request: UpdateQuestionRequest,
+) -> Result<application::QuestionDto, AppError> {
+    state.update_question(id, request)
+}
+#[tauri::command]
+fn delete_question(
+    state: tauri::State<'_, PersistenceService>,
+    id: String,
+) -> Result<(), AppError> {
+    state.delete_question(id)
+}
+
 pub fn run() -> Result<(), String> {
     tauri::Builder::default()
         .setup(|app| {
@@ -167,7 +242,17 @@ pub fn run() -> Result<(), String> {
             list_lessons,
             create_lesson,
             update_lesson,
-            delete_lesson
+            delete_lesson,
+            list_question_sets,
+            get_question_set,
+            create_question_set,
+            update_question_set,
+            delete_question_set,
+            list_questions,
+            get_question,
+            create_question,
+            update_question,
+            delete_question
         ])
         .run(tauri::generate_context!())
         .map_err(|error| error.to_string())
@@ -193,10 +278,10 @@ mod tests {
     fn runtime_info_has_the_phase_marker() {
         let info = RuntimeInfo {
             app_name: "Classroom",
-            phase: "Phase 2",
+            phase: "Phase 4",
         };
         assert_eq!(info.app_name, "Classroom");
-        assert_eq!(info.phase, "Phase 2");
+        assert_eq!(info.phase, "Phase 4");
     }
 
     #[test]

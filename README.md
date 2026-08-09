@@ -2,7 +2,11 @@
 
 Classroom 是教師主控、學生以瀏覽器加入的課堂互動教學軟體。本倉庫目前處於 Phase 1：Monorepo / Application Skeleton。
 
-## Current implementation phase: Phase 3
+## Current implementation phase: Phase 4
+
+Phase 4 includes the typed Question and QuestionSet domain, Zod validation, deterministic TypeScript grading, Rust authoritative grading parity, and local persistence/application support. Question Editor UI, quiz sessions, student answering, assets, HTTP/WebSocket, Supabase, and AI remain out of scope.
+
+The older Phase 0/1 historical notes below are preserved for context; the Phase 4 statement above is the current implementation boundary.
 
 本階段已建立：
 

@@ -132,6 +132,7 @@ mod tests {
         let mut connection = Connection::open_in_memory().expect("connection");
         run(&mut connection).expect("first run");
         run(&mut connection).expect("second run");
+        assert_eq!(super::current_version(&connection).expect("version"), 1);
         assert_eq!(
             connection
                 .query_row("SELECT count(*) FROM schema_migrations", [], |row| row

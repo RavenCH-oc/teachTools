@@ -7,6 +7,9 @@
     ".": "./src/index.ts"
   },
   "types": "./src/index.ts",
+  "dependencies": {
+    "@classtools/domain": "workspace:*"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

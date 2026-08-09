@@ -49,6 +49,18 @@ impl QuestionSetRepository {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
+    pub fn update(
+        database: &Database,
+        id: &str,
+        lesson_id: Option<String>,
+        title: String,
+        description: Option<String>,
+    ) -> Result<QuestionSet, AppError> {
+        validate_name(&title)?;
+        let c = database.connection()?;
+        if c.execute("UPDATE question_sets SET lesson_id=?1,title=?2,description=?3,updated_at=?4 WHERE id=?5", params![lesson_id, title, description, now_utc(), id]).map_err(map_write_error)? == 0 { return Err(AppError::NotFound("question set".to_owned())); }
+        Self::get(database, id)?.ok_or(AppError::Storage)
+    }
     pub fn delete(database: &Database, id: &str) -> Result<(), AppError> {
         let c = database.connection()?;
         if c.execute("DELETE FROM question_sets WHERE id=?1", [id])

@@ -32,7 +32,7 @@ export function App({ api = teacherApi }: AppProps) {
 
   const pageTitle = useMemo(() => nav.find((item) => item.id === page)?.label ?? "Home", [page]);
   return <div className="teacher-shell">
-    <header className="teacher-header"><div><p className="eyebrow">Teacher workspace</p><h1>{APP_NAME}</h1></div><span className="phase-badge">Phase 3</span></header>
+    <header className="teacher-header"><div><p className="eyebrow">Teacher workspace</p><h1>{APP_NAME}</h1></div><span className="phase-badge">Phase 4</span></header>
     <div className="teacher-body">
       <nav aria-label="Teacher navigation" className="teacher-nav">
         {nav.map((item) => <button className={`nav-item ${page === item.id ? "active" : ""}`} key={item.id} onClick={() => setPage(item.id)} type="button">{item.label}</button>)}
@@ -55,7 +55,7 @@ export function App({ api = teacherApi }: AppProps) {
 }
 
 function Home({ classrooms, courses, onNavigate }: { classrooms: Classroom[]; courses: Course[]; onNavigate: (page: Page) => void }) {
-  return <><div className="page-heading"><div><p className="eyebrow">Overview</p><h2>Ready for your next class.</h2><p className="intro">Manage your local teaching workspace from one calm, focused place.</p></div><span className="ready-pill"><span />Local storage ready</span></div><section className="overview-grid"><button className="overview-card" onClick={() => onNavigate("classrooms")} type="button"><span className="card-label">Classrooms</span><strong>{classrooms.length}</strong><small>Manage your groups and students</small></button><button className="overview-card" onClick={() => onNavigate("courses")} type="button"><span className="card-label">Courses</span><strong>{courses.length}</strong><small>Organize your lesson plans</small></button><div className="overview-card muted"><span className="card-label">Coming later</span><strong>Sessions</strong><small>Live classroom workflows stay out of Phase 3.</small></div></section></>;
+  return <><div className="page-heading"><div><p className="eyebrow">Overview</p><h2>Ready for your next class.</h2><p className="intro">Manage your local teaching workspace from one calm, focused place.</p></div><span className="ready-pill"><span />Local storage ready</span></div><section className="overview-grid"><button className="overview-card" onClick={() => onNavigate("classrooms")} type="button"><span className="card-label">Classrooms</span><strong>{classrooms.length}</strong><small>Manage your groups and students</small></button><button className="overview-card" onClick={() => onNavigate("courses")} type="button"><span className="card-label">Courses</span><strong>{courses.length}</strong><small>Organize your lesson plans</small></button><div className="overview-card muted"><span className="card-label">Coming later</span><strong>Sessions</strong><small>Live classroom workflows stay out of Phase 4.</small></div></section></>;
 }
 
 function Classrooms({ api, data, onChange, onError }: { api: TeacherApi; data: Classroom[]; onChange: (items: Classroom[]) => void; onError: (message: string) => void }) {

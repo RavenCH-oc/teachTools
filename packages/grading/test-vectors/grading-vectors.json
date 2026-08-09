@@ -1,0 +1,38 @@
+[
+  {
+    "name": "true-false-correct",
+    "question": { "id": "q-tf", "questionSetId": "set", "type": "true_false", "prompt": "The sky is blue.", "points": 2, "position": 0, "metadata": {}, "configVersion": 1, "answerConfig": { "correctAnswer": true }, "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z" },
+    "answer": { "type": "true_false", "value": true },
+    "expected": { "status": "graded", "correct": true, "score": 2, "maxScore": 2 }
+  },
+  {
+    "name": "single-choice-incorrect",
+    "question": { "id": "q-sc", "questionSetId": "set", "type": "single_choice", "prompt": "Pick A.", "points": 3, "position": 0, "metadata": {}, "configVersion": 1, "answerConfig": { "options": [{ "id": "a", "text": "A" }, { "id": "b", "text": "B" }], "correctOptionId": "a" }, "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z" },
+    "answer": { "type": "single_choice", "optionId": "b" },
+    "expected": { "status": "graded", "correct": false, "score": 0, "maxScore": 3 }
+  },
+  {
+    "name": "multiple-choice-exact-set-order-independent",
+    "question": { "id": "q-mc", "questionSetId": "set", "type": "multiple_choice", "prompt": "Pick A and C.", "points": 4, "position": 0, "metadata": {}, "configVersion": 1, "answerConfig": { "options": [{ "id": "a", "text": "A" }, { "id": "b", "text": "B" }, { "id": "c", "text": "C" }], "correctOptionIds": ["a", "c"] }, "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z" },
+    "answer": { "type": "multiple_choice", "optionIds": ["c", "a"] },
+    "expected": { "status": "graded", "correct": true, "score": 4, "maxScore": 4 }
+  },
+  {
+    "name": "fill-blank-normalization-and-alternative",
+    "question": { "id": "q-fill", "questionSetId": "set", "type": "fill_blank", "prompt": "Name the country.", "points": 5, "position": 0, "metadata": {}, "configVersion": 1, "answerConfig": { "blanks": [{ "id": "country", "acceptedAnswers": ["Taiwan", "臺灣"] }], "normalization": { "trim": true, "unicodeNormalization": "NFKC", "caseSensitive": false } }, "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z" },
+    "answer": { "type": "fill_blank", "values": { "country": "  TAIWAN  " } },
+    "expected": { "status": "graded", "correct": true, "score": 5, "maxScore": 5 }
+  },
+  {
+    "name": "fill-blank-missing-part-is-zero",
+    "question": { "id": "q-fill-two", "questionSetId": "set", "type": "fill_blank", "prompt": "Complete both.", "points": 5, "position": 0, "metadata": {}, "configVersion": 1, "answerConfig": { "blanks": [{ "id": "one", "acceptedAnswers": ["1"] }, { "id": "two", "acceptedAnswers": ["2"] }], "normalization": { "trim": true, "unicodeNormalization": "NFKC", "caseSensitive": false } }, "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z" },
+    "answer": { "type": "fill_blank", "values": { "one": "1" } },
+    "expected": { "status": "graded", "correct": false, "score": 0, "maxScore": 5 }
+  },
+  {
+    "name": "essay-is-pending",
+    "question": { "id": "q-essay", "questionSetId": "set", "type": "essay", "prompt": "Explain.", "points": 6, "position": 0, "metadata": {}, "configVersion": 1, "answerConfig": {}, "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z" },
+    "answer": { "type": "essay", "text": "A considered response." },
+    "expected": { "status": "pending", "score": null, "maxScore": 6 }
+  }
+]

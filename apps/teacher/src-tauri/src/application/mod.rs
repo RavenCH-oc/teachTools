@@ -8,6 +8,11 @@ use crate::infrastructure::persistence::repositories::{
     Classroom, ClassroomRepository, Course, CourseRepository, Lesson, LessonRepository,
     NewClassroom, NewCourse, NewLesson, NewStudent, Student, StudentRepository,
 };
+mod questions;
+pub use questions::{
+    CreateQuestionRequest, CreateQuestionSetRequest, QuestionDto, QuestionSetDto,
+    UpdateQuestionRequest, UpdateQuestionSetRequest,
+};
 
 pub struct PersistenceService {
     database: Database,

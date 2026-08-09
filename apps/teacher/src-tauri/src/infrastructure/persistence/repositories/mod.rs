@@ -8,6 +8,8 @@ pub(crate) mod student;
 pub use classroom::{Classroom, ClassroomRepository, NewClassroom};
 pub use course::{Course, CourseRepository, NewCourse};
 pub use lesson::{Lesson, LessonRepository, NewLesson};
+pub use question::{NewQuestion, Question, QuestionRepository};
+pub use question_set::{NewQuestionSet, QuestionSet, QuestionSetRepository};
 pub use student::{NewStudent, Student, StudentRepository};
 
 use crate::error::AppError;
