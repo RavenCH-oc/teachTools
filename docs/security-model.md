@@ -32,3 +32,11 @@ Supabase publishable 或 anon credential 可以暴露於 client bundle，但不�
 雲端只保留最小 runtime 資料。學生姓名、座號、答案、成績與教師設定都是敏感資料；系統需支援未來的 retention、刪除、匯出與匿名化。log 只能記錄足以診斷的資料，禁止記錄 secret、participant token、完整 request body、完整答案、不必要的學生姓名或敏感 SQL payload。
 
 Production log level 為 ERROR/WARN/INFO/DEBUG/TRACE，但較高診斷層級不可放寬敏感資料規則。診斷匯出必須再次進行 redaction。
+
+## Phase 6 local QuestionAsset boundary
+
+Question media is imported only through the Teacher dialog and a narrow Rust command. Rust accepts PNG, JPEG, WebP, and PDF only after extension and signature validation, rejects SVG and all other media, applies 20 MiB image and 100 MiB PDF limits, and never moves or deletes the selected source file.
+
+The application writes copies only to its managed app-data `assets/` directory. Destination paths are generated from UUIDv7 IDs, persistent metadata stores a relative managed path and SHA-256 checksum, and no source absolute path is persisted. Storage-path traversal, absolute overrides, unsafe display names, and raw I/O errors are rejected or hidden behind controlled application errors. Tauri asset-protocol scope is limited to the managed asset directory; no broad filesystem plugin capability is granted.
+
+Public Question projection includes only safe asset identity, type, display name, MIME type, size, position, and optional PDF page reference. It excludes source paths, managed paths, checksums, correct answers, and grading configuration.

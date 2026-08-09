@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Allow the Teacher window to select image and PDF files for managed Question assets.",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-open"]
+}

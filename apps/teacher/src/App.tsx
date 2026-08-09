@@ -33,7 +33,7 @@ export function App({ api = teacherApi }: AppProps) {
 
   const pageTitle = useMemo(() => nav.find((item) => item.id === page)?.label ?? "Home", [page]);
   return <div className="teacher-shell">
-    <header className="teacher-header"><div><p className="eyebrow">Teacher workspace</p><h1>{APP_NAME}</h1></div><span className="phase-badge">Phase 5</span></header>
+    <header className="teacher-header"><div><p className="eyebrow">Teacher workspace</p><h1>{APP_NAME}</h1></div><span className="phase-badge">Phase 6</span></header>
     <div className="teacher-body">
       <nav aria-label="Teacher navigation" className="teacher-nav">
         {nav.map((item) => <button className={`nav-item ${page === item.id ? "active" : ""}`} key={item.id} onClick={() => setPage(item.id)} type="button">{item.label}</button>)}

@@ -48,4 +48,9 @@ export const teacherApi: TeacherApi = {
   updateQuestion: (id, request) => call("update_question", { id, request }),
   deleteQuestion: (id) => call("delete_question", { id }),
   reorderQuestions: (questionSetId, orderedQuestionIds) => call("reorder_questions", { request: { questionSetId, orderedQuestionIds } }),
+  listQuestionAssets: (questionId) => call("list_question_assets", { questionId }),
+  importQuestionAsset: (questionId, sourcePath) => call("import_question_asset", { request: { questionId, sourcePath } }),
+  deleteQuestionAsset: (assetId) => call("delete_question_asset", { assetId }),
+  getQuestionAssetPreview: (assetId) => call("get_question_asset_preview", { assetId }),
+  updateQuestionAssetPageReference: (assetId, pageReference) => call("update_question_asset_page_reference", { assetId, request: { pageReference } }),
 };

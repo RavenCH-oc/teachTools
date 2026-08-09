@@ -2,6 +2,7 @@ pub(crate) mod classroom;
 mod course;
 mod lesson;
 pub(crate) mod question;
+pub(crate) mod question_asset;
 pub(crate) mod question_set;
 pub(crate) mod student;
 
@@ -9,6 +10,7 @@ pub use classroom::{Classroom, ClassroomRepository, NewClassroom};
 pub use course::{Course, CourseRepository, NewCourse};
 pub use lesson::{Lesson, LessonRepository, NewLesson};
 pub use question::{NewQuestion, Question, QuestionRepository};
+pub use question_asset::{NewQuestionAsset, QuestionAsset, QuestionAssetRepository};
 pub use question_set::{NewQuestionSet, QuestionSet, QuestionSetRepository};
 pub use student::{NewStudent, Student, StudentRepository};
 

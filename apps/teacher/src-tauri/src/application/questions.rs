@@ -321,7 +321,7 @@ impl PersistenceService {
         question_dto(raw)
     }
     pub fn delete_question(&self, id: String) -> Result<(), AppError> {
-        QuestionRepository::delete(&self.database, &id)
+        self.delete_question_with_assets(&id)
     }
     pub fn reorder_questions(
         &self,

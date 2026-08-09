@@ -8,7 +8,12 @@ use crate::infrastructure::persistence::repositories::{
     Classroom, ClassroomRepository, Course, CourseRepository, Lesson, LessonRepository,
     NewClassroom, NewCourse, NewLesson, NewStudent, Student, StudentRepository,
 };
+mod assets;
 mod questions;
+pub use assets::{
+    ImportQuestionAssetRequest, QuestionAssetDto, QuestionAssetPreviewDto,
+    UpdateQuestionAssetPageReferenceRequest,
+};
 pub use questions::{
     CreateQuestionRequest, CreateQuestionSetRequest, QuestionDto, QuestionSetDto,
     ReorderQuestionsRequest, UpdateQuestionRequest, UpdateQuestionSetRequest,
@@ -16,13 +21,16 @@ pub use questions::{
 
 pub struct PersistenceService {
     database: Database,
+    assets: assets::AssetService,
 }
 
 impl PersistenceService {
     pub fn initialize(app_data_dir: impl AsRef<Path>) -> Result<Self, AppError> {
+        let app_data_dir = app_data_dir.as_ref();
         let database = Database::open_in_app_data(app_data_dir)?;
         database.initialize()?;
-        Ok(Self { database })
+        let assets = assets::AssetService::initialize(database.clone(), app_data_dir)?;
+        Ok(Self { database, assets })
     }
     pub fn status(&self) -> Result<LocalDatabaseStatus, AppError> {
         Ok(LocalDatabaseStatus::from(self.database.status()?))
@@ -170,6 +178,37 @@ impl PersistenceService {
     }
     pub fn delete_lesson(&self, id: String) -> Result<(), AppError> {
         LessonRepository::delete(&self.database, &id)
+    }
+    pub fn list_question_assets(
+        &self,
+        question_id: String,
+    ) -> Result<Vec<QuestionAssetDto>, AppError> {
+        self.assets.list_by_question(question_id)
+    }
+    pub fn import_question_asset(
+        &self,
+        request: ImportQuestionAssetRequest,
+    ) -> Result<QuestionAssetDto, AppError> {
+        self.assets.import(request)
+    }
+    pub fn delete_question_asset(&self, asset_id: String) -> Result<(), AppError> {
+        self.assets.delete(asset_id)
+    }
+    pub fn get_question_asset_preview(
+        &self,
+        asset_id: String,
+    ) -> Result<QuestionAssetPreviewDto, AppError> {
+        self.assets.get_preview(asset_id)
+    }
+    pub fn update_question_asset_page_reference(
+        &self,
+        asset_id: String,
+        request: UpdateQuestionAssetPageReferenceRequest,
+    ) -> Result<QuestionAssetDto, AppError> {
+        self.assets.update_page_reference(asset_id, request)
+    }
+    pub(crate) fn delete_question_with_assets(&self, question_id: &str) -> Result<(), AppError> {
+        self.assets.delete_question_with_assets(question_id)
     }
 }
 

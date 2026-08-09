@@ -6,8 +6,9 @@ mod question_domain;
 
 use application::{
     CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateQuestionRequest,
-    CreateQuestionSetRequest, CreateStudentRequest, LocalDatabaseStatus, PersistenceService,
-    ReorderQuestionsRequest, UpdateClassroomRequest, UpdateCourseRequest, UpdateLessonRequest,
+    CreateQuestionSetRequest, CreateStudentRequest, ImportQuestionAssetRequest,
+    LocalDatabaseStatus, PersistenceService, ReorderQuestionsRequest, UpdateClassroomRequest,
+    UpdateCourseRequest, UpdateLessonRequest, UpdateQuestionAssetPageReferenceRequest,
     UpdateQuestionRequest, UpdateQuestionSetRequest, UpdateStudentRequest,
 };
 use error::AppError;
@@ -24,7 +25,7 @@ pub struct RuntimeInfo {
 fn get_app_runtime_info() -> RuntimeInfo {
     RuntimeInfo {
         app_name: "Classroom",
-        phase: "Phase 5",
+        phase: "Phase 6",
     }
 }
 
@@ -226,8 +227,50 @@ fn reorder_questions(
     state.reorder_questions(request)
 }
 
+#[tauri::command]
+fn list_question_assets(
+    state: tauri::State<'_, PersistenceService>,
+    question_id: String,
+) -> Result<Vec<application::QuestionAssetDto>, AppError> {
+    state.list_question_assets(question_id)
+}
+
+#[tauri::command]
+fn import_question_asset(
+    state: tauri::State<'_, PersistenceService>,
+    request: ImportQuestionAssetRequest,
+) -> Result<application::QuestionAssetDto, AppError> {
+    state.import_question_asset(request)
+}
+
+#[tauri::command]
+fn delete_question_asset(
+    state: tauri::State<'_, PersistenceService>,
+    asset_id: String,
+) -> Result<(), AppError> {
+    state.delete_question_asset(asset_id)
+}
+
+#[tauri::command]
+fn get_question_asset_preview(
+    state: tauri::State<'_, PersistenceService>,
+    asset_id: String,
+) -> Result<application::QuestionAssetPreviewDto, AppError> {
+    state.get_question_asset_preview(asset_id)
+}
+
+#[tauri::command]
+fn update_question_asset_page_reference(
+    state: tauri::State<'_, PersistenceService>,
+    asset_id: String,
+    request: UpdateQuestionAssetPageReferenceRequest,
+) -> Result<application::QuestionAssetDto, AppError> {
+    state.update_question_asset_page_reference(asset_id, request)
+}
+
 pub fn run() -> Result<(), String> {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data_dir = app
                 .path()
@@ -267,7 +310,12 @@ pub fn run() -> Result<(), String> {
             create_question,
             update_question,
             delete_question,
-            reorder_questions
+            reorder_questions,
+            list_question_assets,
+            import_question_asset,
+            delete_question_asset,
+            get_question_asset_preview,
+            update_question_asset_page_reference
         ])
         .run(tauri::generate_context!())
         .map_err(|error| error.to_string())
@@ -293,10 +341,10 @@ mod tests {
     fn runtime_info_has_the_phase_marker() {
         let info = RuntimeInfo {
             app_name: "Classroom",
-            phase: "Phase 5",
+            phase: "Phase 6",
         };
         assert_eq!(info.app_name, "Classroom");
-        assert_eq!(info.phase, "Phase 5");
+        assert_eq!(info.phase, "Phase 6");
     }
 
     #[test]

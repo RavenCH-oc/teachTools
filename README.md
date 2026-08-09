@@ -2,11 +2,11 @@
 
 Classroom 是教師主控、學生以瀏覽器加入的課堂互動教學軟體。本倉庫目前處於 Phase 1：Monorepo / Application Skeleton。
 
-## Current implementation phase: Phase 5
+## Current implementation phase: Phase 6
 
-Phase 5 includes the typed Question Bank and Question Editor UI on top of the Phase 4 contracts, including local CRUD, five editors, validation UX, ordering, and answer-safe teacher preview. Quiz sessions, student answering, assets, HTTP/WebSocket, Supabase, and AI remain out of scope.
+Phase 6 adds the local Question image/PDF media foundation: Rust-validated imports into app-managed storage, persisted QuestionAsset metadata and checksums, safe Teacher previews, PDF page references, lifecycle cleanup, and answer-safe public media projection. Student media delivery, quiz sessions, HTTP/WebSocket, Supabase, OCR, and AI remain out of scope.
 
-The older Phase 0/1 historical notes below are preserved for context; the Phase 5 statement above is the current implementation boundary.
+The older Phase 0/1 historical notes below are preserved for context; the Phase 6 statement above is the current implementation boundary.
 
 本階段已建立：
 

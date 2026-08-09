@@ -10,6 +10,14 @@ pub enum AppError {
     NotFound(String),
     #[error("resource conflict")]
     Conflict(String),
+    #[error("unsupported media type")]
+    UnsupportedMediaType,
+    #[error("file exceeds the supported size limit")]
+    FileTooLarge,
+    #[error("managed asset is missing")]
+    AssetMissing,
+    #[error("managed asset failed its integrity check")]
+    AssetCorrupted,
     #[error("database operation failed")]
     Storage,
     #[error("database migration failed")]
@@ -42,6 +50,26 @@ impl Serialize for AppError {
             Self::Conflict(_) => (
                 "conflict",
                 "The operation conflicts with existing data.",
+                false,
+            ),
+            Self::UnsupportedMediaType => (
+                "unsupported_media_type",
+                "Only PNG, JPEG, WebP, and PDF files can be imported.",
+                false,
+            ),
+            Self::FileTooLarge => (
+                "file_too_large",
+                "The selected file exceeds the supported size limit.",
+                false,
+            ),
+            Self::AssetMissing => (
+                "asset_missing",
+                "The managed asset file is missing. You can remove the attachment and import it again.",
+                false,
+            ),
+            Self::AssetCorrupted => (
+                "asset_corrupted",
+                "The managed asset file did not pass its integrity check. You can remove the attachment and import it again.",
                 false,
             ),
             Self::Storage => (

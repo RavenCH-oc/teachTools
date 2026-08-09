@@ -29,13 +29,28 @@ export interface QuestionSet { id: string; lessonId: string | null; title: strin
 export interface CreateQuestionSetInput { lessonId?: string | null; title: string; description?: string | null }
 export interface UpdateQuestionSetInput extends CreateQuestionSetInput { id: string }
 
+export type QuestionAssetType = "image" | "pdf";
+export type QuestionAssetStatus = "ready" | "missing";
+export interface QuestionAsset {
+  id: string; questionId: string; assetType: QuestionAssetType; displayName: string; mimeType: string;
+  sizeBytes: number; position: number; pageReference: number | null; createdAt: string; status: QuestionAssetStatus;
+}
+export interface QuestionAssetPreview extends QuestionAsset { assetUrl: string }
+export interface QuestionPublicAsset {
+  id: string; assetType: QuestionAssetType; displayName: string; mimeType: string;
+  sizeBytes: number; position: number; pageReference: number | null;
+}
+
 export interface TrueFalseAnswer { type: "true_false"; value: boolean }
 export interface SingleChoiceAnswer { type: "single_choice"; optionId: string }
 export interface MultipleChoiceAnswer { type: "multiple_choice"; optionIds: string[] }
 export interface FillBlankAnswer { type: "fill_blank"; values: Record<string, string> }
 export interface EssayAnswer { type: "essay"; text: string }
 export type StudentAnswer = TrueFalseAnswer | SingleChoiceAnswer | MultipleChoiceAnswer | FillBlankAnswer | EssayAnswer;
-export type QuestionPublicView = Omit<Question, "answerConfig"> & { type: QuestionType };
+export type QuestionPublicView = Omit<Question, "answerConfig"> & {
+  type: QuestionType;
+  assets: QuestionPublicAsset[];
+};
 
 export interface Student { id: string; displayName: string; seatNumber: number | null }
 export interface Session { id: string; state: "CREATED" | "LOBBY" | "ACTIVE" | "PAUSED" | "ENDED" | "ARCHIVED" }

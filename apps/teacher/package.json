@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/plugin-dialog": "^2.2.0",
     "@classtools/domain": "workspace:*",
     "@classtools/validation": "workspace:*",
     "@classtools/shared": "workspace:*",

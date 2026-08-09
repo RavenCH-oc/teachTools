@@ -1,9 +1,9 @@
-import type { Question } from "@classtools/domain";
+import type { Question, QuestionAsset } from "@classtools/domain";
 import { questionToPublicView } from "./helpers";
 
-export function QuestionPreview({ question }: { question: Question }) {
-  const preview = questionToPublicView(question);
-  return <section className="preview-card" aria-label="Teacher preview"><div className="preview-header"><span className="eyebrow">Public preview</span><span>{question.points} point{question.points === 1 ? "" : "s"}</span></div><h3>{preview.prompt || "Untitled question"}</h3>{preview.type === "true_false" && <div className="preview-options"><span>True</span><span>False</span></div>}{(preview.type === "single_choice" || preview.type === "multiple_choice") && <div className="preview-options">{preview.options?.map((option) => <span key={option.id}>{option.text || "Untitled option"}</span>)}</div>}{preview.type === "fill_blank" && <p className="preview-placeholder">Fill in {preview.blankCount} blank{preview.blankCount === 1 ? "" : "s"}.</p>}{preview.type === "essay" && <div className="preview-essay">Student response area</div>}<small className="preview-safe-note">Preview excludes correct answers and grading configuration.</small></section>;
+export function QuestionPreview({ question, assets = [] }: { question: Question; assets?: QuestionAsset[] }) {
+  const preview = questionToPublicView(question, assets);
+  return <section className="preview-card" aria-label="Teacher preview"><div className="preview-header"><span className="eyebrow">Public preview</span><span>{question.points} point{question.points === 1 ? "" : "s"}</span></div><h3>{preview.prompt || "Untitled question"}</h3>{preview.type === "true_false" && <div className="preview-options"><span>True</span><span>False</span></div>}{(preview.type === "single_choice" || preview.type === "multiple_choice") && <div className="preview-options">{preview.options?.map((option) => <span key={option.id}>{option.text || "Untitled option"}</span>)}</div>}{preview.type === "fill_blank" && <p className="preview-placeholder">Fill in {preview.blankCount} blank{preview.blankCount === 1 ? "" : "s"}.</p>}{preview.type === "essay" && <div className="preview-essay">Student response area</div>}{preview.assets.length > 0 && <div className="preview-assets" aria-label="Public media references">{preview.assets.map((asset) => <span key={asset.id}>{asset.assetType === "pdf" ? "PDF" : "Image"}: {asset.displayName}{asset.pageReference ? ` · page ${asset.pageReference}` : ""}</span>)}</div>}<small className="preview-safe-note">Preview excludes correct answers, grading configuration, file paths, and checksums.</small></section>;
 }
 
 export function AnswerSummary({ question }: { question: Question }) {

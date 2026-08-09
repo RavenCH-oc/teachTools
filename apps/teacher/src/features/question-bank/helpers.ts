@@ -1,4 +1,4 @@
-import type { CreateQuestionInput, Question, QuestionDraft, QuestionPublicView, QuestionSet, QuestionType } from "@classtools/domain";
+import type { CreateQuestionInput, Question, QuestionAsset, QuestionDraft, QuestionPublicView, QuestionSet, QuestionType } from "@classtools/domain";
 import { questionDraftSchema } from "@classtools/validation";
 import { newStableId } from "./ids";
 
@@ -31,11 +31,12 @@ export function questionToDraft(question: Question): QuestionDraft {
 }
 
 export type QuestionPreviewModel = QuestionPublicView & { options?: Array<{ id: string; text: string }>; blankCount?: number };
-export function questionToPublicView(question: Question): QuestionPreviewModel {
+export function questionToPublicView(question: Question, assets: QuestionAsset[] = []): QuestionPreviewModel {
   const { answerConfig, ...publicQuestion } = question;
-  if (question.type === "single_choice" || question.type === "multiple_choice") return { ...publicQuestion, options: (answerConfig as Extract<Question["answerConfig"], { options: unknown[] }>).options };
-  if (question.type === "fill_blank") return { ...publicQuestion, blankCount: (answerConfig as Extract<Question["answerConfig"], { blanks: unknown[] }>).blanks.length };
-  return publicQuestion;
+  const publicAssets = assets.map(({ id, assetType, displayName, mimeType, sizeBytes, position, pageReference }) => ({ id, assetType, displayName, mimeType, sizeBytes, position, pageReference }));
+  if (question.type === "single_choice" || question.type === "multiple_choice") return { ...publicQuestion, assets: publicAssets, options: (answerConfig as Extract<Question["answerConfig"], { options: unknown[] }>).options };
+  if (question.type === "fill_blank") return { ...publicQuestion, assets: publicAssets, blankCount: (answerConfig as Extract<Question["answerConfig"], { blanks: unknown[] }>).blanks.length };
+  return { ...publicQuestion, assets: publicAssets };
 }
 
 export function validateDraft(draft: QuestionDraft): string[] {

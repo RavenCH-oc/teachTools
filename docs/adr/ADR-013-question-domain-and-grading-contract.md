@@ -10,7 +10,7 @@ Questions use a discriminated union for `true_false`, `single_choice`, `multiple
 
 The TypeScript grading package is reusable for editor previews and future cloud adapters. The Rust grading module consumes the same checked-in JSON vectors and is the authoritative local grading boundary. Neither implementation depends on React, Tauri, SQLite, network services, or Supabase.
 
-Persisted question configuration is version `1`. The existing `0001_initial_local_schema.sql` already contains the required QuestionSet/Question tables and JSON configuration columns, so it remains immutable and no `0002` migration is needed. Points use the existing integer column and must be positive.
+Persisted question configuration is version `1`. The existing `0001_initial_local_schema.sql` already contains the required QuestionSet/Question tables and JSON configuration columns, so it remains immutable. Phase 6 later adds `0002_question_assets_foundation.sql` only for QuestionAsset checksum and PDF page-reference columns; it does not alter Question configuration. Points use the existing integer column and must be positive.
 
 Question authoring DTOs contain answer configuration; any future student/public DTO must be a separate projection and must not expose correct answers or accepted answers.
 
@@ -19,4 +19,4 @@ Question authoring DTOs contain answer configuration; any future student/public 
 - Zod validates frontend/editor inputs while Rust validates all persisted/application inputs authoritatively.
 - Invalid answer structures are structured grading errors, not incorrect scores.
 - QuestionSet deletion remains restricted while questions exist and is exposed as a safe conflict error.
-- Teacher Question Bank, editor, and answer-safe preview UI are implemented in Phase 5; session answering, assets, and cloud/realtime behavior remain future work.
+- Teacher Question Bank, editor, and answer-safe preview UI are implemented in Phase 5. Phase 6 adds local QuestionAsset storage and safe Teacher media preview; session answering and cloud/realtime behavior remain future work.

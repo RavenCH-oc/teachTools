@@ -7,8 +7,8 @@ export interface CreateClassroomRequest { name: string; academic_year?: string |
 export interface CreateStudentRequest { class_id: string; seat_number: number; name: string }
 export interface CreateCourseRequest { name: string; description?: string | null }
 export interface CreateLessonRequest { course_id: string; title: string; description?: string | null; position: number }
-import type { CreateQuestionInput, CreateQuestionSetInput, Question, QuestionSet, UpdateQuestionInput, UpdateQuestionSetInput } from "@classtools/domain";
-export type { Question, QuestionSet } from "@classtools/domain";
+import type { CreateQuestionInput, CreateQuestionSetInput, Question, QuestionAsset, QuestionAssetPreview, QuestionSet, UpdateQuestionInput, UpdateQuestionSetInput } from "@classtools/domain";
+export type { Question, QuestionAsset, QuestionAssetPreview, QuestionSet } from "@classtools/domain";
 
 export interface TeacherApi {
   getLocalDatabaseStatus(): Promise<LocalDatabaseStatus>
@@ -40,4 +40,9 @@ export interface TeacherApi {
   updateQuestion(id: string, request: Omit<UpdateQuestionInput, "id">): Promise<Question>
   deleteQuestion(id: string): Promise<void>
   reorderQuestions(questionSetId: string, orderedQuestionIds: string[]): Promise<Question[]>
+  listQuestionAssets(questionId: string): Promise<QuestionAsset[]>
+  importQuestionAsset(questionId: string, sourcePath: string): Promise<QuestionAsset>
+  deleteQuestionAsset(assetId: string): Promise<void>
+  getQuestionAssetPreview(assetId: string): Promise<QuestionAssetPreview>
+  updateQuestionAssetPageReference(assetId: string, pageReference: number | null): Promise<QuestionAsset>
 }
