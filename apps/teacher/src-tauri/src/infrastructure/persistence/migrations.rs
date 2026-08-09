@@ -1,0 +1,156 @@
+use rusqlite::{Connection, TransactionBehavior};
+use sha2::{Digest, Sha256};
+
+use crate::error::AppError;
+
+const INITIAL_SCHEMA: &str = include_str!("../../../migrations/0001_initial_local_schema.sql");
+
+struct Migration {
+    version: i64,
+    id: &'static str,
+    sql: &'static str,
+}
+
+const MIGRATIONS: &[Migration] = &[Migration {
+    version: 1,
+    id: "0001_initial_local_schema",
+    sql: INITIAL_SCHEMA,
+}];
+
+pub fn run(connection: &mut Connection) -> Result<(), AppError> {
+    connection.execute_batch(
+        "CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY NOT NULL,
+            migration_id TEXT NOT NULL UNIQUE,
+            checksum TEXT NOT NULL,
+            applied_at TEXT NOT NULL
+        )",
+    )?;
+
+    for migration in MIGRATIONS {
+        let expected_checksum = checksum(migration.sql);
+        let existing = connection
+            .query_row(
+                "SELECT migration_id, checksum FROM schema_migrations WHERE version = ?1",
+                [migration.version],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?;
+
+        if let Some((migration_id, actual_checksum)) = existing {
+            if migration_id != migration.id || actual_checksum != expected_checksum {
+                return Err(AppError::MigrationFailed(format!(
+                    "migration {} checksum mismatch",
+                    migration.version
+                )));
+            }
+            continue;
+        }
+
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        transaction.execute_batch(migration.sql).map_err(|_| {
+            AppError::MigrationFailed(format!("migration {} failed", migration.version))
+        })?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, migration_id, checksum, applied_at) VALUES (?1, ?2, ?3, ?4)",
+                rusqlite::params![migration.version, migration.id, expected_checksum, utc_now()],
+            )
+            .map_err(|_| AppError::MigrationFailed(format!("migration {} metadata failed", migration.version)))?;
+        transaction.commit().map_err(|_| {
+            AppError::MigrationFailed(format!("migration {} commit failed", migration.version))
+        })?;
+    }
+    Ok(())
+}
+
+pub fn verify(connection: &Connection) -> Result<(), AppError> {
+    let foreign_keys: i64 = connection.query_row("PRAGMA foreign_keys", [], |row| row.get(0))?;
+    if foreign_keys != 1 {
+        return Err(AppError::MigrationFailed(
+            "foreign key enforcement is disabled".to_owned(),
+        ));
+    }
+    let mut check = connection.prepare("PRAGMA foreign_key_check")?;
+    if check.exists([])? {
+        return Err(AppError::MigrationFailed(
+            "foreign key check failed".to_owned(),
+        ));
+    }
+    for table in [
+        "app_meta",
+        "classes",
+        "students",
+        "courses",
+        "lessons",
+        "question_sets",
+        "questions",
+        "question_assets",
+        "group_presets",
+    ] {
+        let exists: i64 = connection.query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+            [table],
+            |row| row.get(0),
+        )?;
+        if exists != 1 {
+            return Err(AppError::MigrationFailed(format!(
+                "required table {table} is missing"
+            )));
+        }
+    }
+    Ok(())
+}
+
+pub fn current_version(connection: &Connection) -> Result<i64, AppError> {
+    Ok(connection.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+        [],
+        |row| row.get(0),
+    )?)
+}
+
+fn checksum(sql: &str) -> String {
+    format!("{:x}", Sha256::digest(sql.as_bytes()))
+}
+
+fn utc_now() -> String {
+    time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_owned())
+}
+
+use rusqlite::OptionalExtension;
+
+#[cfg(test)]
+mod tests {
+    use super::run;
+    use rusqlite::Connection;
+
+    #[test]
+    fn migration_is_idempotent_and_records_checksum() {
+        let mut connection = Connection::open_in_memory().expect("connection");
+        run(&mut connection).expect("first run");
+        run(&mut connection).expect("second run");
+        assert_eq!(
+            connection
+                .query_row("SELECT count(*) FROM schema_migrations", [], |row| row
+                    .get::<_, i64>(0))
+                .expect("count"),
+            1
+        );
+    }
+
+    #[test]
+    fn checksum_mismatch_fails_closed() {
+        let mut connection = Connection::open_in_memory().expect("connection");
+        run(&mut connection).expect("first run");
+        connection
+            .execute(
+                "UPDATE schema_migrations SET checksum = 'tampered' WHERE version = 1",
+                [],
+            )
+            .expect("tamper metadata");
+        assert!(run(&mut connection).is_err());
+    }
+}

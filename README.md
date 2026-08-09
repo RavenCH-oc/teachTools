@@ -2,7 +2,7 @@
 
 Classroom 是教師主控、學生以瀏覽器加入的課堂互動教學軟體。本倉庫目前處於 Phase 1：Monorepo / Application Skeleton。
 
-## Current implementation phase: Phase 1
+## Current implementation phase: Phase 2
 
 本階段已建立：
 
