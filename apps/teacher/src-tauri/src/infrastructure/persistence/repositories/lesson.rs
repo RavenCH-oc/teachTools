@@ -64,6 +64,29 @@ impl LessonRepository {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
+    pub fn update(
+        database: &Database,
+        id: &str,
+        title: String,
+        description: Option<String>,
+        position: i64,
+    ) -> Result<Lesson, AppError> {
+        validate_name(&title)?;
+        if position < 0 {
+            return Err(AppError::Validation(
+                "position must not be negative".to_owned(),
+            ));
+        }
+        let c = database.connection()?;
+        if c.execute(
+            "UPDATE lessons SET title=?1,description=?2,position=?3,updated_at=?4 WHERE id=?5",
+            params![title, description, position, now_utc(), id],
+        )? == 0
+        {
+            return Err(AppError::NotFound("lesson".to_owned()));
+        }
+        Self::get(database, id)?.ok_or(AppError::Storage)
+    }
     pub fn delete(database: &Database, id: &str) -> Result<(), AppError> {
         let c = database.connection()?;
         if c.execute("DELETE FROM lessons WHERE id=?1", [id])

@@ -2,7 +2,11 @@ mod application;
 mod error;
 mod infrastructure;
 
-use application::{LocalDatabaseStatus, PersistenceService};
+use application::{
+    CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateStudentRequest,
+    LocalDatabaseStatus, PersistenceService, UpdateClassroomRequest, UpdateCourseRequest,
+    UpdateLessonRequest, UpdateStudentRequest,
+};
 use error::AppError;
 use serde::Serialize;
 use tauri::Manager;
@@ -31,8 +35,107 @@ fn get_local_database_status(
 #[tauri::command]
 fn list_classrooms(
     state: tauri::State<'_, PersistenceService>,
-) -> Result<Vec<infrastructure::persistence::repositories::Classroom>, AppError> {
+) -> Result<Vec<application::ClassroomDto>, AppError> {
     state.list_classrooms()
+}
+#[tauri::command]
+fn create_classroom(
+    state: tauri::State<'_, PersistenceService>,
+    request: CreateClassroomRequest,
+) -> Result<application::ClassroomDto, AppError> {
+    state.create_classroom(request)
+}
+#[tauri::command]
+fn update_classroom(
+    state: tauri::State<'_, PersistenceService>,
+    id: String,
+    request: UpdateClassroomRequest,
+) -> Result<application::ClassroomDto, AppError> {
+    state.update_classroom(id, request)
+}
+#[tauri::command]
+fn delete_classroom(
+    state: tauri::State<'_, PersistenceService>,
+    id: String,
+) -> Result<(), AppError> {
+    state.delete_classroom(id)
+}
+#[tauri::command]
+fn list_students(
+    state: tauri::State<'_, PersistenceService>,
+    class_id: String,
+) -> Result<Vec<application::StudentDto>, AppError> {
+    state.list_students(class_id)
+}
+#[tauri::command]
+fn create_student(
+    state: tauri::State<'_, PersistenceService>,
+    request: CreateStudentRequest,
+) -> Result<application::StudentDto, AppError> {
+    state.create_student(request)
+}
+#[tauri::command]
+fn update_student(
+    state: tauri::State<'_, PersistenceService>,
+    id: String,
+    request: UpdateStudentRequest,
+) -> Result<application::StudentDto, AppError> {
+    state.update_student(id, request)
+}
+#[tauri::command]
+fn delete_student(state: tauri::State<'_, PersistenceService>, id: String) -> Result<(), AppError> {
+    state.delete_student(id)
+}
+#[tauri::command]
+fn list_courses(
+    state: tauri::State<'_, PersistenceService>,
+) -> Result<Vec<application::CourseDto>, AppError> {
+    state.list_courses()
+}
+#[tauri::command]
+fn create_course(
+    state: tauri::State<'_, PersistenceService>,
+    request: CreateCourseRequest,
+) -> Result<application::CourseDto, AppError> {
+    state.create_course(request)
+}
+#[tauri::command]
+fn update_course(
+    state: tauri::State<'_, PersistenceService>,
+    id: String,
+    request: UpdateCourseRequest,
+) -> Result<application::CourseDto, AppError> {
+    state.update_course(id, request)
+}
+#[tauri::command]
+fn delete_course(state: tauri::State<'_, PersistenceService>, id: String) -> Result<(), AppError> {
+    state.delete_course(id)
+}
+#[tauri::command]
+fn list_lessons(
+    state: tauri::State<'_, PersistenceService>,
+    course_id: String,
+) -> Result<Vec<application::LessonDto>, AppError> {
+    state.list_lessons(course_id)
+}
+#[tauri::command]
+fn create_lesson(
+    state: tauri::State<'_, PersistenceService>,
+    request: CreateLessonRequest,
+) -> Result<application::LessonDto, AppError> {
+    state.create_lesson(request)
+}
+#[tauri::command]
+fn update_lesson(
+    state: tauri::State<'_, PersistenceService>,
+    id: String,
+    request: UpdateLessonRequest,
+) -> Result<application::LessonDto, AppError> {
+    state.update_lesson(id, request)
+}
+#[tauri::command]
+fn delete_lesson(state: tauri::State<'_, PersistenceService>, id: String) -> Result<(), AppError> {
+    state.delete_lesson(id)
 }
 
 pub fn run() -> Result<(), String> {
@@ -49,7 +152,22 @@ pub fn run() -> Result<(), String> {
         .invoke_handler(tauri::generate_handler![
             get_app_runtime_info,
             get_local_database_status,
-            list_classrooms
+            list_classrooms,
+            create_classroom,
+            update_classroom,
+            delete_classroom,
+            list_students,
+            create_student,
+            update_student,
+            delete_student,
+            list_courses,
+            create_course,
+            update_course,
+            delete_course,
+            list_lessons,
+            create_lesson,
+            update_lesson,
+            delete_lesson
         ])
         .run(tauri::generate_context!())
         .map_err(|error| error.to_string())

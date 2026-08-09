@@ -5,7 +5,10 @@ pub(crate) mod question;
 pub(crate) mod question_set;
 pub(crate) mod student;
 
-pub use classroom::{Classroom, ClassroomRepository};
+pub use classroom::{Classroom, ClassroomRepository, NewClassroom};
+pub use course::{Course, CourseRepository, NewCourse};
+pub use lesson::{Lesson, LessonRepository, NewLesson};
+pub use student::{NewStudent, Student, StudentRepository};
 
 use crate::error::AppError;
 
@@ -23,21 +26,20 @@ pub(crate) fn validate_name(name: &str) -> Result<(), AppError> {
     if name.trim().is_empty() {
         return Err(AppError::Validation("name must not be empty".to_owned()));
     }
+    if name.trim().len() > 200 {
+        return Err(AppError::Validation(
+            "name must be at most 200 characters".to_owned(),
+        ));
+    }
     Ok(())
 }
 
 pub(crate) fn map_write_error(error: rusqlite::Error) -> AppError {
     match error {
         rusqlite::Error::SqliteFailure(ref failure, _)
-            if failure.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE
-                || failure.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_PRIMARYKEY =>
+            if failure.code == rusqlite::ErrorCode::ConstraintViolation =>
         {
-            AppError::Conflict("a record with these values already exists".to_owned())
-        }
-        rusqlite::Error::SqliteFailure(ref failure, _)
-            if failure.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_FOREIGNKEY =>
-        {
-            AppError::Conflict("the referenced record does not exist".to_owned())
+            AppError::Conflict("the operation conflicts with existing data".to_owned())
         }
         _ => AppError::Storage,
     }

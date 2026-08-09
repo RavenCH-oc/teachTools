@@ -58,6 +58,30 @@ impl StudentRepository {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
+    pub fn update(
+        database: &Database,
+        id: &str,
+        seat_number: i64,
+        name: String,
+    ) -> Result<Student, AppError> {
+        validate_name(&name)?;
+        if seat_number <= 0 {
+            return Err(AppError::Validation(
+                "seat number must be positive".to_owned(),
+            ));
+        }
+        let connection = database.connection()?;
+        let changed = connection
+            .execute(
+                "UPDATE students SET seat_number=?1,name=?2,updated_at=?3 WHERE id=?4",
+                params![seat_number, name, now_utc(), id],
+            )
+            .map_err(map_write_error)?;
+        if changed == 0 {
+            return Err(AppError::NotFound("student".to_owned()));
+        }
+        Self::get(database, id)?.ok_or(AppError::Storage)
+    }
     pub fn delete(database: &Database, id: &str) -> Result<(), AppError> {
         let connection = database.connection()?;
         if connection.execute("DELETE FROM students WHERE id=?1", [id])? == 0 {

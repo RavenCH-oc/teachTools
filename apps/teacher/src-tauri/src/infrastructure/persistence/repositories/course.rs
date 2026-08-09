@@ -61,6 +61,23 @@ impl CourseRepository {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
+    pub fn update(
+        database: &Database,
+        id: &str,
+        name: String,
+        description: Option<String>,
+    ) -> Result<Course, AppError> {
+        validate_name(&name)?;
+        let c = database.connection()?;
+        if c.execute(
+            "UPDATE courses SET name=?1,description=?2,updated_at=?3 WHERE id=?4",
+            params![name, description, now_utc(), id],
+        )? == 0
+        {
+            return Err(AppError::NotFound("course".to_owned()));
+        }
+        Self::get(database, id)?.ok_or(AppError::Storage)
+    }
     pub fn delete(database: &Database, id: &str) -> Result<(), AppError> {
         let c = database.connection()?;
         if c.execute("DELETE FROM courses WHERE id=?1", [id])
