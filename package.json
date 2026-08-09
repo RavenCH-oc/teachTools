@@ -1,0 +1,33 @@
+{
+  "name": "classroom",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm dev:teacher",
+    "dev:teacher": "pnpm --filter @classtools/teacher dev",
+    "dev:student": "pnpm --filter @classtools/student dev",
+    "tauri:dev": "pnpm --filter @classtools/teacher tauri:dev",
+    "build": "pnpm --recursive --filter=!classroom run build",
+    "build:teacher": "pnpm --filter @classtools/teacher build",
+    "build:student": "pnpm --filter @classtools/student build",
+    "typecheck": "pnpm --recursive --filter=!classroom run typecheck",
+    "test": "pnpm --recursive --filter=!classroom run test",
+    "lint": "pnpm --recursive --filter=!classroom run lint"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/node": "^22.10.5",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.17.0",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.8"
+  }
+}
