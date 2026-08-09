@@ -1,0 +1,11 @@
+import type { Question } from "@classtools/domain";
+import { questionToPublicView } from "./helpers";
+
+export function QuestionPreview({ question }: { question: Question }) {
+  const preview = questionToPublicView(question);
+  return <section className="preview-card" aria-label="Teacher preview"><div className="preview-header"><span className="eyebrow">Public preview</span><span>{question.points} point{question.points === 1 ? "" : "s"}</span></div><h3>{preview.prompt || "Untitled question"}</h3>{preview.type === "true_false" && <div className="preview-options"><span>True</span><span>False</span></div>}{(preview.type === "single_choice" || preview.type === "multiple_choice") && <div className="preview-options">{preview.options?.map((option) => <span key={option.id}>{option.text || "Untitled option"}</span>)}</div>}{preview.type === "fill_blank" && <p className="preview-placeholder">Fill in {preview.blankCount} blank{preview.blankCount === 1 ? "" : "s"}.</p>}{preview.type === "essay" && <div className="preview-essay">Student response area</div>}<small className="preview-safe-note">Preview excludes correct answers and grading configuration.</small></section>;
+}
+
+export function AnswerSummary({ question }: { question: Question }) {
+  return <section className="answer-summary" aria-label="Correct answer summary"><div className="preview-header"><span className="eyebrow">Teacher answer summary</span></div>{question.type === "true_false" && <p>Correct answer: <strong>{question.answerConfig.correctAnswer ? "True" : "False"}</strong></p>}{question.type === "single_choice" && <p>Correct option: <strong>{question.answerConfig.options.find((option) => option.id === question.answerConfig.correctOptionId)?.text || "Not selected"}</strong></p>}{question.type === "multiple_choice" && <p>Correct options: <strong>{question.answerConfig.options.filter((option) => question.answerConfig.correctOptionIds.includes(option.id)).map((option) => option.text || "Untitled").join(", ") || "Not selected"}</strong></p>}{question.type === "fill_blank" && <ul>{question.answerConfig.blanks.map((blank, index) => <li key={blank.id}>Blank {index + 1}: <strong>{blank.acceptedAnswers.filter(Boolean).join(" / ") || "No accepted answer"}</strong></li>)}</ul>}{question.type === "essay" && <p>Essay grading remains <strong>pending</strong>.</p>}</section>;
+}

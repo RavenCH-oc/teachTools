@@ -11,7 +11,7 @@ use crate::infrastructure::persistence::repositories::{
 mod questions;
 pub use questions::{
     CreateQuestionRequest, CreateQuestionSetRequest, QuestionDto, QuestionSetDto,
-    UpdateQuestionRequest, UpdateQuestionSetRequest,
+    ReorderQuestionsRequest, UpdateQuestionRequest, UpdateQuestionSetRequest,
 };
 
 pub struct PersistenceService {
@@ -134,6 +134,12 @@ impl PersistenceService {
                 .map(Into::into)
                 .collect(),
         )
+    }
+    pub fn list_all_lessons(&self) -> Result<Vec<LessonDto>, AppError> {
+        Ok(LessonRepository::list_all(&self.database)?
+            .into_iter()
+            .map(Into::into)
+            .collect())
     }
     pub fn create_lesson(&self, request: CreateLessonRequest) -> Result<LessonDto, AppError> {
         Ok(LessonRepository::create(

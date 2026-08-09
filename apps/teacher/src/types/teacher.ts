@@ -25,6 +25,7 @@ export interface TeacherApi {
   updateCourse(id: string, request: CreateCourseRequest): Promise<Course>
   deleteCourse(id: string): Promise<void>
   listLessons(courseId: string): Promise<Lesson[]>
+  listAllLessons(): Promise<Lesson[]>
   createLesson(request: CreateLessonRequest): Promise<Lesson>
   updateLesson(id: string, request: Omit<CreateLessonRequest, "course_id">): Promise<Lesson>
   deleteLesson(id: string): Promise<void>
@@ -38,4 +39,5 @@ export interface TeacherApi {
   createQuestion(request: CreateQuestionInput): Promise<Question>
   updateQuestion(id: string, request: Omit<UpdateQuestionInput, "id">): Promise<Question>
   deleteQuestion(id: string): Promise<void>
+  reorderQuestions(questionSetId: string, orderedQuestionIds: string[]): Promise<Question[]>
 }

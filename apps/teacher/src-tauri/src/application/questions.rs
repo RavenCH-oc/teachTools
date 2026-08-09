@@ -86,6 +86,12 @@ pub struct UpdateQuestionRequest {
     #[serde(default = "default_config_version")]
     pub config_version: i64,
 }
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReorderQuestionsRequest {
+    pub question_set_id: String,
+    pub ordered_question_ids: Vec<String>,
+}
 
 fn empty_object() -> Value {
     serde_json::json!({})
@@ -317,6 +323,43 @@ impl PersistenceService {
     pub fn delete_question(&self, id: String) -> Result<(), AppError> {
         QuestionRepository::delete(&self.database, &id)
     }
+    pub fn reorder_questions(
+        &self,
+        request: ReorderQuestionsRequest,
+    ) -> Result<Vec<QuestionDto>, AppError> {
+        if QuestionSetRepository::get(&self.database, &request.question_set_id)?.is_none() {
+            return Err(AppError::NotFound("question set".to_owned()));
+        }
+        let current =
+            QuestionRepository::list_by_question_set(&self.database, &request.question_set_id)?;
+        let mut expected = current
+            .iter()
+            .map(|question| question.id.clone())
+            .collect::<Vec<_>>();
+        expected.sort();
+        let mut actual = request.ordered_question_ids.clone();
+        actual.sort();
+        if request.ordered_question_ids.len() != current.len() || actual != expected {
+            return Err(AppError::Validation(
+                "ordered question IDs must exactly match the question set".to_owned(),
+            ));
+        }
+        if request
+            .ordered_question_ids
+            .windows(2)
+            .any(|pair| pair[0] == pair[1])
+        {
+            return Err(AppError::Validation(
+                "ordered question IDs must be unique".to_owned(),
+            ));
+        }
+        QuestionRepository::reorder(
+            &self.database,
+            &request.question_set_id,
+            &request.ordered_question_ids,
+        )?;
+        self.list_questions(request.question_set_id)
+    }
 }
 impl From<QuestionSet> for QuestionSetDto {
     fn from(value: QuestionSet) -> Self {
@@ -539,5 +582,73 @@ mod tests {
             service.get_question(question.id),
             Err(AppError::Storage)
         ));
+    }
+
+    #[test]
+    fn reorder_questions_is_atomic_and_deterministic() {
+        let directory = tempfile::tempdir().expect("directory");
+        let service = PersistenceService::initialize(directory.path()).expect("service");
+        let set = service
+            .create_question_set(CreateQuestionSetRequest {
+                lesson_id: None,
+                title: "Set".to_owned(),
+                description: None,
+            })
+            .expect("set");
+        let questions = (0..3)
+            .map(|position| {
+                service
+                    .create_question(CreateQuestionRequest {
+                        position,
+                        ..request(
+                            &set.id,
+                            QuestionType::TrueFalse,
+                            QuestionConfiguration::TrueFalse(TrueFalseConfig {
+                                correct_answer: true,
+                            }),
+                            1,
+                        )
+                    })
+                    .expect("question")
+            })
+            .collect::<Vec<_>>();
+        let ordered = vec![
+            questions[2].id.clone(),
+            questions[0].id.clone(),
+            questions[1].id.clone(),
+        ];
+        let saved = service
+            .reorder_questions(ReorderQuestionsRequest {
+                question_set_id: set.id.clone(),
+                ordered_question_ids: ordered.clone(),
+            })
+            .expect("reorder");
+        assert_eq!(
+            saved
+                .iter()
+                .map(|question| question.id.clone())
+                .collect::<Vec<_>>(),
+            ordered
+        );
+        assert!(matches!(
+            service.reorder_questions(ReorderQuestionsRequest {
+                question_set_id: set.id.clone(),
+                ordered_question_ids: vec![
+                    questions[0].id.clone(),
+                    questions[0].id.clone(),
+                    questions[1].id.clone()
+                ],
+            }),
+            Err(AppError::Validation(_))
+        ));
+        assert_eq!(
+            service
+                .list_questions(set.id)
+                .expect("list")
+                .iter()
+                .map(|question| question.position)
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
     }
 }

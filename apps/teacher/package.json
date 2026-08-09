@@ -6,6 +6,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2.2.0",
     "@classtools/domain": "workspace:*",
+    "@classtools/validation": "workspace:*",
     "@classtools/shared": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

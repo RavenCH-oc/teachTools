@@ -159,6 +159,24 @@ impl QuestionRepository {
         }
         Ok(())
     }
+
+    pub fn reorder(
+        database: &Database,
+        question_set_id: &str,
+        ordered_ids: &[String],
+    ) -> Result<(), AppError> {
+        let mut connection = database.connection()?;
+        let transaction = connection.transaction()?;
+        for (position, id) in ordered_ids.iter().enumerate() {
+            transaction
+                .execute(
+                    "UPDATE questions SET position=?1, updated_at=?2 WHERE id=?3 AND question_set_id=?4",
+                    params![position as i64, now_utc(), id, question_set_id],
+                )
+                .map_err(map_write_error)?;
+        }
+        transaction.commit().map_err(map_write_error)
+    }
 }
 fn json(raw: String) -> Result<serde_json::Value, rusqlite::Error> {
     serde_json::from_str(&raw).map_err(|error| {

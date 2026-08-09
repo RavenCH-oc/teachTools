@@ -75,6 +75,9 @@ importers:
       '@classtools/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@classtools/validation':
+        specifier: workspace:*
+        version: link:../../packages/validation
       '@tauri-apps/api':
         specifier: ^2.2.0
         version: 2.11.1

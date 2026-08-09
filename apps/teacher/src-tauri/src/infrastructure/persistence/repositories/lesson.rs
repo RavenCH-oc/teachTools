@@ -64,6 +64,32 @@ impl LessonRepository {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
+    pub fn list_all(database: &Database) -> Result<Vec<Lesson>, AppError> {
+        let c = database.connection()?;
+        let mut s = c.prepare("SELECT id,course_id,title,description,content_metadata,position,created_at,updated_at FROM lessons ORDER BY course_id,position,id")?;
+        let rows = s
+            .query_map([], |r| {
+                let raw: String = r.get(4)?;
+                Ok(Lesson {
+                    id: r.get(0)?,
+                    course_id: r.get(1)?,
+                    title: r.get(2)?,
+                    description: r.get(3)?,
+                    content_metadata: serde_json::from_str(&raw).map_err(|error| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            4,
+                            rusqlite::types::Type::Text,
+                            Box::new(error),
+                        )
+                    })?,
+                    position: r.get(5)?,
+                    created_at: r.get(6)?,
+                    updated_at: r.get(7)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
     pub fn update(
         database: &Database,
         id: &str,

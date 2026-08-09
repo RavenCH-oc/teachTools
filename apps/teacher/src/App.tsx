@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { APP_NAME } from "@classtools/shared";
 import { teacherApi, TeacherApiError } from "./services/teacherApi";
 import type { Classroom, Course, Lesson, Student, TeacherApi } from "./types/teacher";
+import { QuestionBankPage } from "./features/question-bank/QuestionBankPage";
 
-type Page = "home" | "classrooms" | "students" | "courses" | "lessons";
+type Page = "home" | "classrooms" | "students" | "courses" | "lessons" | "question-bank";
 const nav: Array<{ id: Page; label: string }> = [
   { id: "home", label: "Home" }, { id: "classrooms", label: "Classrooms" }, { id: "students", label: "Students" },
-  { id: "courses", label: "Courses" }, { id: "lessons", label: "Lessons" },
+  { id: "courses", label: "Courses" }, { id: "lessons", label: "Lessons" }, { id: "question-bank", label: "Question Bank" },
 ];
-const later = ["Sessions", "Question Sets", "Settings"];
+const later = ["Sessions", "Settings"];
 
 interface AppProps { api?: TeacherApi }
 
@@ -32,7 +33,7 @@ export function App({ api = teacherApi }: AppProps) {
 
   const pageTitle = useMemo(() => nav.find((item) => item.id === page)?.label ?? "Home", [page]);
   return <div className="teacher-shell">
-    <header className="teacher-header"><div><p className="eyebrow">Teacher workspace</p><h1>{APP_NAME}</h1></div><span className="phase-badge">Phase 4</span></header>
+    <header className="teacher-header"><div><p className="eyebrow">Teacher workspace</p><h1>{APP_NAME}</h1></div><span className="phase-badge">Phase 5</span></header>
     <div className="teacher-body">
       <nav aria-label="Teacher navigation" className="teacher-nav">
         {nav.map((item) => <button className={`nav-item ${page === item.id ? "active" : ""}`} key={item.id} onClick={() => setPage(item.id)} type="button">{item.label}</button>)}
@@ -48,6 +49,7 @@ export function App({ api = teacherApi }: AppProps) {
         {status === "ready" && page === "students" && <Students api={api} classrooms={classrooms} onError={setError} />}
         {status === "ready" && page === "courses" && <Courses api={api} data={courses} onChange={setCourses} onError={setError} />}
         {status === "ready" && page === "lessons" && <Lessons api={api} courses={courses} onError={setError} />}
+        {status === "ready" && page === "question-bank" && <QuestionBankPage api={api} onError={setError} />}
         {status === "ready" && page !== "home" && <p className="page-kicker">Teacher workspace / {pageTitle}</p>}
       </main>
     </div>
@@ -55,7 +57,7 @@ export function App({ api = teacherApi }: AppProps) {
 }
 
 function Home({ classrooms, courses, onNavigate }: { classrooms: Classroom[]; courses: Course[]; onNavigate: (page: Page) => void }) {
-  return <><div className="page-heading"><div><p className="eyebrow">Overview</p><h2>Ready for your next class.</h2><p className="intro">Manage your local teaching workspace from one calm, focused place.</p></div><span className="ready-pill"><span />Local storage ready</span></div><section className="overview-grid"><button className="overview-card" onClick={() => onNavigate("classrooms")} type="button"><span className="card-label">Classrooms</span><strong>{classrooms.length}</strong><small>Manage your groups and students</small></button><button className="overview-card" onClick={() => onNavigate("courses")} type="button"><span className="card-label">Courses</span><strong>{courses.length}</strong><small>Organize your lesson plans</small></button><div className="overview-card muted"><span className="card-label">Coming later</span><strong>Sessions</strong><small>Live classroom workflows stay out of Phase 4.</small></div></section></>;
+  return <><div className="page-heading"><div><p className="eyebrow">Overview</p><h2>Ready for your next class.</h2><p className="intro">Manage your local teaching workspace from one calm, focused place.</p></div><span className="ready-pill"><span />Local storage ready</span></div><section className="overview-grid"><button className="overview-card" onClick={() => onNavigate("classrooms")} type="button"><span className="card-label">Classrooms</span><strong>{classrooms.length}</strong><small>Manage your groups and students</small></button><button className="overview-card" onClick={() => onNavigate("courses")} type="button"><span className="card-label">Courses</span><strong>{courses.length}</strong><small>Organize your lesson plans</small></button><button className="overview-card" onClick={() => onNavigate("question-bank")} type="button"><span className="card-label">Question Bank</span><strong>Author</strong><small>Create validated question sets and previews</small></button></section></>;
 }
 
 function Classrooms({ api, data, onChange, onError }: { api: TeacherApi; data: Classroom[]; onChange: (items: Classroom[]) => void; onError: (message: string) => void }) {

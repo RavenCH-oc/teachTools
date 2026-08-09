@@ -33,6 +33,7 @@ export const teacherApi: TeacherApi = {
   updateCourse: (id, request) => call("update_course", { id, request }),
   deleteCourse: (id) => call("delete_course", { id }),
   listLessons: (courseId) => call("list_lessons", { courseId }),
+  listAllLessons: () => call("list_all_lessons"),
   createLesson: (request) => call("create_lesson", { request }),
   updateLesson: (id, request) => call("update_lesson", { id, request }),
   deleteLesson: (id) => call("delete_lesson", { id }),
@@ -46,4 +47,5 @@ export const teacherApi: TeacherApi = {
   createQuestion: (request) => call("create_question", { request }),
   updateQuestion: (id, request) => call("update_question", { id, request }),
   deleteQuestion: (id) => call("delete_question", { id }),
+  reorderQuestions: (questionSetId, orderedQuestionIds) => call("reorder_questions", { request: { questionSetId, orderedQuestionIds } }),
 };

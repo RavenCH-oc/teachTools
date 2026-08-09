@@ -19,4 +19,4 @@ Question authoring DTOs contain answer configuration; any future student/public 
 - Zod validates frontend/editor inputs while Rust validates all persisted/application inputs authoritatively.
 - Invalid answer structures are structured grading errors, not incorrect scores.
 - QuestionSet deletion remains restricted while questions exist and is exposed as a safe conflict error.
-- Question Editor UI, preview UI, session answering, assets, and cloud/realtime behavior remain future work.
+- Teacher Question Bank, editor, and answer-safe preview UI are implemented in Phase 5; session answering, assets, and cloud/realtime behavior remain future work.

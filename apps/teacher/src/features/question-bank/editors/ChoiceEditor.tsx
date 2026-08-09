@@ -1,0 +1,10 @@
+import type { ChoiceOption } from "@classtools/domain";
+import { newStableId } from "../ids";
+
+interface Props { options: ChoiceOption[]; multiple: boolean; correctOptionId?: string; correctOptionIds?: string[]; onChange: (options: ChoiceOption[], correct: string | string[]) => void }
+export function ChoiceEditor({ options, multiple, correctOptionId, correctOptionIds = [], onChange }: Props) {
+  const setOption = (id: string, text: string) => onChange(options.map((option) => option.id === id ? { ...option, text } : option), multiple ? correctOptionIds : (correctOptionId ?? ""));
+  const setCorrect = (id: string) => onChange(options, multiple ? (correctOptionIds.includes(id) ? correctOptionIds.filter((value) => value !== id) : [...correctOptionIds, id]) : id);
+  const remove = (id: string) => { const next = options.filter((option) => option.id !== id); const correct = multiple ? correctOptionIds.filter((value) => value !== id) : (correctOptionId === id ? "" : correctOptionId ?? ""); onChange(next, correct); };
+  return <div className="option-editor"><div className="editor-subheading"><span>Options</span><small>Stable IDs are retained while text changes.</small></div>{options.map((option, index) => <div className="option-row" key={option.id}><input aria-label={`Option ${index + 1} text`} value={option.text} onChange={(event) => setOption(option.id, event.target.value)} placeholder={`Option ${index + 1}`} /><label className="correct-control"><input aria-label={`Mark option ${index + 1} correct`} checked={multiple ? correctOptionIds.includes(option.id) : correctOptionId === option.id} onChange={() => setCorrect(option.id)} type={multiple ? "checkbox" : "radio"} name={multiple ? undefined : "correct-option"} /> Correct</label><button aria-label={`Delete option ${index + 1}`} className="icon-button danger-icon" disabled={options.length <= 2} onClick={() => remove(option.id)} type="button">×</button></div>)}<button className="button ghost" onClick={() => onChange([...options, { id: newStableId("option"), text: "" }], multiple ? correctOptionIds : correctOptionId ?? "")} type="button">＋ Add option</button></div>;
+}

@@ -7,8 +7,8 @@ mod question_domain;
 use application::{
     CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateQuestionRequest,
     CreateQuestionSetRequest, CreateStudentRequest, LocalDatabaseStatus, PersistenceService,
-    UpdateClassroomRequest, UpdateCourseRequest, UpdateLessonRequest, UpdateQuestionRequest,
-    UpdateQuestionSetRequest, UpdateStudentRequest,
+    ReorderQuestionsRequest, UpdateClassroomRequest, UpdateCourseRequest, UpdateLessonRequest,
+    UpdateQuestionRequest, UpdateQuestionSetRequest, UpdateStudentRequest,
 };
 use error::AppError;
 use serde::Serialize;
@@ -24,7 +24,7 @@ pub struct RuntimeInfo {
 fn get_app_runtime_info() -> RuntimeInfo {
     RuntimeInfo {
         app_name: "Classroom",
-        phase: "Phase 4",
+        phase: "Phase 5",
     }
 }
 
@@ -122,6 +122,12 @@ fn list_lessons(
     state.list_lessons(course_id)
 }
 #[tauri::command]
+fn list_all_lessons(
+    state: tauri::State<'_, PersistenceService>,
+) -> Result<Vec<application::LessonDto>, AppError> {
+    state.list_all_lessons()
+}
+#[tauri::command]
 fn create_lesson(
     state: tauri::State<'_, PersistenceService>,
     request: CreateLessonRequest,
@@ -212,6 +218,13 @@ fn delete_question(
 ) -> Result<(), AppError> {
     state.delete_question(id)
 }
+#[tauri::command]
+fn reorder_questions(
+    state: tauri::State<'_, PersistenceService>,
+    request: ReorderQuestionsRequest,
+) -> Result<Vec<application::QuestionDto>, AppError> {
+    state.reorder_questions(request)
+}
 
 pub fn run() -> Result<(), String> {
     tauri::Builder::default()
@@ -240,6 +253,7 @@ pub fn run() -> Result<(), String> {
             update_course,
             delete_course,
             list_lessons,
+            list_all_lessons,
             create_lesson,
             update_lesson,
             delete_lesson,
@@ -252,7 +266,8 @@ pub fn run() -> Result<(), String> {
             get_question,
             create_question,
             update_question,
-            delete_question
+            delete_question,
+            reorder_questions
         ])
         .run(tauri::generate_context!())
         .map_err(|error| error.to_string())
@@ -278,10 +293,10 @@ mod tests {
     fn runtime_info_has_the_phase_marker() {
         let info = RuntimeInfo {
             app_name: "Classroom",
-            phase: "Phase 4",
+            phase: "Phase 5",
         };
         assert_eq!(info.app_name, "Classroom");
-        assert_eq!(info.phase, "Phase 4");
+        assert_eq!(info.phase, "Phase 5");
     }
 
     #[test]
