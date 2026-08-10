@@ -31,6 +31,30 @@ button.overview-card:hover { border-color: #78bbb4; transform: translateY(-2px);
 .overview-card strong { color: #193f5d; font-size: 2.7rem; letter-spacing: -.05em; margin: 21px 0 8px; }
 .overview-card small { color: #607384; font-size: .85rem; line-height: 1.4; }
 .overview-card.muted strong { font-size: 1.7rem; }
+.local-server-panel { background: #fff; border: 1px solid #dbe5ea; border-radius: 17px; margin-top: 22px; max-width: 900px; padding: 23px; }
+.local-server-heading { align-items: flex-start; display: flex; gap: 18px; justify-content: space-between; }
+.local-server-heading h2 { font-size: 1.55rem; }
+.local-server-heading > div > p:last-child { color: #607384; font-size: .84rem; line-height: 1.6; margin: 10px 0 0; max-width: 630px; }
+.server-state { border-radius: 999px; font-size: .75rem; font-weight: 750; padding: 8px 11px; white-space: nowrap; }
+.server-state-running { background: #e7f5f3; color: #176a68; }
+.server-state-stopped { background: #edf2f4; color: #607384; }
+.server-state-starting, .server-state-stopping { background: #fff4dd; color: #916322; }
+.server-error { align-items: center; background: #fff1ed; border: 1px solid #efc1b5; border-radius: 10px; color: #873f32; display: flex; font-size: .8rem; gap: 12px; justify-content: space-between; margin-top: 18px; padding: 10px 12px; }
+.server-error button { background: transparent; border: 0; color: inherit; font-weight: 750; }
+.server-details { border-top: 1px solid #edf1f3; display: grid; gap: 17px; margin-top: 19px; padding-top: 18px; }
+.server-details dl { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.server-details dl > div { background: #f7f9fa; border-radius: 9px; padding: 10px; }
+.server-details dt { color: #71828d; font-size: .67rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.server-details dd { color: #243f52; font-size: .79rem; margin: 5px 0 0; overflow-wrap: anywhere; }
+.server-details a { color: #176a68; font-weight: 750; }
+.server-instance-id { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .7rem !important; }
+.server-endpoints h3 { color: #455b6c; font-size: .77rem; margin: 0; }
+.server-endpoints p, .server-endpoints ul { color: #71828d; font-size: .75rem; line-height: 1.55; margin: 7px 0 0; padding-left: 0; }
+.server-endpoints ul { display: grid; gap: 5px; list-style: none; }
+.server-endpoints code { color: #176a68; font-size: .72rem; overflow-wrap: anywhere; }
+.server-idle-note, .server-firewall-note { color: #71828d; font-size: .78rem; line-height: 1.55; margin: 18px 0 0; }
+.server-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
+.server-firewall-note { border-top: 1px solid #edf1f3; padding-top: 14px; }
 .split-layout { align-items: start; display: grid; gap: 20px; grid-template-columns: minmax(250px, .78fr) minmax(360px, 1.22fr); }
 .form-card, .list-card, .state-card { background: #fff; border: 1px solid #dbe5ea; border-radius: 17px; padding: 23px; }
 .form-card h3, .list-card h3 { color: #193f5d; font-size: 1.05rem; margin: 0; }

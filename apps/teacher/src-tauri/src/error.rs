@@ -24,6 +24,14 @@ pub enum AppError {
     MigrationFailed(String),
     #[error("application initialization failed")]
     Initialization(String),
+    #[error("local server could not bind")]
+    ServerBindFailed,
+    #[error("local server could not start")]
+    ServerStartFailed,
+    #[error("local server could not stop")]
+    ServerShutdownFailed,
+    #[error("local transport protocol error")]
+    ProtocolError,
 }
 
 impl From<rusqlite::Error> for AppError {
@@ -85,6 +93,26 @@ impl Serialize for AppError {
             Self::Initialization(_) => (
                 "initialization_error",
                 "The local database could not be initialized.",
+                false,
+            ),
+            Self::ServerBindFailed => (
+                "server_bind_failed",
+                "The local classroom server could not start. Check that your network is available and try again.",
+                true,
+            ),
+            Self::ServerStartFailed => (
+                "server_start_failed",
+                "The local classroom server could not be started.",
+                true,
+            ),
+            Self::ServerShutdownFailed => (
+                "server_shutdown_failed",
+                "The local classroom server could not be stopped cleanly.",
+                true,
+            ),
+            Self::ProtocolError => (
+                "protocol_error",
+                "The local transport message is invalid.",
                 false,
             ),
         };

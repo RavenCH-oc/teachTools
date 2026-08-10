@@ -50,6 +50,9 @@ importers:
 
   apps/student:
     dependencies:
+      '@classtools/backend-contract':
+        specifier: workspace:*
+        version: link:../../packages/backend-contract
       '@classtools/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -101,7 +104,11 @@ importers:
         specifier: ^16.1.0
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
 
-  packages/backend-contract: {}
+  packages/backend-contract:
+    dependencies:
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
 
   packages/domain: {}
 

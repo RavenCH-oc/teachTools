@@ -1,4 +1,15 @@
 export interface LocalDatabaseStatus { database_open: boolean; schema_version: number; path_classification: string }
+export type LocalServerLifecycleState = "stopped" | "starting" | "running" | "stopping";
+export interface LocalServerStatus {
+  running: boolean;
+  lifecycleState: LocalServerLifecycleState;
+  port: number | null;
+  localUrl: string | null;
+  serverInstanceId: string | null;
+  candidateUrls: string[];
+  webSocketUrls: string[];
+  protocolVersion: number;
+}
 export interface Classroom { id: string; name: string; academic_year: string | null; created_at: string; updated_at: string }
 export interface Student { id: string; class_id: string; seat_number: number; name: string; created_at: string; updated_at: string }
 export interface Course { id: string; name: string; description: string | null; created_at: string; updated_at: string }
@@ -12,6 +23,9 @@ export type { Question, QuestionAsset, QuestionAssetPreview, QuestionSet } from 
 
 export interface TeacherApi {
   getLocalDatabaseStatus(): Promise<LocalDatabaseStatus>
+  startLocalServer(): Promise<LocalServerStatus>
+  stopLocalServer(): Promise<LocalServerStatus>
+  getLocalServerStatus(): Promise<LocalServerStatus>
   listClassrooms(): Promise<Classroom[]>
   createClassroom(request: CreateClassroomRequest): Promise<Classroom>
   updateClassroom(id: string, request: CreateClassroomRequest): Promise<Classroom>

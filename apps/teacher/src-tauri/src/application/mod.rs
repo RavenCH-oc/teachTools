@@ -9,11 +9,13 @@ use crate::infrastructure::persistence::repositories::{
     NewClassroom, NewCourse, NewLesson, NewStudent, Student, StudentRepository,
 };
 mod assets;
+mod local_server;
 mod questions;
 pub use assets::{
     ImportQuestionAssetRequest, QuestionAssetDto, QuestionAssetPreviewDto,
     UpdateQuestionAssetPageReferenceRequest,
 };
+pub use local_server::{LocalServerService, LocalServerStatus};
 pub use questions::{
     CreateQuestionRequest, CreateQuestionSetRequest, QuestionDto, QuestionSetDto,
     ReorderQuestionsRequest, UpdateQuestionRequest, UpdateQuestionSetRequest,

@@ -20,6 +20,9 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
 
 export const teacherApi: TeacherApi = {
   getLocalDatabaseStatus: () => call("get_local_database_status"),
+  startLocalServer: () => call("start_local_server"),
+  stopLocalServer: () => call("stop_local_server"),
+  getLocalServerStatus: () => call("get_local_server_status"),
   listClassrooms: () => call("list_classrooms"),
   createClassroom: (request) => call("create_classroom", { request }),
   updateClassroom: (id, request) => call("update_classroom", { id, request }),

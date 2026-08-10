@@ -5,6 +5,8 @@ import type { TeacherApi } from "./types/teacher";
 
 const mockApi = (overrides: Partial<TeacherApi> = {}): TeacherApi => ({
   getLocalDatabaseStatus: vi.fn().mockResolvedValue({ database_open: true, schema_version: 1, path_classification: "app_data" }),
+  getLocalServerStatus: vi.fn().mockResolvedValue({ running: false, lifecycleState: "stopped", port: null, localUrl: null, serverInstanceId: null, candidateUrls: [], webSocketUrls: [], protocolVersion: 1 }),
+  startLocalServer: vi.fn(), stopLocalServer: vi.fn(),
   listClassrooms: vi.fn().mockResolvedValue([]), createClassroom: vi.fn(), updateClassroom: vi.fn(), deleteClassroom: vi.fn(),
   listStudents: vi.fn().mockResolvedValue([]), createStudent: vi.fn(), updateStudent: vi.fn(), deleteStudent: vi.fn(),
   listCourses: vi.fn().mockResolvedValue([]), createCourse: vi.fn(), updateCourse: vi.fn(), deleteCourse: vi.fn(),

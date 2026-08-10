@@ -7,9 +7,10 @@ mod question_domain;
 use application::{
     CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateQuestionRequest,
     CreateQuestionSetRequest, CreateStudentRequest, ImportQuestionAssetRequest,
-    LocalDatabaseStatus, PersistenceService, ReorderQuestionsRequest, UpdateClassroomRequest,
-    UpdateCourseRequest, UpdateLessonRequest, UpdateQuestionAssetPageReferenceRequest,
-    UpdateQuestionRequest, UpdateQuestionSetRequest, UpdateStudentRequest,
+    LocalDatabaseStatus, LocalServerService, LocalServerStatus, PersistenceService,
+    ReorderQuestionsRequest, UpdateClassroomRequest, UpdateCourseRequest, UpdateLessonRequest,
+    UpdateQuestionAssetPageReferenceRequest, UpdateQuestionRequest, UpdateQuestionSetRequest,
+    UpdateStudentRequest,
 };
 use error::AppError;
 use serde::Serialize;
@@ -25,7 +26,7 @@ pub struct RuntimeInfo {
 fn get_app_runtime_info() -> RuntimeInfo {
     RuntimeInfo {
         app_name: "Classroom",
-        phase: "Phase 6",
+        phase: "Phase 7",
     }
 }
 
@@ -33,6 +34,27 @@ fn get_app_runtime_info() -> RuntimeInfo {
 fn get_local_database_status(
     state: tauri::State<'_, PersistenceService>,
 ) -> Result<LocalDatabaseStatus, AppError> {
+    state.status()
+}
+
+#[tauri::command]
+async fn start_local_server(
+    state: tauri::State<'_, LocalServerService>,
+) -> Result<LocalServerStatus, AppError> {
+    state.start().await
+}
+
+#[tauri::command]
+async fn stop_local_server(
+    state: tauri::State<'_, LocalServerService>,
+) -> Result<LocalServerStatus, AppError> {
+    state.stop().await
+}
+
+#[tauri::command]
+fn get_local_server_status(
+    state: tauri::State<'_, LocalServerService>,
+) -> Result<LocalServerStatus, AppError> {
     state.status()
 }
 
@@ -269,7 +291,7 @@ fn update_question_asset_page_reference(
 }
 
 pub fn run() -> Result<(), String> {
-    tauri::Builder::default()
+    let application = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data_dir = app
@@ -278,11 +300,15 @@ pub fn run() -> Result<(), String> {
                 .map_err(|error| AppError::Initialization(error.to_string()))?;
             let service = PersistenceService::initialize(app_data_dir)?;
             app.manage(service);
+            app.manage(LocalServerService::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_app_runtime_info,
             get_local_database_status,
+            start_local_server,
+            stop_local_server,
+            get_local_server_status,
             list_classrooms,
             create_classroom,
             update_classroom,
@@ -317,8 +343,17 @@ pub fn run() -> Result<(), String> {
             get_question_asset_preview,
             update_question_asset_page_reference
         ])
-        .run(tauri::generate_context!())
-        .map_err(|error| error.to_string())
+        .build(tauri::generate_context!())
+        .map_err(|error| error.to_string())?;
+    application.run(|app, event| {
+        if let tauri::RunEvent::ExitRequested { .. } = event {
+            let server = app.state::<LocalServerService>();
+            if tauri::async_runtime::block_on(server.stop()).is_err() {
+                eprintln!("Local server shutdown failed during application exit.");
+            }
+        }
+    });
+    Ok(())
 }
 
 #[cfg(test)]
@@ -341,10 +376,10 @@ mod tests {
     fn runtime_info_has_the_phase_marker() {
         let info = RuntimeInfo {
             app_name: "Classroom",
-            phase: "Phase 6",
+            phase: "Phase 7",
         };
         assert_eq!(info.app_name, "Classroom");
-        assert_eq!(info.phase, "Phase 6");
+        assert_eq!(info.phase, "Phase 7");
     }
 
     #[test]

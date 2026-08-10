@@ -1,0 +1,60 @@
+{
+  "validClientMessages": [
+    {
+      "protocolVersion": 1,
+      "type": "ping",
+      "requestId": "ping-0001"
+    }
+  ],
+  "validServerMessages": [
+    {
+      "protocolVersion": 1,
+      "type": "server_hello",
+      "serverInstanceId": "019b2af9-4fe6-7f2d-a5d5-711897ed2a31"
+    },
+    {
+      "protocolVersion": 1,
+      "type": "pong",
+      "requestId": "ping-0001"
+    },
+    {
+      "protocolVersion": 1,
+      "type": "error",
+      "code": "PROTOCOL_ERROR",
+      "message": "The transport message is invalid."
+    }
+  ],
+  "invalidClientMessages": [
+    {
+      "name": "unsupported protocol version",
+      "message": {
+        "protocolVersion": 2,
+        "type": "ping",
+        "requestId": "ping-0002"
+      }
+    },
+    {
+      "name": "unknown message type",
+      "message": {
+        "protocolVersion": 1,
+        "type": "join",
+        "requestId": "join-0001"
+      }
+    },
+    {
+      "name": "missing request identifier",
+      "message": {
+        "protocolVersion": 1,
+        "type": "ping"
+      }
+    },
+    {
+      "name": "empty request identifier",
+      "message": {
+        "protocolVersion": 1,
+        "type": "ping",
+        "requestId": "   "
+      }
+    }
+  ]
+}

@@ -40,3 +40,9 @@ Question media is imported only through the Teacher dialog and a narrow Rust com
 The application writes copies only to its managed app-data `assets/` directory. Destination paths are generated from UUIDv7 IDs, persistent metadata stores a relative managed path and SHA-256 checksum, and no source absolute path is persisted. Storage-path traversal, absolute overrides, unsafe display names, and raw I/O errors are rejected or hidden behind controlled application errors. Tauri asset-protocol scope is limited to the managed asset directory; no broad filesystem plugin capability is granted.
 
 Public Question projection includes only safe asset identity, type, display name, MIME type, size, position, and optional PDF page reference. It excludes source paths, managed paths, checksums, correct answers, and grading configuration.
+
+## Phase 7 local transport boundary
+
+The local Axum transport serves only a static root page, health metadata, and a same-origin WebSocket handshake/ping endpoint. It has no wildcard CORS policy, admin HTTP API, raw database access, filesystem API, asset route, directory listing, or public Teacher/Student/Question data. Health and `server_hello` contain only protocol version and a per-start UUIDv7 server instance ID.
+
+WebSocket upgrades require an `http` Origin matching the request Host and port. Text JSON is limited to 64 KiB and validated against a typed versioned protocol. Malformed, binary, unknown-version, and unknown-type messages receive a safe protocol error rather than raw parser or socket details. Phase 7 has no authentication because it exposes no classroom data; Session and Participant credentials remain a future boundary.

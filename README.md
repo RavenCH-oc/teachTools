@@ -2,11 +2,11 @@
 
 Classroom 是教師主控、學生以瀏覽器加入的課堂互動教學軟體。本倉庫目前處於 Phase 1：Monorepo / Application Skeleton。
 
-## Current implementation phase: Phase 6
+## Current implementation phase: Phase 7
 
-Phase 6 adds the local Question image/PDF media foundation: Rust-validated imports into app-managed storage, persisted QuestionAsset metadata and checksums, safe Teacher previews, PDF page references, lifecycle cleanup, and answer-safe public media projection. Student media delivery, quiz sessions, HTTP/WebSocket, Supabase, OCR, and AI remain out of scope.
+Phase 7 adds an on-demand local Classroom HTTP/WebSocket transport foundation. The Teacher Tauri process hosts a Rust Axum server on `0.0.0.0:0` only after the teacher starts it, with a static root page, versioned health data, same-origin WebSocket hello/ping/pong, controlled lifecycle shutdown, and safe LAN candidate diagnostics. QR join, student sessions, participants, question publishing, grading submissions, student media delivery, Supabase, OCR, and AI remain out of scope.
 
-The older Phase 0/1 historical notes below are preserved for context; the Phase 6 statement above is the current implementation boundary.
+The older Phase 0/1 historical notes below are preserved for context; the Phase 7 statement above is the current implementation boundary.
 
 本階段已建立：
 
