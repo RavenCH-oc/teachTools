@@ -7,7 +7,7 @@
     "dev": "pnpm dev:teacher",
     "dev:teacher": "pnpm --filter @classtools/teacher dev",
     "dev:student": "pnpm --filter @classtools/student dev",
-    "tauri:dev": "pnpm --filter @classtools/teacher tauri:dev",
+    "tauri:dev": "pnpm build:student && pnpm --filter @classtools/teacher tauri:dev",
     "build": "pnpm --recursive --filter=!classroom run build",
     "build:teacher": "pnpm --filter @classtools/teacher build",
     "build:student": "pnpm --filter @classtools/student build",

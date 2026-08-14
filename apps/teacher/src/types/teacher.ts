@@ -10,6 +10,28 @@ export interface LocalServerStatus {
   webSocketUrls: string[];
   protocolVersion: number;
 }
+export type LocalSessionState = "CREATED" | "LOBBY" | "ENDED";
+export interface LocalSession {
+  id: string;
+  classroomId: string;
+  classroomName: string;
+  serverInstanceId: string;
+  state: LocalSessionState;
+  joinMode: "roster_match";
+  joinCode: string;
+  createdAt: string;
+  lobbyOpenedAt: string | null;
+  endedAt: string | null;
+  endedReason: string | null;
+}
+export interface LocalSessionParticipant {
+  participantId: string;
+  studentId: string | null;
+  seatNumber: number;
+  displayName: string;
+  joinedAt: string;
+  online: boolean;
+}
 export interface Classroom { id: string; name: string; academic_year: string | null; created_at: string; updated_at: string }
 export interface Student { id: string; class_id: string; seat_number: number; name: string; created_at: string; updated_at: string }
 export interface Course { id: string; name: string; description: string | null; created_at: string; updated_at: string }
@@ -26,6 +48,11 @@ export interface TeacherApi {
   startLocalServer(): Promise<LocalServerStatus>
   stopLocalServer(): Promise<LocalServerStatus>
   getLocalServerStatus(): Promise<LocalServerStatus>
+  createLocalSession(classroomId: string): Promise<LocalSession>
+  openLocalSessionLobby(sessionId: string): Promise<LocalSession>
+  getActiveLocalSession(): Promise<LocalSession | null>
+  endLocalSession(sessionId: string): Promise<LocalSession>
+  listLocalSessionParticipants(sessionId: string): Promise<LocalSessionParticipant[]>
   listClassrooms(): Promise<Classroom[]>
   createClassroom(request: CreateClassroomRequest): Promise<Classroom>
   updateClassroom(id: string, request: CreateClassroomRequest): Promise<Classroom>

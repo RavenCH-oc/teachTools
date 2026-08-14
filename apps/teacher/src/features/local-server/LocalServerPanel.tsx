@@ -54,7 +54,7 @@ export function LocalServerPanel({ api }: LocalServerPanelProps) {
   return <section aria-labelledby="local-server-title" className="local-server-panel">
     <div className="local-server-heading">
       <div>
-        <p className="eyebrow">Local transport</p>
+        <p className="eyebrow">本機傳輸服務</p>
         <h2 id="local-server-title">本機教室伺服器</h2>
         <p>按需啟動 HTTP 與 WebSocket transport；尚未提供 QR、學生加入或課堂資料 API。</p>
       </div>
@@ -68,13 +68,13 @@ export function LocalServerPanel({ api }: LocalServerPanelProps) {
         <div><dt>連接埠</dt><dd>{status.port}</dd></div>
         <div><dt>本機網址</dt><dd><a href={status.localUrl ?? undefined} rel="noreferrer" target="_blank">{status.localUrl}</a></dd></div>
         <div><dt>協定版本</dt><dd>v{status.protocolVersion}</dd></div>
-        <div><dt>Server instance</dt><dd className="server-instance-id">{status.serverInstanceId}</dd></div>
+        <div><dt>伺服器執行個體</dt><dd className="server-instance-id">{status.serverInstanceId}</dd></div>
       </dl>
       <EndpointList label="LAN 候選網址" urls={status.candidateUrls} empty="沒有偵測到可供 LAN 使用的 IPv4 位址。" />
-      <EndpointList label="WebSocket endpoints" urls={status.webSocketUrls} empty="沒有可用的 WebSocket endpoint。" />
+      <EndpointList label="WebSocket 位址" urls={status.webSocketUrls} empty="沒有可用的 WebSocket 位址。" />
     </div>}
 
-    {!loading && !status?.running && <p className="server-idle-note">伺服器目前未監聽任何連接埠，也沒有背景 server task。</p>}
+    {!loading && !status?.running && <p className="server-idle-note">伺服器目前未監聽任何連接埠，也沒有背景工作。</p>}
 
     <div className="server-actions">
       <button className="button primary" disabled={!canStart} onClick={() => void changeServerState(() => api.startLocalServer())} type="button">

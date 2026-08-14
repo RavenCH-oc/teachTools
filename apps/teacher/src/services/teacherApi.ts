@@ -7,7 +7,7 @@ export class TeacherApiError extends Error {
   readonly retryable: boolean;
   constructor(error: unknown) {
     const shape = typeof error === "object" && error !== null ? error as TeacherApiErrorShape : {};
-    super(shape.message ?? "The Teacher operation could not be completed.");
+    super(shape.message ?? "教師端操作未完成。");
     this.name = "TeacherApiError";
     this.code = shape.code ?? "INTERNAL";
     this.retryable = shape.retryable ?? false;
@@ -23,6 +23,11 @@ export const teacherApi: TeacherApi = {
   startLocalServer: () => call("start_local_server"),
   stopLocalServer: () => call("stop_local_server"),
   getLocalServerStatus: () => call("get_local_server_status"),
+  createLocalSession: (classroomId) => call("create_local_session", { classroomId }),
+  openLocalSessionLobby: (sessionId) => call("open_local_session_lobby", { sessionId }),
+  getActiveLocalSession: () => call("get_active_local_session"),
+  endLocalSession: (sessionId) => call("end_local_session", { sessionId }),
+  listLocalSessionParticipants: (sessionId) => call("list_local_session_participants", { sessionId }),
   listClassrooms: () => call("list_classrooms"),
   createClassroom: (request) => call("create_classroom", { request }),
   updateClassroom: (id, request) => call("update_classroom", { id, request }),

@@ -46,3 +46,6 @@ Public Question projection includes only safe asset identity, type, display name
 The local Axum transport serves only a static root page, health metadata, and a same-origin WebSocket handshake/ping endpoint. It has no wildcard CORS policy, admin HTTP API, raw database access, filesystem API, asset route, directory listing, or public Teacher/Student/Question data. Health and `server_hello` contain only protocol version and a per-start UUIDv7 server instance ID.
 
 WebSocket upgrades require an `http` Origin matching the request Host and port. Text JSON is limited to 64 KiB and validated against a typed versioned protocol. Malformed, binary, unknown-version, and unknown-type messages receive a safe protocol error rather than raw parser or socket details. Phase 7 has no authentication because it exposes no classroom data; Session and Participant credentials remain a future boundary.
+# Phase 8 local lobby boundary
+
+The QR payload contains only the selected Student join URL and join code. It contains no participant credential, participant ID, teacher credential, roster, answer, asset path, or database information. Join requests require same-origin `Origin` validation and use a small per-IP failed-attempt limiter. Credential authentication occurs only in the WebSocket message body; raw credentials and hashes are not logged.

@@ -6,6 +6,7 @@ use crate::error::AppError;
 const INITIAL_SCHEMA: &str = include_str!("../../../migrations/0001_initial_local_schema.sql");
 const QUESTION_ASSETS_FOUNDATION: &str =
     include_str!("../../../migrations/0002_question_assets_foundation.sql");
+const LOCAL_SESSION_LOBBY: &str = include_str!("../../../migrations/0003_local_session_lobby.sql");
 
 struct Migration {
     version: i64,
@@ -23,6 +24,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 2,
         id: "0002_question_assets_foundation",
         sql: QUESTION_ASSETS_FOUNDATION,
+    },
+    Migration {
+        version: 3,
+        id: "0003_local_session_lobby",
+        sql: LOCAL_SESSION_LOBBY,
     },
 ];
 
@@ -96,6 +102,8 @@ pub fn verify(connection: &Connection) -> Result<(), AppError> {
         "questions",
         "question_assets",
         "group_presets",
+        "local_sessions",
+        "session_participants",
     ] {
         let exists: i64 = connection.query_row(
             "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
@@ -151,13 +159,13 @@ mod tests {
         let mut connection = Connection::open_in_memory().expect("connection");
         run(&mut connection).expect("first run");
         run(&mut connection).expect("second run");
-        assert_eq!(super::current_version(&connection).expect("version"), 2);
+        assert_eq!(super::current_version(&connection).expect("version"), 3);
         assert_eq!(
             connection
                 .query_row("SELECT count(*) FROM schema_migrations", [], |row| row
                     .get::<_, i64>(0))
                 .expect("count"),
-            2
+            3
         );
     }
 
@@ -175,7 +183,7 @@ mod tests {
     }
 
     #[test]
-    fn upgrades_a_v1_database_to_the_question_assets_foundation() {
+    fn upgrades_a_v1_database_to_the_latest_schema() {
         let mut connection = Connection::open_in_memory().expect("connection");
         connection
             .execute_batch(super::INITIAL_SCHEMA)
@@ -194,7 +202,7 @@ mod tests {
 
         run(&mut connection).expect("upgrade");
 
-        assert_eq!(super::current_version(&connection).expect("version"), 2);
+        assert_eq!(super::current_version(&connection).expect("version"), 3);
         assert!(connection
             .prepare("SELECT name FROM pragma_table_info('question_assets') WHERE name = 'sha256'")
             .expect("statement")
@@ -205,5 +213,34 @@ mod tests {
             .expect("statement")
             .exists([])
             .expect("page reference column"));
+        assert!(connection
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'local_sessions'"
+            )
+            .expect("session table query")
+            .exists([])
+            .expect("session table"));
+    }
+
+    #[test]
+    fn upgrades_a_v2_database_to_the_local_session_lobby() {
+        let mut connection = Connection::open_in_memory().expect("connection");
+        connection
+            .execute_batch(super::INITIAL_SCHEMA)
+            .expect("v1 schema");
+        connection
+            .execute_batch(super::QUESTION_ASSETS_FOUNDATION)
+            .expect("v2 schema");
+        connection.execute_batch("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY NOT NULL, migration_id TEXT NOT NULL UNIQUE, checksum TEXT NOT NULL, applied_at TEXT NOT NULL)").expect("migration table");
+        for migration in &super::MIGRATIONS[..2] {
+            connection.execute("INSERT INTO schema_migrations(version, migration_id, checksum, applied_at) VALUES (?1, ?2, ?3, 'now')", rusqlite::params![migration.version, migration.id, super::checksum(migration.sql)]).expect("v2 metadata");
+        }
+        run(&mut connection).expect("upgrade");
+        run(&mut connection).expect("reopen no-op");
+        assert_eq!(super::current_version(&connection).expect("version"), 3);
+        assert!(connection.prepare("SELECT 1 FROM local_sessions").is_ok());
+        assert!(connection
+            .prepare("SELECT 1 FROM session_participants")
+            .is_ok());
     }
 }

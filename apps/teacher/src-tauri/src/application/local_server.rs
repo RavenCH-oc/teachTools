@@ -1,9 +1,11 @@
-use std::net::{Ipv4Addr, SocketAddr};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock};
+use std::time::{Duration, Instant};
 
 use axum::extract::{
     ws::{Message, WebSocket, WebSocketUpgrade},
-    State,
+    ConnectInfo, Path, State,
 };
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode, Uri};
 use axum::response::{Html, IntoResponse, Response};
@@ -16,11 +18,24 @@ use tokio::sync::oneshot;
 use tower_http::limit::RequestBodyLimitLayer;
 use uuid::Uuid;
 
+use crate::application::{LocalSessionService, StudentAssetLocation, StudentAssetProvider};
 use crate::error::AppError;
 
 pub const LOCAL_PROTOCOL_VERSION: u8 = 1;
 const MAX_MESSAGE_BYTES: usize = 64 * 1024;
 const MAX_HTTP_BODY_BYTES: usize = 64 * 1024;
+const JOIN_LIMIT_MAX_FAILURES: usize = 10;
+const JOIN_LIMIT_WINDOW: Duration = Duration::from_secs(60);
+const AUTH_TIMEOUT: Duration = Duration::from_secs(10);
+pub const PRESENCE_TIMEOUT: Duration = Duration::from_secs(7);
+
+#[cfg(debug_assertions)]
+fn transport_debug(category: &str) {
+    eprintln!("Local transport: {category}");
+}
+
+#[cfg(not(debug_assertions))]
+fn transport_debug(_: &str) {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -122,13 +137,23 @@ impl LocalServerStatus {
 
 pub struct LocalServerService {
     lifecycle: Arc<Mutex<ServerLifecycle>>,
+    session: Arc<LocalSessionService>,
+    student_assets: StudentAssetLocation,
+    presence: PresenceRegistry,
 }
 
 impl LocalServerService {
-    pub fn new() -> Self {
+    pub fn new(session: Arc<LocalSessionService>, student_assets: StudentAssetLocation) -> Self {
         Self {
             lifecycle: Arc::new(Mutex::new(ServerLifecycle::Stopped)),
+            session,
+            student_assets,
+            presence: PresenceRegistry::default(),
         }
+    }
+
+    pub fn is_participant_online(&self, participant_id: &str) -> bool {
+        self.presence.is_online(participant_id)
     }
 
     pub fn status(&self) -> Result<LocalServerStatus, AppError> {
@@ -141,6 +166,11 @@ impl LocalServerService {
     }
 
     pub async fn stop(&self) -> Result<LocalServerStatus, AppError> {
+        if self.session.has_open_lobby()? {
+            return Err(AppError::Conflict(
+                "end the local session before stopping the server".to_owned(),
+            ));
+        }
         let shutdown = {
             let mut lifecycle = self.lifecycle()?;
             match std::mem::replace(&mut *lifecycle, ServerLifecycle::Stopped) {
@@ -221,7 +251,14 @@ impl LocalServerService {
             web_socket_urls: web_socket_urls(bound_address.port(), &candidate_urls),
             candidate_urls,
         };
-        let router_state = Arc::new(TransportState { server_instance_id });
+        let assets = self.student_assets.load()?;
+        let router_state = Arc::new(TransportState {
+            server_instance_id,
+            session: Arc::clone(&self.session),
+            assets,
+            presence: self.presence.clone(),
+            limiter: JoinRateLimiter::default(),
+        });
         let (shutdown_sender, shutdown_receiver) = oneshot::channel();
 
         let mut lifecycle = self.lifecycle()?;
@@ -266,15 +303,149 @@ impl LocalServerService {
     }
 }
 
-impl Default for LocalServerService {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Clone)]
 struct TransportState {
     server_instance_id: String,
+    session: Arc<LocalSessionService>,
+    assets: StudentAssetProvider,
+    presence: PresenceRegistry,
+    limiter: JoinRateLimiter,
+}
+
+type PresenceClock = Arc<dyn Fn() -> Duration + Send + Sync>;
+
+#[derive(Clone)]
+pub struct PresenceRegistry {
+    connections: Arc<RwLock<HashMap<String, HashMap<Uuid, Duration>>>>,
+    clock: PresenceClock,
+}
+
+impl Default for PresenceRegistry {
+    fn default() -> Self {
+        let started_at = Instant::now();
+        Self::with_clock(Arc::new(move || started_at.elapsed()))
+    }
+}
+
+impl PresenceRegistry {
+    fn with_clock(clock: PresenceClock) -> Self {
+        Self {
+            connections: Arc::new(RwLock::new(HashMap::new())),
+            clock,
+        }
+    }
+
+    fn connect(&self, participant_id: &str) -> Uuid {
+        let connection_id = Uuid::now_v7();
+        self.connect_with_id(participant_id, connection_id);
+        connection_id
+    }
+
+    fn connect_with_id(&self, participant_id: &str, connection_id: Uuid) {
+        if let Ok(mut connections) = self.connections.write() {
+            connections
+                .entry(participant_id.to_owned())
+                .or_default()
+                .insert(connection_id, (self.clock)());
+        }
+    }
+
+    fn heartbeat(&self, participant_id: &str, connection_id: Uuid) {
+        if let Ok(mut connections) = self.connections.write() {
+            if let Some(last_seen) = connections
+                .get_mut(participant_id)
+                .and_then(|participant| participant.get_mut(&connection_id))
+            {
+                *last_seen = (self.clock)();
+            }
+        }
+    }
+
+    fn disconnect(&self, participant_id: &str, connection_id: Uuid) {
+        if let Ok(mut connections) = self.connections.write() {
+            let should_remove = connections
+                .get_mut(participant_id)
+                .is_some_and(|participant| {
+                    participant.remove(&connection_id);
+                    participant.is_empty()
+                });
+            if should_remove {
+                connections.remove(participant_id);
+            }
+        }
+    }
+
+    fn is_online(&self, participant_id: &str) -> bool {
+        let now = (self.clock)();
+        let Ok(mut connections) = self.connections.write() else {
+            return false;
+        };
+        let online = connections
+            .get_mut(participant_id)
+            .is_some_and(|participant| {
+                participant
+                    .retain(|_, last_seen| now.saturating_sub(*last_seen) <= PRESENCE_TIMEOUT);
+                !participant.is_empty()
+            });
+        if !online {
+            connections.remove(participant_id);
+        }
+        online
+    }
+}
+
+#[derive(Clone, Default)]
+struct JoinRateLimiter {
+    attempts: Arc<Mutex<HashMap<IpAddr, JoinAttemptWindow>>>,
+}
+
+#[derive(Clone)]
+struct JoinAttemptWindow {
+    started_at: Instant,
+    failures: usize,
+}
+
+impl JoinRateLimiter {
+    fn permits(&self, source: IpAddr) -> bool {
+        let Ok(mut attempts) = self.attempts.lock() else {
+            return false;
+        };
+        let now = Instant::now();
+        let window = attempts.entry(source).or_insert(JoinAttemptWindow {
+            started_at: now,
+            failures: 0,
+        });
+        if now.duration_since(window.started_at) >= JOIN_LIMIT_WINDOW {
+            *window = JoinAttemptWindow {
+                started_at: now,
+                failures: 0,
+            };
+        }
+        window.failures < JOIN_LIMIT_MAX_FAILURES
+    }
+
+    fn failure(&self, source: IpAddr) {
+        if let Ok(mut attempts) = self.attempts.lock() {
+            let now = Instant::now();
+            let window = attempts.entry(source).or_insert(JoinAttemptWindow {
+                started_at: now,
+                failures: 0,
+            });
+            if now.duration_since(window.started_at) >= JOIN_LIMIT_WINDOW {
+                *window = JoinAttemptWindow {
+                    started_at: now,
+                    failures: 0,
+                };
+            }
+            window.failures = window.failures.saturating_add(1);
+        }
+    }
+
+    fn success(&self, source: IpAddr) {
+        if let Ok(mut attempts) = self.attempts.lock() {
+            attempts.remove(&source);
+        }
+    }
 }
 
 fn router(state: Arc<TransportState>) -> Router {
@@ -282,6 +453,10 @@ fn router(state: Arc<TransportState>) -> Router {
         .route("/", get(root))
         .route("/health", get(health))
         .route("/ws", get(web_socket_upgrade))
+        .route("/student/", get(student_root))
+        .route("/student/join/{join_code}", get(student_join_page))
+        .route("/student/assets/{file_name}", get(student_asset))
+        .route("/api/v1/join/{join_code}", get(join_info).post(join))
         .fallback(not_found)
         .layer(RequestBodyLimitLayer::new(MAX_HTTP_BODY_BYTES))
         .with_state(state)
@@ -293,6 +468,200 @@ async fn root() -> Response {
     )
     .into_response();
     with_static_security(response)
+}
+
+async fn student_root(State(state): State<Arc<TransportState>>) -> Response {
+    student_html(&state)
+}
+
+async fn student_join_page(
+    State(state): State<Arc<TransportState>>,
+    Path(_join_code): Path<String>,
+) -> Response {
+    student_html(&state)
+}
+
+async fn student_asset(
+    State(state): State<Arc<TransportState>>,
+    Path(file_name): Path<String>,
+) -> Response {
+    match state.assets.asset(&file_name) {
+        Ok(Some(contents)) => {
+            let mut response = contents.into_response();
+            response
+                .headers_mut()
+                .insert(header::CONTENT_TYPE, asset_content_type(&file_name));
+            response.headers_mut().insert(
+                "x-content-type-options",
+                HeaderValue::from_static("nosniff"),
+            );
+            response.headers_mut().insert(
+                "cache-control",
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
+            );
+            response
+        }
+        Ok(None) => with_static_security((StatusCode::NOT_FOUND, "Not found.").into_response()),
+        Err(_) => with_static_security(
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Student application unavailable.",
+            )
+                .into_response(),
+        ),
+    }
+}
+
+fn student_html(state: &TransportState) -> Response {
+    match state.assets.index_html() {
+        Ok(contents) => {
+            let mut response = contents.into_response();
+            response.headers_mut().insert(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("text/html; charset=utf-8"),
+            );
+            with_static_security(response)
+        }
+        Err(_) => with_static_security(
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Student application unavailable.",
+            )
+                .into_response(),
+        ),
+    }
+}
+
+fn asset_content_type(file_name: &str) -> HeaderValue {
+    let value = if file_name.ends_with(".js") {
+        "text/javascript; charset=utf-8"
+    } else if file_name.ends_with(".css") {
+        "text/css; charset=utf-8"
+    } else if file_name.ends_with(".svg") {
+        "image/svg+xml"
+    } else {
+        "application/octet-stream"
+    };
+    HeaderValue::from_static(value)
+}
+
+async fn join_info(
+    State(state): State<Arc<TransportState>>,
+    Path(join_code): Path<String>,
+) -> Response {
+    let session = Arc::clone(&state.session);
+    let server_instance_id = state.server_instance_id.clone();
+    match blocking(move || {
+        session.public_join_info(&join_code, &server_instance_id, LOCAL_PROTOCOL_VERSION)
+    })
+    .await
+    {
+        Ok(info) => with_static_security(Json(info).into_response()),
+        Err(_) => public_error(
+            StatusCode::NOT_FOUND,
+            "JOIN_CODE_INVALID",
+            "課堂代碼無效或課堂尚未開放。",
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct JoinRequest {
+    seat_number: i64,
+    name: String,
+}
+
+async fn join(
+    State(state): State<Arc<TransportState>>,
+    ConnectInfo(source): ConnectInfo<SocketAddr>,
+    Path(join_code): Path<String>,
+    headers: HeaderMap,
+    Json(request): Json<JoinRequest>,
+) -> Response {
+    if !origin_matches_host(&headers) {
+        return public_error(
+            StatusCode::FORBIDDEN,
+            "ORIGIN_REJECTED",
+            "無法完成加入請求。請從課堂網址重新開啟頁面。",
+        );
+    }
+    let source_ip = source.ip();
+    if !state.limiter.permits(source_ip) {
+        return public_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "RATE_LIMITED",
+            "嘗試次數過多，請稍後再試。",
+        );
+    }
+    let session = Arc::clone(&state.session);
+    let server_instance_id = state.server_instance_id.clone();
+    match blocking(move || {
+        session.join(
+            &join_code,
+            request.seat_number,
+            &request.name,
+            &server_instance_id,
+        )
+    })
+    .await
+    {
+        Ok(joined) => {
+            state.limiter.success(source_ip);
+            with_static_security(Json(joined).into_response())
+        }
+        Err(AppError::SeatAlreadyJoined) => {
+            state.limiter.failure(source_ip);
+            public_error(
+                StatusCode::CONFLICT,
+                "SEAT_ALREADY_JOINED",
+                "這個座號已經加入課堂。",
+            )
+        }
+        Err(AppError::SessionNotOpen) => {
+            state.limiter.failure(source_ip);
+            public_error(
+                StatusCode::CONFLICT,
+                "SESSION_NOT_OPEN",
+                "課堂大廳尚未開放或已結束。",
+            )
+        }
+        Err(AppError::ServerInstanceMismatch) => {
+            state.limiter.failure(source_ip);
+            public_error(
+                StatusCode::CONFLICT,
+                "SERVER_INSTANCE_MISMATCH",
+                "課堂伺服器已更新，請重新整理頁面。",
+            )
+        }
+        Err(_) => {
+            state.limiter.failure(source_ip);
+            public_error(
+                StatusCode::UNAUTHORIZED,
+                "IDENTITY_MISMATCH",
+                "座號或姓名不正確。",
+            )
+        }
+    }
+}
+
+async fn blocking<T: Send + 'static>(
+    operation: impl FnOnce() -> Result<T, AppError> + Send + 'static,
+) -> Result<T, AppError> {
+    tauri::async_runtime::spawn_blocking(operation)
+        .await
+        .map_err(|_| AppError::Storage)?
+}
+
+fn public_error(status: StatusCode, code: &'static str, message: &'static str) -> Response {
+    with_static_security((status, Json(PublicError { code, message })).into_response())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PublicError {
+    code: &'static str,
+    message: &'static str,
 }
 
 async fn health(State(state): State<Arc<TransportState>>) -> Response {
@@ -330,6 +699,7 @@ async fn web_socket_upgrade(
 }
 
 async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
+    transport_debug("ws connection opened");
     if !send_server_message(
         &mut socket,
         &ServerMessage::ServerHello {
@@ -339,20 +709,72 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
     )
     .await
     {
+        transport_debug("server hello send failed");
         return;
     }
+    transport_debug("server_hello sent");
 
+    let authentication = tokio::time::timeout(
+        AUTH_TIMEOUT,
+        authenticate_socket(&mut socket, Arc::clone(&state)),
+    )
+    .await;
+    let participant_id = match authentication {
+        Ok(SocketAuthentication::Authenticated(participant_id)) => participant_id,
+        Ok(SocketAuthentication::Rejected(code)) => {
+            transport_debug("participant authentication rejected");
+            let _ = send_transport_error(&mut socket, code).await;
+            return;
+        }
+        Ok(SocketAuthentication::Disconnected) => {
+            transport_debug("socket closed before authentication");
+            return;
+        }
+        Err(_) => {
+            transport_debug("participant authentication timed out");
+            let _ = send_transport_error(&mut socket, "AUTH_TIMEOUT").await;
+            return;
+        }
+    };
+    let connection_id = state.presence.connect(&participant_id);
+    transport_debug("presence lease created");
+    let mut events = state.session.subscribe();
+    loop {
+        tokio::select! {
+            next = socket.recv() => {
+                let Some(next) = next else { break; };
+                if !handle_authenticated_socket_message(&mut socket, next, &state.presence, &participant_id, connection_id).await { break; }
+            }
+            event = events.recv() => match event {
+                Ok(event) => {
+                    if !send_server_message(&mut socket, &ServerMessage::SessionStateChanged { protocol_version: LOCAL_PROTOCOL_VERSION, session_id: event.session_id, state: event.state }).await { break; }
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+            },
+        }
+    }
+    state.presence.disconnect(&participant_id, connection_id);
+    transport_debug("presence lease removed; socket closed");
+}
+
+enum SocketAuthentication {
+    Authenticated(String),
+    Rejected(&'static str),
+    Disconnected,
+}
+
+async fn authenticate_socket(
+    socket: &mut WebSocket,
+    state: Arc<TransportState>,
+) -> SocketAuthentication {
     while let Some(next) = socket.recv().await {
         match next {
-            Ok(Message::Text(text)) => {
-                if text.len() > MAX_MESSAGE_BYTES {
-                    let _ = send_protocol_error(&mut socket).await;
-                    break;
-                }
+            Ok(Message::Text(text)) if text.len() <= MAX_MESSAGE_BYTES => {
                 match parse_client_message(&text) {
                     Ok(ClientMessage::Ping { request_id, .. }) => {
                         if !send_server_message(
-                            &mut socket,
+                            socket,
                             &ServerMessage::Pong {
                                 protocol_version: LOCAL_PROTOCOL_VERSION,
                                 request_id,
@@ -360,22 +782,101 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
                         )
                         .await
                         {
-                            break;
+                            return SocketAuthentication::Disconnected;
+                        }
+                    }
+                    Ok(ClientMessage::ParticipantAuth {
+                        session_id,
+                        participant_id,
+                        credential,
+                        ..
+                    }) => {
+                        transport_debug("participant_auth received");
+                        let session = Arc::clone(&state.session);
+                        let server_instance_id = state.server_instance_id.clone();
+                        let authentication_participant_id = participant_id.clone();
+                        match blocking(move || {
+                            session.authenticate(
+                                &session_id,
+                                &authentication_participant_id,
+                                &credential,
+                                &server_instance_id,
+                            )
+                        })
+                        .await
+                        {
+                            Ok(authenticated) => {
+                                if !send_server_message(
+                                    socket,
+                                    &ServerMessage::ParticipantAuthenticated {
+                                        protocol_version: LOCAL_PROTOCOL_VERSION,
+                                        participant: authenticated.participant,
+                                        classroom_name: authenticated.classroom_name,
+                                        session_state: authenticated.session_state,
+                                    },
+                                )
+                                .await
+                                {
+                                    return SocketAuthentication::Disconnected;
+                                }
+                                transport_debug("participant authentication succeeded");
+                                return SocketAuthentication::Authenticated(participant_id);
+                            }
+                            Err(error) => {
+                                return SocketAuthentication::Rejected(authentication_error_code(
+                                    &error,
+                                ));
+                            }
                         }
                     }
                     Err(()) => {
-                        let _ = send_protocol_error(&mut socket).await;
-                        break;
+                        return SocketAuthentication::Rejected("PROTOCOL_ERROR");
                     }
                 }
             }
-            Ok(Message::Binary(_)) => {
-                let _ = send_protocol_error(&mut socket).await;
-                break;
+            Ok(Message::Text(_)) | Ok(Message::Binary(_)) => {
+                return SocketAuthentication::Rejected("PROTOCOL_ERROR");
             }
-            Ok(Message::Close(_)) | Err(_) => break,
-            Ok(Message::Ping(_) | Message::Pong(_)) => {}
+            Ok(Message::Close(_)) | Err(_) => return SocketAuthentication::Disconnected,
+            Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => {}
         }
+    }
+    SocketAuthentication::Disconnected
+}
+
+async fn handle_authenticated_socket_message(
+    socket: &mut WebSocket,
+    next: Result<Message, axum::Error>,
+    presence: &PresenceRegistry,
+    participant_id: &str,
+    connection_id: Uuid,
+) -> bool {
+    match next {
+        Ok(Message::Text(text)) if text.len() <= MAX_MESSAGE_BYTES => {
+            match parse_client_message(&text) {
+                Ok(ClientMessage::Ping { request_id, .. }) => {
+                    presence.heartbeat(participant_id, connection_id);
+                    send_server_message(
+                        socket,
+                        &ServerMessage::Pong {
+                            protocol_version: LOCAL_PROTOCOL_VERSION,
+                            request_id,
+                        },
+                    )
+                    .await
+                }
+                _ => {
+                    let _ = send_protocol_error(socket).await;
+                    false
+                }
+            }
+        }
+        Ok(Message::Text(_)) | Ok(Message::Binary(_)) => {
+            let _ = send_protocol_error(socket).await;
+            false
+        }
+        Ok(Message::Close(_)) | Err(_) => false,
+        Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => true,
     }
 }
 
@@ -386,6 +887,26 @@ async fn send_protocol_error(socket: &mut WebSocket) -> bool {
             protocol_version: LOCAL_PROTOCOL_VERSION,
             code: "PROTOCOL_ERROR",
             message: "The transport message is invalid.",
+        },
+    )
+    .await
+}
+
+fn authentication_error_code(error: &AppError) -> &'static str {
+    match error {
+        AppError::ServerInstanceMismatch => "SERVER_INSTANCE_MISMATCH",
+        AppError::SessionNotOpen => "SESSION_ENDED",
+        _ => "AUTH_FAILED",
+    }
+}
+
+async fn send_transport_error(socket: &mut WebSocket, code: &'static str) -> bool {
+    send_server_message(
+        socket,
+        &ServerMessage::Error {
+            protocol_version: LOCAL_PROTOCOL_VERSION,
+            code,
+            message: "Participant authentication failed.",
         },
     )
     .await
@@ -408,6 +929,24 @@ fn parse_client_message(text: &str) -> Result<ClientMessage, ()> {
         } if *protocol_version == LOCAL_PROTOCOL_VERSION
             && !request_id.trim().is_empty()
             && request_id.len() <= 120 =>
+        {
+            Ok(message)
+        }
+        ClientMessage::ParticipantAuth {
+            protocol_version,
+            request_id,
+            session_id,
+            participant_id,
+            credential,
+        } if *protocol_version == LOCAL_PROTOCOL_VERSION
+            && !request_id.trim().is_empty()
+            && request_id.len() <= 120
+            && Uuid::parse_str(session_id).is_ok()
+            && Uuid::parse_str(participant_id).is_ok()
+            && credential.len() == 43
+            && credential
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_') =>
         {
             Ok(message)
         }
@@ -471,6 +1010,13 @@ enum ClientMessage {
         protocol_version: u8,
         request_id: String,
     },
+    ParticipantAuth {
+        protocol_version: u8,
+        request_id: String,
+        session_id: String,
+        participant_id: String,
+        credential: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -488,6 +1034,17 @@ enum ServerMessage {
         protocol_version: u8,
         request_id: String,
     },
+    ParticipantAuthenticated {
+        protocol_version: u8,
+        participant: crate::application::ParticipantSelfView,
+        classroom_name: String,
+        session_state: String,
+    },
+    SessionStateChanged {
+        protocol_version: u8,
+        session_id: String,
+        state: String,
+    },
     Error {
         protocol_version: u8,
         code: &'static str,
@@ -502,11 +1059,14 @@ async fn run_server(
     lifecycle: Arc<Mutex<ServerLifecycle>>,
     server_instance_id: String,
 ) {
-    let result = axum::serve(listener, router)
-        .with_graceful_shutdown(async move {
-            let _ = shutdown_receiver.await;
-        })
-        .await;
+    let result = axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(async move {
+        let _ = shutdown_receiver.await;
+    })
+    .await;
     if result.is_err() {
         eprintln!("Local server terminated unexpectedly.");
     }
@@ -586,6 +1146,8 @@ fn web_socket_urls(port: u16, candidate_urls: &[String]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
 
     use futures_util::{SinkExt, StreamExt};
     use serde::Deserialize;
@@ -600,9 +1162,65 @@ mod tests {
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
     >;
 
+    fn test_presence_clock() -> (Arc<AtomicU64>, PresenceClock) {
+        let milliseconds = Arc::new(AtomicU64::new(0));
+        let clock_milliseconds = Arc::clone(&milliseconds);
+        (
+            milliseconds,
+            Arc::new(move || Duration::from_millis(clock_milliseconds.load(Ordering::Relaxed))),
+        )
+    }
+
+    fn test_service() -> LocalServerService {
+        test_service_with_roster().0
+    }
+
+    fn test_service_with_roster() -> (LocalServerService, String) {
+        let directory = tempfile::tempdir().expect("test directory").keep();
+        std::fs::create_dir_all(directory.join("student/assets"))
+            .expect("student assets directory");
+        std::fs::write(directory.join("student/index.html"), "<main>student</main>")
+            .expect("student index");
+        std::fs::write(
+            directory.join("student/assets/app-test.js"),
+            "console.log('student')",
+        )
+        .expect("student asset");
+        let database = crate::infrastructure::persistence::database::Database::open(
+            directory.join("classroom.sqlite3"),
+        );
+        database.initialize().expect("database");
+        let classroom =
+            crate::infrastructure::persistence::repositories::ClassroomRepository::create(
+                &database,
+                crate::infrastructure::persistence::repositories::NewClassroom {
+                    name: "3A".to_owned(),
+                    academic_year: None,
+                },
+            )
+            .expect("classroom");
+        crate::infrastructure::persistence::repositories::StudentRepository::create(
+            &database,
+            crate::infrastructure::persistence::repositories::NewStudent {
+                class_id: classroom.id.clone(),
+                seat_number: 12,
+                name: "王小明".to_owned(),
+            },
+        )
+        .expect("student");
+        let session = LocalSessionService::initialize(database).expect("session service");
+        (
+            LocalServerService::new(
+                session,
+                StudentAssetLocation::from_root(directory.join("student")),
+            ),
+            classroom.id,
+        )
+    }
+
     #[tokio::test]
     async fn http_endpoints_are_narrow_and_safe() {
-        let service = LocalServerService::new();
+        let service = test_service();
         let status = service
             .start_on(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), false)
             .await
@@ -628,13 +1246,22 @@ mod tests {
         assert!(traversal.starts_with("http/1.1 404"));
         let oversized = http_oversized_request(port).await;
         assert!(oversized.starts_with("http/1.1 413"));
+        let student = http_get(port, "/student/").await;
+        assert!(student.starts_with("http/1.1 200"));
+        assert!(student.contains("<main>student</main>"));
+        let asset = http_get(port, "/student/assets/app-test.js").await;
+        assert!(asset.starts_with("http/1.1 200"));
+        assert!(asset.contains("console.log"));
+        assert!(http_get(port, "/student/assets/missing.js")
+            .await
+            .starts_with("http/1.1 404"));
 
         service.stop().await.expect("server stops");
     }
 
     #[tokio::test]
     async fn websocket_handshake_ping_and_protocol_errors_are_safe() {
-        let service = LocalServerService::new();
+        let service = test_service();
         let status = service
             .start_on(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), false)
             .await
@@ -669,7 +1296,7 @@ mod tests {
 
     #[tokio::test]
     async fn websocket_rejects_unknown_protocol_binary_and_foreign_origin() {
-        let service = LocalServerService::new();
+        let service = test_service();
         let status = service
             .start_on(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), false)
             .await
@@ -702,7 +1329,7 @@ mod tests {
 
     #[tokio::test]
     async fn multiple_clients_and_lifecycle_are_idempotent() {
-        let service = LocalServerService::new();
+        let service = test_service();
         let first = service
             .start_on(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), false)
             .await
@@ -750,6 +1377,178 @@ mod tests {
     }
 
     #[test]
+    fn presence_uses_recent_connection_leases_instead_of_socket_counts() {
+        let (milliseconds, clock) = test_presence_clock();
+        let presence = PresenceRegistry::with_clock(clock);
+        let participant_id = "019fe920-0e14-7e30-8a9d-367f86c03bcc";
+        let first_connection = Uuid::now_v7();
+        let second_connection = Uuid::now_v7();
+
+        presence.connect_with_id(participant_id, first_connection);
+        assert!(presence.is_online(participant_id));
+
+        milliseconds.store(6_000, Ordering::Relaxed);
+        presence.heartbeat(participant_id, first_connection);
+        milliseconds.store(12_999, Ordering::Relaxed);
+        assert!(presence.is_online(participant_id));
+
+        milliseconds.store(13_001, Ordering::Relaxed);
+        assert!(!presence.is_online(participant_id));
+
+        presence.connect_with_id(participant_id, first_connection);
+        presence.connect_with_id(participant_id, second_connection);
+        milliseconds.store(20_002, Ordering::Relaxed);
+        presence.heartbeat(participant_id, second_connection);
+        assert!(presence.is_online(participant_id));
+
+        milliseconds.store(27_003, Ordering::Relaxed);
+        assert!(!presence.is_online(participant_id));
+
+        presence.connect_with_id(participant_id, first_connection);
+        assert!(presence.is_online(participant_id));
+        presence.disconnect(participant_id, first_connection);
+        assert!(!presence.is_online(participant_id));
+    }
+
+    #[tokio::test]
+    async fn stale_presence_lease_expires_and_reauthentication_restores_teacher_online() {
+        let (mut service, classroom_id) = test_service_with_roster();
+        let (milliseconds, clock) = test_presence_clock();
+        service.presence = PresenceRegistry::with_clock(clock);
+        let status = service
+            .start_on(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), false)
+            .await
+            .expect("server starts");
+        let port = status.port.expect("port");
+        let server_id = status.server_instance_id.clone().expect("server id");
+        let session = service
+            .session
+            .create(classroom_id, server_id.clone())
+            .expect("session");
+        let session = service
+            .session
+            .open_lobby(session.id, server_id)
+            .expect("lobby");
+        let joined = http_join(port, &session.join_code, 12, "王小明").await;
+
+        let (mut socket, _) = connect_same_origin(port).await;
+        let _ = receive_text(&mut socket).await;
+        socket
+            .send(ClientWebSocketMessage::Text(
+                format!("{{\"protocolVersion\":1,\"type\":\"participant_auth\",\"requestId\":\"auth-1\",\"sessionId\":\"{}\",\"participantId\":\"{}\",\"credential\":\"{}\"}}", joined.session_id, joined.participant_id, joined.credential).into(),
+            ))
+            .await
+            .expect("auth sends");
+        assert!(receive_text(&mut socket)
+            .await
+            .contains("participant_authenticated"));
+        assert!(teacher_participants(&service, &session.id)[0].online);
+
+        milliseconds.store(6_000, Ordering::Relaxed);
+        socket
+            .send(ClientWebSocketMessage::Text(
+                "{\"protocolVersion\":1,\"type\":\"ping\",\"requestId\":\"heartbeat-1\"}".into(),
+            ))
+            .await
+            .expect("heartbeat sends");
+        assert!(receive_text(&mut socket)
+            .await
+            .contains("\"type\":\"pong\""));
+
+        milliseconds.store(12_999, Ordering::Relaxed);
+        assert!(teacher_participants(&service, &session.id)[0].online);
+
+        milliseconds.store(13_001, Ordering::Relaxed);
+        assert!(!teacher_participants(&service, &session.id)[0].online);
+
+        let (mut reconnected, _) = connect_same_origin(port).await;
+        let _ = receive_text(&mut reconnected).await;
+        reconnected
+            .send(ClientWebSocketMessage::Text(
+                format!("{{\"protocolVersion\":1,\"type\":\"participant_auth\",\"requestId\":\"auth-2\",\"sessionId\":\"{}\",\"participantId\":\"{}\",\"credential\":\"{}\"}}", joined.session_id, joined.participant_id, joined.credential).into(),
+            ))
+            .await
+            .expect("reconnect auth sends");
+        assert!(receive_text(&mut reconnected)
+            .await
+            .contains("participant_authenticated"));
+        assert!(teacher_participants(&service, &session.id)[0].online);
+
+        reconnected
+            .close(None)
+            .await
+            .expect("reconnected socket closes");
+        socket.close(None).await.expect("stale socket closes");
+        service
+            .session
+            .end(session.id, "teacher_ended")
+            .expect("session ends");
+        service.stop().await.expect("server stops");
+    }
+
+    #[tokio::test]
+    async fn join_http_websocket_auth_presence_and_end_broadcast_are_safe() {
+        let (service, classroom_id) = test_service_with_roster();
+        let status = service
+            .start_on(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), false)
+            .await
+            .expect("server starts");
+        let port = status.port.expect("port");
+        let server_id = status.server_instance_id.clone().expect("server id");
+        let session = service
+            .session
+            .create(classroom_id, server_id.clone())
+            .expect("session");
+        let session = service
+            .session
+            .open_lobby(session.id, server_id.clone())
+            .expect("lobby");
+        let join_info = http_get(port, &format!("/api/v1/join/{}", session.join_code)).await;
+        assert!(join_info.starts_with("http/1.1 200"));
+        assert!(!join_info.contains("王小明"));
+        let joined = http_join(port, &session.join_code, 12, "王小明").await;
+        let (mut socket, _) = connect_same_origin(port).await;
+        let _ = receive_text(&mut socket).await;
+        socket.send(ClientWebSocketMessage::Text(format!("{{\"protocolVersion\":1,\"type\":\"participant_auth\",\"requestId\":\"auth-1\",\"sessionId\":\"{}\",\"participantId\":\"{}\",\"credential\":\"{}\"}}", joined.session_id, joined.participant_id, joined.credential).into())).await.expect("auth sends");
+        let authenticated = receive_text(&mut socket).await;
+        assert!(authenticated.contains("participant_authenticated"));
+        assert!(service.is_participant_online(&joined.participant_id));
+        assert!(teacher_participants(&service, &session.id)[0].online);
+
+        socket.close(None).await.expect("socket closes");
+        drop(socket);
+        wait_for_presence(&service, &joined.participant_id, false).await;
+        assert!(!teacher_participants(&service, &session.id)[0].online);
+
+        let (mut reconnected, _) = connect_same_origin(port).await;
+        let _ = receive_text(&mut reconnected).await;
+        reconnected.send(ClientWebSocketMessage::Text(format!("{{\"protocolVersion\":1,\"type\":\"participant_auth\",\"requestId\":\"auth-2\",\"sessionId\":\"{}\",\"participantId\":\"{}\",\"credential\":\"{}\"}}", joined.session_id, joined.participant_id, joined.credential).into())).await.expect("reconnect auth sends");
+        assert!(receive_text(&mut reconnected)
+            .await
+            .contains("participant_authenticated"));
+        assert!(service.is_participant_online(&joined.participant_id));
+
+        service
+            .session
+            .end(session.id, "teacher_ended")
+            .expect("end");
+        let ended = receive_text(&mut reconnected).await;
+        assert!(ended.contains("session_state_changed"));
+        assert!(ended.contains("ENDED"));
+        reconnected.close(None).await.expect("close");
+        drop(reconnected);
+        wait_for_presence(&service, &joined.participant_id, false).await;
+
+        let (mut expired, _) = connect_same_origin(port).await;
+        let _ = receive_text(&mut expired).await;
+        expired.send(ClientWebSocketMessage::Text(format!("{{\"protocolVersion\":1,\"type\":\"participant_auth\",\"requestId\":\"auth-3\",\"sessionId\":\"{}\",\"participantId\":\"{}\",\"credential\":\"{}\"}}", joined.session_id, joined.participant_id, joined.credential).into())).await.expect("expired auth sends");
+        assert!(receive_text(&mut expired)
+            .await
+            .contains("\"code\":\"SESSION_ENDED\""));
+        service.stop().await.expect("server stops");
+    }
+
+    #[test]
     fn protocol_fixture_and_network_classification_match_the_contract() {
         let fixtures: ProtocolFixtures = serde_json::from_str(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -778,6 +1577,21 @@ mod tests {
         .await
     }
 
+    async fn http_join(port: u16, join_code: &str, seat_number: i64, name: &str) -> JoinResponse {
+        let body = format!("{{\"seatNumber\":{seat_number},\"name\":\"{name}\"}}");
+        let response = http_raw_request(
+            port,
+            format!(
+                "POST /api/v1/join/{join_code} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: http://127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            ),
+        )
+        .await;
+        let (headers, body) = response.split_once("\r\n\r\n").expect("http response body");
+        assert!(headers.starts_with("HTTP/1.1 200"), "{response}");
+        serde_json::from_str(body).expect("join response")
+    }
+
     async fn http_oversized_request(port: u16) -> String {
         http_request(
             port,
@@ -790,6 +1604,10 @@ mod tests {
     }
 
     async fn http_request(port: u16, request: String) -> String {
+        http_raw_request(port, request).await.to_ascii_lowercase()
+    }
+
+    async fn http_raw_request(port: u16, request: String) -> String {
         let mut stream =
             tokio::net::TcpStream::connect(SocketAddr::from((Ipv4Addr::LOCALHOST, port)))
                 .await
@@ -803,9 +1621,7 @@ mod tests {
             .read_to_end(&mut response)
             .await
             .expect("http response");
-        String::from_utf8(response)
-            .expect("utf8 response")
-            .to_ascii_lowercase()
+        String::from_utf8(response).expect("utf8 response")
     }
 
     async fn connect_same_origin(
@@ -854,6 +1670,38 @@ mod tests {
     fn assert_protocol_error(text: &str) {
         assert!(text.contains("\"type\":\"error\""));
         assert!(text.contains("\"code\":\"PROTOCOL_ERROR\""));
+    }
+
+    fn teacher_participants(
+        service: &LocalServerService,
+        session_id: &str,
+    ) -> Vec<crate::application::TeacherParticipantDto> {
+        let mut participants = service
+            .session
+            .list_participants(session_id)
+            .expect("participants");
+        for participant in &mut participants {
+            participant.online = service.is_participant_online(&participant.participant_id);
+        }
+        participants
+    }
+
+    async fn wait_for_presence(service: &LocalServerService, participant_id: &str, online: bool) {
+        for _ in 0..32 {
+            if service.is_participant_online(participant_id) == online {
+                return;
+            }
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(service.is_participant_online(participant_id), online);
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct JoinResponse {
+        session_id: String,
+        participant_id: String,
+        credential: String,
     }
 
     #[derive(Deserialize)]

@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@classtools/domain": "workspace:*",
+    "@classtools/shared": "workspace:*",
+    "@classtools/validation": "workspace:*",
     "@tauri-apps/api": "^2.2.0",
     "@tauri-apps/plugin-dialog": "^2.2.0",
-    "@classtools/domain": "workspace:*",
-    "@classtools/validation": "workspace:*",
-    "@classtools/shared": "workspace:*",
+    "qrcode.react": "4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

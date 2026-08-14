@@ -36,3 +36,10 @@ OPEN 期間可接受 Submission。LOCKED 後，新 submission 預設拒絕並回
 ## 封存邊界
 
 endSession 停止新的 classroom interaction，archiveSession 將 final runtime 資料、grades、統計與必要 audit metadata 轉入 SQLite 歷史資料。封存完成後 session 變為不可變；Supabase runtime copy 可按 retention policy 清除或匿名化。
+# Phase 8 local session scope
+
+Phase 8 persists only `CREATED → LOBBY → ENDED`. `ACTIVE`, `PAUSED`, `ARCHIVED`, question delivery, answer submission, and grading are future work. A normal app exit ends any active local session before the local server stops; process restart fail-closes prior non-terminal sessions as `ENDED`.
+
+## Phase 8 Teacher Presence
+
+Teacher Presence is a 7-second, non-persistent heartbeat lease for authenticated Lobby connections. The Student client renews its connection lease with the existing typed WebSocket `ping` every 3 seconds. Teacher polling reports a participant online when any one of that participant's runtime connections has a recent lease; it does not use raw socket counts or change durable session/participant state.

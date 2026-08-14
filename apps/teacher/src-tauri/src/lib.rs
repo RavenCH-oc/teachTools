@@ -7,10 +7,10 @@ mod question_domain;
 use application::{
     CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateQuestionRequest,
     CreateQuestionSetRequest, CreateStudentRequest, ImportQuestionAssetRequest,
-    LocalDatabaseStatus, LocalServerService, LocalServerStatus, PersistenceService,
-    ReorderQuestionsRequest, UpdateClassroomRequest, UpdateCourseRequest, UpdateLessonRequest,
-    UpdateQuestionAssetPageReferenceRequest, UpdateQuestionRequest, UpdateQuestionSetRequest,
-    UpdateStudentRequest,
+    LocalDatabaseStatus, LocalServerService, LocalServerStatus, LocalSessionDto,
+    LocalSessionService, PersistenceService, ReorderQuestionsRequest, UpdateClassroomRequest,
+    UpdateCourseRequest, UpdateLessonRequest, UpdateQuestionAssetPageReferenceRequest,
+    UpdateQuestionRequest, UpdateQuestionSetRequest, UpdateStudentRequest,
 };
 use error::AppError;
 use serde::Serialize;
@@ -26,7 +26,7 @@ pub struct RuntimeInfo {
 fn get_app_runtime_info() -> RuntimeInfo {
     RuntimeInfo {
         app_name: "Classroom",
-        phase: "Phase 7",
+        phase: "Phase 8",
     }
 }
 
@@ -56,6 +56,60 @@ fn get_local_server_status(
     state: tauri::State<'_, LocalServerService>,
 ) -> Result<LocalServerStatus, AppError> {
     state.status()
+}
+
+#[tauri::command]
+fn create_local_session(
+    classroom_id: String,
+    sessions: tauri::State<'_, std::sync::Arc<LocalSessionService>>,
+    server: tauri::State<'_, LocalServerService>,
+) -> Result<LocalSessionDto, AppError> {
+    let status = server.status()?;
+    let Some(server_instance_id) = status.server_instance_id else {
+        return Err(AppError::ServerStartFailed);
+    };
+    sessions.create(classroom_id, server_instance_id)
+}
+
+#[tauri::command]
+fn open_local_session_lobby(
+    session_id: String,
+    sessions: tauri::State<'_, std::sync::Arc<LocalSessionService>>,
+    server: tauri::State<'_, LocalServerService>,
+) -> Result<LocalSessionDto, AppError> {
+    let status = server.status()?;
+    let Some(server_instance_id) = status.server_instance_id else {
+        return Err(AppError::ServerStartFailed);
+    };
+    sessions.open_lobby(session_id, server_instance_id)
+}
+
+#[tauri::command]
+fn get_active_local_session(
+    sessions: tauri::State<'_, std::sync::Arc<LocalSessionService>>,
+) -> Result<Option<LocalSessionDto>, AppError> {
+    sessions.active()
+}
+
+#[tauri::command]
+fn end_local_session(
+    session_id: String,
+    sessions: tauri::State<'_, std::sync::Arc<LocalSessionService>>,
+) -> Result<LocalSessionDto, AppError> {
+    sessions.end(session_id, "teacher_ended")
+}
+
+#[tauri::command]
+fn list_local_session_participants(
+    session_id: String,
+    sessions: tauri::State<'_, std::sync::Arc<LocalSessionService>>,
+    server: tauri::State<'_, LocalServerService>,
+) -> Result<Vec<application::TeacherParticipantDto>, AppError> {
+    let mut participants = sessions.list_participants(&session_id)?;
+    for participant in &mut participants {
+        participant.online = server.is_participant_online(&participant.participant_id);
+    }
+    Ok(participants)
 }
 
 #[tauri::command]
@@ -299,8 +353,15 @@ pub fn run() -> Result<(), String> {
                 .app_data_dir()
                 .map_err(|error| AppError::Initialization(error.to_string()))?;
             let service = PersistenceService::initialize(app_data_dir)?;
+            let sessions = LocalSessionService::initialize(service.database_for_local_session())?;
+            let student_assets =
+                application::StudentAssetLocation::development_or_bundle(app.handle())?;
+            app.manage(LocalServerService::new(
+                std::sync::Arc::clone(&sessions),
+                student_assets,
+            ));
+            app.manage(sessions);
             app.manage(service);
-            app.manage(LocalServerService::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -309,6 +370,11 @@ pub fn run() -> Result<(), String> {
             start_local_server,
             stop_local_server,
             get_local_server_status,
+            create_local_session,
+            open_local_session_lobby,
+            get_active_local_session,
+            end_local_session,
+            list_local_session_participants,
             list_classrooms,
             create_classroom,
             update_classroom,
@@ -347,6 +413,10 @@ pub fn run() -> Result<(), String> {
         .map_err(|error| error.to_string())?;
     application.run(|app, event| {
         if let tauri::RunEvent::ExitRequested { .. } = event {
+            let sessions = app.state::<std::sync::Arc<LocalSessionService>>();
+            if sessions.end_active_for_exit().is_err() {
+                eprintln!("Local session shutdown failed during application exit.");
+            }
             let server = app.state::<LocalServerService>();
             if tauri::async_runtime::block_on(server.stop()).is_err() {
                 eprintln!("Local server shutdown failed during application exit.");
@@ -376,10 +446,10 @@ mod tests {
     fn runtime_info_has_the_phase_marker() {
         let info = RuntimeInfo {
             app_name: "Classroom",
-            phase: "Phase 7",
+            phase: "Phase 8",
         };
         assert_eq!(info.app_name, "Classroom");
-        assert_eq!(info.phase, "Phase 7");
+        assert_eq!(info.phase, "Phase 8");
     }
 
     #[test]

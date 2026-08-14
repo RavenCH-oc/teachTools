@@ -82,6 +82,44 @@ button {
   max-width: 320px;
 }
 
+.student-card form {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.student-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.student-field label {
+  color: #d9ecee;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.student-field input {
+  background: #fff;
+  border: 1px solid #adcfd0;
+  border-radius: 12px;
+  box-sizing: border-box;
+  color: #123447;
+  font: inherit;
+  min-width: 0;
+  padding: 13px 14px;
+  width: 100%;
+}
+
+.student-field input:focus {
+  border-color: #83d1c7;
+  box-shadow: 0 0 0 3px rgb(131 209 199 / 25%);
+  outline: none;
+}
+
 .join-button {
   background: #83d1c7;
   border: 0;
@@ -89,6 +127,7 @@ button {
   color: #123447;
   cursor: pointer;
   font-weight: 800;
+  min-height: 48px;
   padding: 14px 22px;
 }
 

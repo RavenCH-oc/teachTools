@@ -32,6 +32,22 @@ pub enum AppError {
     ServerShutdownFailed,
     #[error("local transport protocol error")]
     ProtocolError,
+    #[error("local session not found")]
+    SessionNotFound,
+    #[error("local session is not open")]
+    SessionNotOpen,
+    #[error("local session server instance does not match")]
+    ServerInstanceMismatch,
+    #[error("local session join code is invalid")]
+    JoinCodeInvalid,
+    #[error("local session identity does not match")]
+    IdentityMismatch,
+    #[error("local session seat has already joined")]
+    SeatAlreadyJoined,
+    #[error("local session participant authentication failed")]
+    AuthenticationFailed,
+    #[error("student static assets are unavailable")]
+    StudentAssetsUnavailable,
 }
 
 impl From<rusqlite::Error> for AppError {
@@ -114,6 +130,22 @@ impl Serialize for AppError {
                 "protocol_error",
                 "The local transport message is invalid.",
                 false,
+            ),
+            Self::SessionNotFound => ("session_not_found", "The classroom session was not found.", false),
+            Self::SessionNotOpen => ("session_not_open", "The classroom lobby is not open.", false),
+            Self::ServerInstanceMismatch => (
+                "server_instance_mismatch",
+                "The classroom server has changed. Refresh the session and try again.",
+                false,
+            ),
+            Self::JoinCodeInvalid => ("join_code_invalid", "The classroom code is invalid.", false),
+            Self::IdentityMismatch => ("identity_mismatch", "The supplied identity does not match.", false),
+            Self::SeatAlreadyJoined => ("seat_already_joined", "This seat has already joined the classroom.", false),
+            Self::AuthenticationFailed => ("authentication_failed", "Participant authentication failed.", false),
+            Self::StudentAssetsUnavailable => (
+                "student_assets_unavailable",
+                "The student application is not available. Build it before starting the local server.",
+                true,
             ),
         };
         state.serialize_field("code", code)?;

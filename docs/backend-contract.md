@@ -51,3 +51,8 @@ submission_id 為穩定 client-generated UUIDv7。第一次成功處理會持久
 required capabilities：session lifecycle、participant join/reconnect、question lifecycle、submission idempotency、authoritative grading、realtime events、archive。
 
 optional capabilities：student questions/voting、groups、peer review、future custom question types。UI 必須依 capability flag 隱藏或停用不支援的工作流程。
+# Phase 8 local lobby transport
+
+The shared local protocol supports `server_hello`, `ping`, `pong`, `participant_auth`, `participant_authenticated`, `session_state_changed`, and controlled errors. No question, answer, score, roster, or participant-list message is public. `participant_auth` sends the temporary credential only in the WebSocket message body. `AUTH_FAILED`, `SESSION_ENDED`, and `SERVER_INSTANCE_MISMATCH` are authoritative credential outcomes; `AUTH_TIMEOUT` is transient and must keep the stored credential eligible for reconnect.
+
+After `participant_authenticated`, the Student client sends the existing typed `ping` message every 3 seconds and the server replies with `pong`. Each authenticated `ping` renews that connection's non-persistent presence lease. Teacher participant queries treat a participant as online only while at least one authenticated connection has been seen within 7 seconds; raw WebSocket counts do not define presence.

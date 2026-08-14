@@ -21,6 +21,7 @@ function apiFixture(): TeacherApi {
     listQuestions: vi.fn(), getQuestion: vi.fn(), createQuestion: vi.fn(), updateQuestion: vi.fn(), deleteQuestion: vi.fn(), reorderQuestions: vi.fn(),
     listQuestionAssets: vi.fn(), importQuestionAsset: vi.fn(), deleteQuestionAsset: vi.fn(), getQuestionAssetPreview: vi.fn(), updateQuestionAssetPageReference: vi.fn(),
     getLocalServerStatus: vi.fn().mockResolvedValue(stopped), startLocalServer: vi.fn().mockResolvedValue(running), stopLocalServer: vi.fn().mockResolvedValue(stopped),
+    createLocalSession: vi.fn(), openLocalSessionLobby: vi.fn(), getActiveLocalSession: vi.fn().mockResolvedValue(null), endLocalSession: vi.fn(), listLocalSessionParticipants: vi.fn().mockResolvedValue([]),
   };
 }
 
@@ -28,7 +29,7 @@ describe("LocalServerPanel", () => {
   it("does not start a listener automatically and renders diagnostics after an explicit start", async () => {
     const api = apiFixture();
     render(<LocalServerPanel api={api} />);
-    await waitFor(() => expect(screen.getByText("伺服器目前未監聽任何連接埠，也沒有背景 server task。")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("伺服器目前未監聽任何連接埠，也沒有背景工作。")).toBeInTheDocument());
     expect(api.startLocalServer).not.toHaveBeenCalled();
     screen.getByRole("button", { name: "啟動伺服器" }).click();
     await waitFor(() => expect(screen.getByText("http://192.168.1.30:41234")).toBeInTheDocument());

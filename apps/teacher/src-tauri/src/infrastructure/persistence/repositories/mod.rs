@@ -1,6 +1,7 @@
 pub(crate) mod classroom;
 mod course;
 mod lesson;
+pub(crate) mod local_session;
 pub(crate) mod question;
 pub(crate) mod question_asset;
 pub(crate) mod question_set;

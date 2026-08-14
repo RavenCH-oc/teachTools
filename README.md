@@ -2,11 +2,11 @@
 
 Classroom 是教師主控、學生以瀏覽器加入的課堂互動教學軟體。本倉庫目前處於 Phase 1：Monorepo / Application Skeleton。
 
-## Current implementation phase: Phase 7
+## Current implementation phase: Phase 8
 
-Phase 7 adds an on-demand local Classroom HTTP/WebSocket transport foundation. The Teacher Tauri process hosts a Rust Axum server on `0.0.0.0:0` only after the teacher starts it, with a static root page, versioned health data, same-origin WebSocket hello/ping/pong, controlled lifecycle shutdown, and safe LAN candidate diagnostics. QR join, student sessions, participants, question publishing, grading submissions, student media delivery, Supabase, OCR, and AI remain out of scope.
+Phase 8 adds a local Teacher-to-Student lobby slice. The Teacher starts the local Axum server, chooses a classroom, creates and opens one roster-matched Local Session, explicitly selects a LAN candidate URL, and renders an offline SVG QR code. The Rust server delivers the built Student app, validates seat/name pairs without roster enumeration, stores only SHA-256 participant credential hashes, and authenticates Student WebSockets for lobby presence and session end events. The packaged Teacher runtime serves the prebuilt Student app without Node, pnpm, or Vite.
 
-The older Phase 0/1 historical notes below are preserved for context; the Phase 7 statement above is the current implementation boundary.
+Live Quiz question publishing, Student answers, grading, scores, grouping, peer review, Supabase, cloud sessions, OCR, and AI remain out of scope.
 
 本階段已建立：
 

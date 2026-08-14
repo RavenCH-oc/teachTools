@@ -10,16 +10,23 @@ use crate::infrastructure::persistence::repositories::{
 };
 mod assets;
 mod local_server;
+mod local_session;
 mod questions;
+mod student_assets;
 pub use assets::{
     ImportQuestionAssetRequest, QuestionAssetDto, QuestionAssetPreviewDto,
     UpdateQuestionAssetPageReferenceRequest,
 };
 pub use local_server::{LocalServerService, LocalServerStatus};
+pub use local_session::{
+    LocalSessionDto, LocalSessionService, ParticipantSelfView, TeacherParticipantDto,
+};
 pub use questions::{
     CreateQuestionRequest, CreateQuestionSetRequest, QuestionDto, QuestionSetDto,
     ReorderQuestionsRequest, UpdateQuestionRequest, UpdateQuestionSetRequest,
 };
+pub use student_assets::StudentAssetLocation;
+pub(crate) use student_assets::StudentAssetProvider;
 
 pub struct PersistenceService {
     database: Database,
@@ -211,6 +218,9 @@ impl PersistenceService {
     }
     pub(crate) fn delete_question_with_assets(&self, question_id: &str) -> Result<(), AppError> {
         self.assets.delete_question_with_assets(question_id)
+    }
+    pub(crate) fn database_for_local_session(&self) -> Database {
+        self.database.clone()
     }
 }
 
