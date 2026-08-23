@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LiveQuizPage, type LiveQuizApi } from "./LiveQuizPage";
-import type { LocalServerStatus, LocalSession, Question, QuestionSet } from "../../types/teacher";
+import type { LocalServerStatus, LocalSession, Question, QuestionSet, QuestionStatistics, SessionQuestion } from "../../types/teacher";
 
 const server: LocalServerStatus = {
   running: true,
@@ -29,6 +29,7 @@ const baseSession: LocalSession = {
 };
 
 function apiFixture(session: LocalSession | null): LiveQuizApi {
+  const statistics: QuestionStatistics = { sessionQuestionId: "session-question", position: 0, questionType: "true_false", prompt: "A", participantCount: 4, answeredCount: 3, unansweredCount: 1, responseRate: 0.75, gradedCount: 0, pendingCount: 0, correctCount: 0, incorrectCount: 0, accuracy: null, averageScore: null, maxPoints: 1, choiceDistribution: [] };
   return {
     getLocalServerStatus: vi.fn().mockResolvedValue(server),
     getActiveLocalSession: vi.fn().mockResolvedValue(session),
@@ -42,7 +43,12 @@ function apiFixture(session: LocalSession | null): LiveQuizApi {
     reopenSessionQuestion: vi.fn(),
     revealSessionQuestion: vi.fn(),
     getSessionQuestionProgress: vi.fn(),
+    getQuestionStatistics: vi.fn().mockResolvedValue(statistics),
   };
+}
+
+function publishedQuestion(state: SessionQuestion["state"]): SessionQuestion {
+  return { id: "session-question-1", sessionId: baseSession.id, sourceQuestionId: "source-question-1", type: "true_false", prompt: "A", points: 1, position: 0, answerConfig: { correctAnswer: true }, gradingConfig: {}, metadata: {}, configVersion: 1, state, createdAt: "2026-08-11T00:00:00Z", openedAt: null, lockedAt: null, revealedAt: null, assets: [] };
 }
 
 describe("LiveQuizPage", () => {
@@ -105,5 +111,49 @@ describe("LiveQuizPage", () => {
     expect(screen.getByRole("heading", { name: "即時測驗" })).toBeInTheDocument();
     expect(api.getActiveLocalSession).toHaveBeenLastCalledWith();
     expect(screen.queryByText("請先開啟伺服器並建立課堂。")).not.toBeInTheDocument();
+  });
+
+  it("hydrates the current-question dashboard without disabling Live Quiz controls", async () => {
+    const api = apiFixture(baseSession);
+    vi.mocked(api.listSessionQuestions).mockResolvedValue([publishedQuestion("OPEN")]);
+    render(<LiveQuizPage api={api} onError={vi.fn()} />);
+
+    expect(await screen.findByText("3 / 4")).toBeInTheDocument();
+    expect(screen.getByText("作答結束後會顯示答案分析。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "鎖定題目" })).toBeEnabled();
+    expect(api.getQuestionStatistics).toHaveBeenCalledWith(baseSession.id, "session-question-1");
+  });
+
+  it("shows the hidden current question and keeps its open action available", async () => {
+    const api = apiFixture(baseSession);
+    vi.mocked(api.listSessionQuestions).mockResolvedValue([publishedQuestion("HIDDEN")]);
+    render(<LiveQuizPage api={api} onError={vi.fn()} />);
+
+    expect(await screen.findByText("題目尚未開放作答。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "開啟題目" })).toBeEnabled();
+    expect(api.getQuestionStatistics).not.toHaveBeenCalled();
+  });
+
+  it("selects the latest hidden question after a previously revealed question", async () => {
+    const api = apiFixture(baseSession);
+    vi.mocked(api.listSessionQuestions).mockResolvedValue([
+      { ...publishedQuestion("REVEALED"), id: "session-question-1", position: 0 },
+      { ...publishedQuestion("HIDDEN"), id: "session-question-2", position: 1 },
+    ]);
+    render(<LiveQuizPage api={api} onError={vi.fn()} />);
+
+    expect(await screen.findByText("題目尚未開放作答。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "開啟題目" })).toBeEnabled();
+    expect(screen.queryByText("作答結束後會顯示答案分析。")).not.toBeInTheDocument();
+  });
+
+  it("keeps question controls enabled while statistics are still loading", async () => {
+    const api = apiFixture(baseSession);
+    vi.mocked(api.listSessionQuestions).mockResolvedValue([publishedQuestion("OPEN")]);
+    vi.mocked(api.getQuestionStatistics).mockReturnValue(new Promise<QuestionStatistics>(() => undefined));
+    render(<LiveQuizPage api={api} onError={vi.fn()} />);
+
+    expect(await screen.findByText("正在更新統計…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "鎖定題目" })).toBeEnabled();
   });
 });

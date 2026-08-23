@@ -62,7 +62,7 @@ export function App({ api = teacherApi }: AppProps) {
         {status === "ready" && page === "lessons" && <Lessons api={api} courses={courses} onError={setError} />}
         {status === "ready" && page === "question-bank" && <QuestionBankPage api={api} onDraftStateChange={setHasQuestionDraft} onError={setError} />}
         {status === "ready" && page === "local-session" && <LocalSessionLobbyPage api={api} classrooms={classrooms} onError={setError} onClearError={() => setError("")} onOpenLiveQuiz={() => navigate("live-quiz")} />}
-        {status === "ready" && page === "live-quiz" && <LiveQuizPage api={api as Required<Pick<TeacherApi, "getLocalServerStatus" | "getActiveLocalSession" | "listQuestionSets" | "listQuestions" | "startLocalSession" | "publishSessionQuestion" | "listSessionQuestions" | "openSessionQuestion" | "lockSessionQuestion" | "reopenSessionQuestion" | "revealSessionQuestion" | "getSessionQuestionProgress">>} onError={setError} />}
+        {status === "ready" && page === "live-quiz" && <LiveQuizPage api={api as Required<Pick<TeacherApi, "getLocalServerStatus" | "getActiveLocalSession" | "listQuestionSets" | "listQuestions" | "startLocalSession" | "publishSessionQuestion" | "listSessionQuestions" | "openSessionQuestion" | "lockSessionQuestion" | "reopenSessionQuestion" | "revealSessionQuestion" | "getSessionQuestionProgress" | "getQuestionStatistics">>} onError={setError} />}
         {status === "ready" && page !== "home" && <p className="page-kicker">教師工作區 / {pageTitle}</p>}
       </main>
     </div>
