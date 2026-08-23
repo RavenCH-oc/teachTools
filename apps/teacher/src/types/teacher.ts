@@ -39,6 +39,73 @@ export interface SessionQuestion {
   createdAt: string; openedAt: string | null; lockedAt: string | null; revealedAt: string | null; assets: Array<{ id: string; assetType: "image" | "pdf"; displayName: string; mimeType: string; sizeBytes: number; position: number; pageReference: number | null }>;
 }
 export interface TeacherQuestionProgress { sessionQuestionId: string; answeredCount: number; participantCount: number; answeredParticipantIds: string[] }
+export interface ChoiceDistribution {
+  optionId: string;
+  label: string;
+  selectionCount: number;
+  selectionRate: number | null;
+}
+export interface QuestionStatistics {
+  sessionQuestionId: string;
+  position: number;
+  questionType: Question["type"];
+  prompt: string;
+  participantCount: number;
+  answeredCount: number;
+  unansweredCount: number;
+  responseRate: number | null;
+  gradedCount: number;
+  pendingCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  accuracy: number | null;
+  averageScore: number | null;
+  maxPoints: number;
+  choiceDistribution: ChoiceDistribution[];
+}
+export interface ParticipantSessionStatistics {
+  participantId: string;
+  seatNumber: number;
+  displayName: string;
+  eligibleQuestionCount: number;
+  answeredCount: number;
+  unansweredCount: number;
+  gradedCount: number;
+  pendingCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  earnedScore: number;
+  gradedPossibleScore: number;
+  accuracy: number | null;
+  scoreRate: number | null;
+}
+export interface SessionStatistics {
+  sessionId: string;
+  sessionState: LocalSessionState;
+  participantCount: number;
+  publishedQuestionCount: number;
+  eligibleQuestionCount: number;
+  answeredOpportunityCount: number;
+  totalOpportunityCount: number;
+  responseRate: number | null;
+  gradedSubmissionCount: number;
+  pendingSubmissionCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  accuracy: number | null;
+  earnedScoreTotal: number;
+  gradedPossibleScoreTotal: number;
+  scoreRate: number | null;
+  questionSummaries: QuestionStatistics[];
+  participantSummaries: ParticipantSessionStatistics[];
+}
+export interface QuestionDifficulty {
+  sessionQuestionId: string;
+  position: number;
+  prompt: string;
+  accuracy: number;
+  gradedCount: number;
+}
 export interface Classroom { id: string; name: string; academic_year: string | null; created_at: string; updated_at: string }
 export interface Student { id: string; class_id: string; seat_number: number; name: string; created_at: string; updated_at: string }
 export interface Course { id: string; name: string; description: string | null; created_at: string; updated_at: string }
@@ -79,6 +146,11 @@ export interface TeacherApi {
   reopenSessionQuestion?(sessionQuestionId: string): Promise<SessionQuestion>
   revealSessionQuestion?(sessionQuestionId: string): Promise<SessionQuestion>
   getSessionQuestionProgress?(sessionQuestionId: string, sessionId: string): Promise<TeacherQuestionProgress>
+  getQuestionStatistics?(sessionId: string, sessionQuestionId: string): Promise<QuestionStatistics>
+  listQuestionStatistics?(sessionId: string): Promise<QuestionStatistics[]>
+  getParticipantSessionStatistics?(sessionId: string, participantId: string): Promise<ParticipantSessionStatistics>
+  getSessionStatistics?(sessionId: string): Promise<SessionStatistics>
+  getDifficultQuestions?(sessionId: string): Promise<QuestionDifficulty[]>
   listClassrooms(): Promise<Classroom[]>
   createClassroom(request: CreateClassroomRequest): Promise<Classroom>
   updateClassroom(id: string, request: CreateClassroomRequest): Promise<Classroom>

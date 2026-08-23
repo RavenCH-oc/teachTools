@@ -13,6 +13,7 @@ mod live_quiz;
 mod local_server;
 mod local_session;
 mod questions;
+mod statistics;
 mod student_assets;
 pub use assets::{
     DeleteQuestionDraftAssetRequest, DraftQuestionAssetDto, ImportQuestionAssetRequest,
@@ -31,6 +32,10 @@ pub use questions::{
     CreateQuestionRequest, CreateQuestionSetRequest, CreateQuestionWithDraftAssetsRequest,
     QuestionDto, QuestionSetDto, ReorderQuestionsRequest, UpdateQuestionRequest,
     UpdateQuestionSetRequest,
+};
+pub use statistics::{
+    ParticipantSessionStatisticsDto, QuestionDifficultyDto, QuestionStatisticsDto,
+    SessionStatisticsDto, StatisticsService,
 };
 pub use student_assets::StudentAssetLocation;
 pub(crate) use student_assets::StudentAssetProvider;

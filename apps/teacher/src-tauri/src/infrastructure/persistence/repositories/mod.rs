@@ -6,6 +6,7 @@ pub(crate) mod local_session;
 pub(crate) mod question;
 pub(crate) mod question_asset;
 pub(crate) mod question_set;
+pub(crate) mod statistics;
 pub(crate) mod student;
 
 pub use classroom::{Classroom, ClassroomRepository, NewClassroom};

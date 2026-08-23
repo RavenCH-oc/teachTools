@@ -9,9 +9,10 @@ use application::{
     CreateQuestionSetRequest, CreateQuestionWithDraftAssetsRequest, CreateStudentRequest,
     DeleteQuestionDraftAssetRequest, ImportQuestionAssetRequest, ImportQuestionDraftAssetRequest,
     LiveQuizService, LocalDatabaseStatus, LocalServerService, LocalServerStatus, LocalSessionDto,
-    LocalSessionService, PersistenceService, ReorderQuestionsRequest, UpdateClassroomRequest,
-    UpdateCourseRequest, UpdateLessonRequest, UpdateQuestionAssetPageReferenceRequest,
-    UpdateQuestionRequest, UpdateQuestionSetRequest, UpdateStudentRequest,
+    LocalSessionService, PersistenceService, ReorderQuestionsRequest, StatisticsService,
+    UpdateClassroomRequest, UpdateCourseRequest, UpdateLessonRequest,
+    UpdateQuestionAssetPageReferenceRequest, UpdateQuestionRequest, UpdateQuestionSetRequest,
+    UpdateStudentRequest,
 };
 use error::AppError;
 use serde::Serialize;
@@ -152,6 +153,48 @@ fn get_session_question_progress(
         session_question_id,
         sessions.list_participants(&session_id)?.len(),
     )
+}
+
+#[tauri::command]
+fn get_question_statistics(
+    session_id: String,
+    session_question_id: String,
+    statistics: tauri::State<'_, std::sync::Arc<StatisticsService>>,
+) -> Result<application::QuestionStatisticsDto, AppError> {
+    statistics.question_statistics(&session_id, &session_question_id)
+}
+
+#[tauri::command]
+fn list_question_statistics(
+    session_id: String,
+    statistics: tauri::State<'_, std::sync::Arc<StatisticsService>>,
+) -> Result<Vec<application::QuestionStatisticsDto>, AppError> {
+    statistics.list_question_statistics(&session_id)
+}
+
+#[tauri::command]
+fn get_participant_session_statistics(
+    session_id: String,
+    participant_id: String,
+    statistics: tauri::State<'_, std::sync::Arc<StatisticsService>>,
+) -> Result<application::ParticipantSessionStatisticsDto, AppError> {
+    statistics.participant_statistics(&session_id, &participant_id)
+}
+
+#[tauri::command]
+fn get_session_statistics(
+    session_id: String,
+    statistics: tauri::State<'_, std::sync::Arc<StatisticsService>>,
+) -> Result<application::SessionStatisticsDto, AppError> {
+    statistics.session_statistics(&session_id)
+}
+
+#[tauri::command]
+fn get_difficult_questions(
+    session_id: String,
+    statistics: tauri::State<'_, std::sync::Arc<StatisticsService>>,
+) -> Result<Vec<application::QuestionDifficultyDto>, AppError> {
+    statistics.difficult_questions(&session_id)
 }
 
 #[tauri::command]
@@ -464,6 +507,9 @@ pub fn run() -> Result<(), String> {
             let sessions = LocalSessionService::initialize(service.database_for_local_session())?;
             let quiz =
                 LiveQuizService::initialize(service.database_for_local_session(), app_data_dir)?;
+            let statistics = std::sync::Arc::new(StatisticsService::initialize(
+                service.database_for_local_session(),
+            ));
             let student_assets =
                 application::StudentAssetLocation::development_or_bundle(app.handle())?;
             app.manage(LocalServerService::new(
@@ -473,6 +519,7 @@ pub fn run() -> Result<(), String> {
             ));
             app.manage(quiz);
             app.manage(sessions);
+            app.manage(statistics);
             app.manage(service);
             Ok(())
         })
@@ -495,6 +542,11 @@ pub fn run() -> Result<(), String> {
             reopen_session_question,
             reveal_session_question,
             get_session_question_progress,
+            get_question_statistics,
+            list_question_statistics,
+            get_participant_session_statistics,
+            get_session_statistics,
+            get_difficult_questions,
             list_classrooms,
             create_classroom,
             update_classroom,
