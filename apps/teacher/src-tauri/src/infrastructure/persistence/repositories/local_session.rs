@@ -73,7 +73,7 @@ impl LocalSessionRepository {
         }
         let active_exists = transaction
             .query_row(
-                "SELECT 1 FROM local_sessions WHERE state IN ('CREATED', 'LOBBY') LIMIT 1",
+                "SELECT 1 FROM local_sessions WHERE state IN ('CREATED', 'LOBBY', 'ACTIVE') LIMIT 1",
                 [],
                 |_| Ok(()),
             )
@@ -98,7 +98,7 @@ impl LocalSessionRepository {
         connection
             .query_row(
                 &session_select(
-                    "WHERE s.state IN ('CREATED', 'LOBBY') ORDER BY s.created_at DESC LIMIT 1",
+                    "WHERE s.state IN ('CREATED', 'LOBBY', 'ACTIVE') ORDER BY s.created_at DESC LIMIT 1",
                 ),
                 [],
                 session_from_row,
@@ -158,7 +158,7 @@ impl LocalSessionRepository {
         let connection = database.connection()?;
         let now = now_utc();
         let changed = connection.execute(
-            "UPDATE local_sessions SET state = 'ENDED', ended_at = ?1, ended_reason = ?2, updated_at = ?1 WHERE id = ?3 AND state IN ('CREATED', 'LOBBY')",
+            "UPDATE local_sessions SET state = 'ENDED', ended_at = ?1, ended_reason = ?2, updated_at = ?1 WHERE id = ?3 AND state IN ('CREATED', 'LOBBY', 'ACTIVE')",
             params![now, reason, id],
         )?;
         if changed == 0 {
@@ -167,11 +167,28 @@ impl LocalSessionRepository {
         Self::get_by_id(database, id)?.ok_or(AppError::Storage)
     }
 
+    pub fn start(
+        database: &Database,
+        id: &str,
+        server_instance_id: &str,
+    ) -> Result<LocalSessionRecord, AppError> {
+        let connection = database.connection()?;
+        let now = now_utc();
+        let changed = connection.execute(
+            "UPDATE local_sessions SET state = 'ACTIVE', updated_at = ?1 WHERE id = ?2 AND state = 'LOBBY' AND server_instance_id = ?3",
+            params![now, id, server_instance_id],
+        )?;
+        if changed == 0 {
+            return Err(session_transition_error(database, id, server_instance_id)?);
+        }
+        Self::get_by_id(database, id)?.ok_or(AppError::Storage)
+    }
+
     pub fn end_stale_sessions(database: &Database) -> Result<(), AppError> {
         let connection = database.connection()?;
         let now = now_utc();
         connection.execute(
-            "UPDATE local_sessions SET state = 'ENDED', ended_at = ?1, ended_reason = 'server_restart', updated_at = ?1 WHERE state IN ('CREATED', 'LOBBY')",
+            "UPDATE local_sessions SET state = 'ENDED', ended_at = ?1, ended_reason = 'server_restart', updated_at = ?1 WHERE state IN ('CREATED', 'LOBBY', 'ACTIVE')",
             [now],
         )?;
         Ok(())

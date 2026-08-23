@@ -1,10 +1,12 @@
 # Session 與題目生命週期
 
-## Session 狀態
+## Session 狀態（通用架構延伸）
+
+下列完整生命週期是 Phase 0 所保留的未來 archive/pause 架構延伸；Phase 9 local runtime 的實際狀態與轉換，以本文後面的 `Phase 9 local live quiz scope` 為準。Phase 9 不建立或寫入 `PAUSED`、`ARCHIVED`。
 
     CREATED → LOBBY → ACTIVE → PAUSED → ACTIVE → ENDED → ARCHIVED
 
-Session state 為 CREATED、LOBBY、ACTIVE、PAUSED、ENDED、ARCHIVED。有效轉換如下：
+通用 Session state 可包含 CREATED、LOBBY、ACTIVE、PAUSED、ENDED、ARCHIVED。有效轉換如下：
 
 | 目前狀態 | 允許轉換 |
 | --- | --- |
@@ -36,9 +38,11 @@ OPEN 期間可接受 Submission。LOCKED 後，新 submission 預設拒絕並回
 ## 封存邊界
 
 endSession 停止新的 classroom interaction，archiveSession 將 final runtime 資料、grades、統計與必要 audit metadata 轉入 SQLite 歷史資料。封存完成後 session 變為不可變；Supabase runtime copy 可按 retention policy 清除或匿名化。
-# Phase 8 local session scope
+# Phase 9 local live quiz scope
 
-Phase 8 persists only `CREATED → LOBBY → ENDED`. `ACTIVE`, `PAUSED`, `ARCHIVED`, question delivery, answer submission, and grading are future work. A normal app exit ends any active local session before the local server stops; process restart fail-closes prior non-terminal sessions as `ENDED`.
+Phase 9 persists `CREATED → LOBBY → ACTIVE → ENDED`. Entering `ACTIVE` closes join admission. A normal app exit ends any active local session before the local server stops; process restart fail-closes prior non-terminal sessions as `ENDED`. `PAUSED` and `ARCHIVED` remain future extensions.
+
+Each published question is an immutable session snapshot. Its lifecycle is `HIDDEN → OPEN → LOCKED → REVEALED`, with only `LOCKED → OPEN` permitted for reopen. A Session may have only one `OPEN` or `LOCKED` question. Students receive no hidden question or grading data, and own grading/results become visible only after `REVEALED`.
 
 ## Phase 8 Teacher Presence
 

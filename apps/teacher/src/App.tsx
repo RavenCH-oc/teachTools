@@ -5,11 +5,12 @@ import type { Classroom, Course, Lesson, Student, TeacherApi } from "./types/tea
 import { QuestionBankPage } from "./features/question-bank/QuestionBankPage";
 import { LocalServerPanel } from "./features/local-server/LocalServerPanel";
 import { LocalSessionLobbyPage } from "./features/local-session/LocalSessionLobbyPage";
+import { LiveQuizPage } from "./features/live-quiz/LiveQuizPage";
 
-type Page = "home" | "classrooms" | "students" | "courses" | "lessons" | "question-bank" | "local-session";
+type Page = "home" | "classrooms" | "students" | "courses" | "lessons" | "question-bank" | "local-session" | "live-quiz";
 const nav: Array<{ id: Page; label: string }> = [
   { id: "home", label: "首頁" }, { id: "classrooms", label: "班級" }, { id: "students", label: "學生" },
-  { id: "courses", label: "課程" }, { id: "lessons", label: "課程單元" }, { id: "question-bank", label: "題庫" }, { id: "local-session", label: "課堂" },
+  { id: "courses", label: "課程" }, { id: "lessons", label: "課程單元" }, { id: "question-bank", label: "題庫" }, { id: "local-session", label: "課堂" }, { id: "live-quiz", label: "即時測驗" },
 ];
 const later = ["設定"];
 
@@ -21,6 +22,7 @@ export function App({ api = teacherApi }: AppProps) {
   const [error, setError] = useState("");
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [hasQuestionDraft, setHasQuestionDraft] = useState(false);
 
   const run = async (operation: () => Promise<void>) => {
     setError("");
@@ -34,9 +36,15 @@ export function App({ api = teacherApi }: AppProps) {
   useEffect(() => { void refresh(); }, []);
 
   const pageTitle = useMemo(() => nav.find((item) => item.id === page)?.label ?? "首頁", [page]);
-  const navigate = (next: Page) => { setError(""); setPage(next); };
+  const navigate = (next: Page) => {
+    if (page === "question-bank" && hasQuestionDraft && next !== page) {
+      setError("請先建立或取消目前的題目草稿，再離開題庫。");
+      return;
+    }
+    setError(""); setPage(next);
+  };
   return <div className="teacher-shell">
-    <header className="teacher-header"><div><p className="eyebrow">教師工作區</p><h1>{APP_NAME}</h1></div><span className="phase-badge">第 8 階段</span></header>
+    <header className="teacher-header"><div><p className="eyebrow">教師工作區</p><h1>{APP_NAME}</h1></div><span className="phase-badge">第 9 階段</span></header>
     <div className="teacher-body">
       <nav aria-label="教師導覽" className="teacher-nav">
         {nav.map((item) => <button className={`nav-item ${page === item.id ? "active" : ""}`} key={item.id} onClick={() => navigate(item.id)} type="button">{item.label}</button>)}
@@ -52,8 +60,9 @@ export function App({ api = teacherApi }: AppProps) {
         {status === "ready" && page === "students" && <Students api={api} classrooms={classrooms} onError={setError} />}
         {status === "ready" && page === "courses" && <Courses api={api} data={courses} onChange={setCourses} onError={setError} />}
         {status === "ready" && page === "lessons" && <Lessons api={api} courses={courses} onError={setError} />}
-        {status === "ready" && page === "question-bank" && <QuestionBankPage api={api} onError={setError} />}
-        {status === "ready" && page === "local-session" && <LocalSessionLobbyPage api={api} classrooms={classrooms} onError={setError} onClearError={() => setError("")} />}
+        {status === "ready" && page === "question-bank" && <QuestionBankPage api={api} onDraftStateChange={setHasQuestionDraft} onError={setError} />}
+        {status === "ready" && page === "local-session" && <LocalSessionLobbyPage api={api} classrooms={classrooms} onError={setError} onClearError={() => setError("")} onOpenLiveQuiz={() => navigate("live-quiz")} />}
+        {status === "ready" && page === "live-quiz" && <LiveQuizPage api={api as Required<Pick<TeacherApi, "getLocalServerStatus" | "getActiveLocalSession" | "listQuestionSets" | "listQuestions" | "startLocalSession" | "publishSessionQuestion" | "listSessionQuestions" | "openSessionQuestion" | "lockSessionQuestion" | "reopenSessionQuestion" | "revealSessionQuestion" | "getSessionQuestionProgress">>} onError={setError} />}
         {status === "ready" && page !== "home" && <p className="page-kicker">教師工作區 / {pageTitle}</p>}
       </main>
     </div>

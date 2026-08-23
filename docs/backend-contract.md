@@ -44,14 +44,18 @@ Local mode 使用 WebSocket；cloud mode 使用 Supabase Realtime。訂閱端以
 
 ## Submission idempotency
 
-submission_id 為穩定 client-generated UUIDv7。第一次成功處理會持久化 request 的語意結果；相同 identity 與相同 payload 重送回傳原結果；相同 identity 搭配不同 payload 回傳 CONFLICT。任何 timeout、重連或重試都不得產生重複作答、重複評分或雙重統計。題目鎖定時的處理永遠基於 backend 的原子 state 檢查。
+submission_id 為穩定、以瀏覽器 Web Crypto 產生的 client-generated UUID（支援 `randomUUID()`，並以 UUIDv4 `getRandomValues()` fallback）；第一次成功處理會持久化 request 的語意結果；相同 identity 與相同 payload 重送回傳原結果；相同 identity 搭配不同 payload 回傳 CONFLICT。任何 timeout、重連或重試都不得產生重複作答、重複評分或雙重統計。題目鎖定時的處理永遠基於 backend 的原子 state 檢查。
 
 ## Capabilities
 
 required capabilities：session lifecycle、participant join/reconnect、question lifecycle、submission idempotency、authoritative grading、realtime events、archive。
 
 optional capabilities：student questions/voting、groups、peer review、future custom question types。UI 必須依 capability flag 隱藏或停用不支援的工作流程。
-# Phase 8 local lobby transport
+# Phase 9 local live quiz transport
+
+The authenticated local WebSocket protocol adds `session_sync`, `question_state_changed`, `question_revealed`, `submit_answer`, `submission_acknowledged`, and `submission_result`. `submit_answer` carries a UUID submission ID and typed answer only. The server performs replay lookup before rejecting a locked question, then creates immutable revisions transactionally for distinct IDs. Student public DTOs never contain answer config, grading config, other participants' answers, or scores.
+
+Session media is served by an authenticated header-based route. The route also requires the owning `SessionQuestion` to be `OPEN`, `LOCKED`, or `REVEALED`; `HIDDEN` question assets are not downloadable. The URL contains only a session-asset ID; credential, participant ID, and filesystem path never appear in a URL or public DTO.
 
 The shared local protocol supports `server_hello`, `ping`, `pong`, `participant_auth`, `participant_authenticated`, `session_state_changed`, and controlled errors. No question, answer, score, roster, or participant-list message is public. `participant_auth` sends the temporary credential only in the WebSocket message body. `AUTH_FAILED`, `SESSION_ENDED`, and `SERVER_INSTANCE_MISMATCH` are authoritative credential outcomes; `AUTH_TIMEOUT` is transient and must keep the stored credential eligible for reconnect.
 

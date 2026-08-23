@@ -2,11 +2,11 @@
 
 Classroom 是教師主控、學生以瀏覽器加入的課堂互動教學軟體。本倉庫目前處於 Phase 1：Monorepo / Application Skeleton。
 
-## Current implementation phase: Phase 8
+## Current implementation phase: Phase 9
 
-Phase 8 adds a local Teacher-to-Student lobby slice. The Teacher starts the local Axum server, chooses a classroom, creates and opens one roster-matched Local Session, explicitly selects a LAN candidate URL, and renders an offline SVG QR code. The Rust server delivers the built Student app, validates seat/name pairs without roster enumeration, stores only SHA-256 participant credential hashes, and authenticates Student WebSockets for lobby presence and session end events. The packaged Teacher runtime serves the prebuilt Student app without Node, pnpm, or Vite.
+Phase 9 adds the local live-quiz vertical slice. A Teacher starts the session, snapshots a Question Bank question and managed media into session-owned storage, opens/locks/reopens/reveals it, and sees basic answered progress. Authenticated Students receive only public question data, submit typed answers with idempotent UUID submission IDs, recover the current question after reconnect, and see only their own result after reveal. Rust grades automatic question types from the immutable session snapshot; essays remain pending.
 
-Live Quiz question publishing, Student answers, grading, scores, grouping, peer review, Supabase, cloud sessions, OCR, and AI remain out of scope.
+Advanced statistics, grouping, peer review, manual essay grading, Supabase/cloud sessions, OCR, and AI remain out of scope.
 
 本階段已建立：
 
@@ -21,7 +21,7 @@ Live Quiz question publishing, Student answers, grading, scores, grouping, peer 
 - @classtools/grading
 - strict TypeScript、ESLint、Vitest 與 React Testing Library smoke tests
 
-本階段刻意尚未建立 SQLite schema、Supabase client/migrations、local HTTP/WebSocket server、QR、grading engine、登入、資料 repositories 或 Phase 2 domain workflows。
+Phase 9 已在既有 contract 上加入 SQLite migrations/repositories、local HTTP/WebSocket transport、QR join、authenticated Student lobby、live question snapshots、authoritative Rust grading、submission idempotency，以及 question/session media flows。Supabase/cloud runtime、進階統計、分組、同儕互評、OCR 與 AI 仍不在本階段範圍。
 
 ## Development prerequisites
 
@@ -61,4 +61,4 @@ Phase 0 架構與工程契約仍是所有後續工作的規範：
 - [工程規範](docs/engineering-rules.md)
 - [Architecture Decision Records](docs/adr/)
 
-Python、Electron、C#、Java、Go、資料庫與雲端 SDK 不屬於此 skeleton 的 dependency boundary。下一階段才會在既有 contract 上加入 persistence 與 runtime implementation。
+Python、Electron、C#、Java、Go、Supabase client 與大型 UI/state framework 不屬於目前 application dependency boundary；本地 SQLite 與 Rust local server 是 Phase 2–9 已核准的 runtime。後續階段仍須在既有 contract 上逐步加入明確授權的 cloud 與分析能力。

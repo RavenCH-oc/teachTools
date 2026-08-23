@@ -17,6 +17,7 @@ const MAX_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
 const MAX_PDF_BYTES: u64 = 100 * 1024 * 1024;
 const MAX_ASSETS_PER_QUESTION: usize = 10;
 const STALE_TEMP_AGE: Duration = Duration::from_secs(60 * 60);
+const STALE_DRAFT_AGE: Duration = Duration::from_secs(24 * 60 * 60);
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,6 +42,24 @@ pub struct QuestionAssetPreviewDto {
     pub asset_url: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionDraftDto {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DraftQuestionAssetDto {
+    pub id: String,
+    pub draft_id: String,
+    pub asset_type: String,
+    pub display_name: String,
+    pub mime_type: String,
+    pub size_bytes: i64,
+    pub asset_url: String,
+}
+
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AssetStatus {
@@ -53,6 +72,20 @@ pub enum AssetStatus {
 pub struct ImportQuestionAssetRequest {
     pub question_id: String,
     pub source_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportQuestionDraftAssetRequest {
+    pub draft_id: String,
+    pub source_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteQuestionDraftAssetRequest {
+    pub draft_id: String,
+    pub draft_asset_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -122,10 +155,30 @@ struct SourceProfile {
     size_bytes: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DraftAssetRecord {
+    id: String,
+    extension: String,
+    asset_type: String,
+    display_name: String,
+    mime_type: String,
+    size_bytes: u64,
+    sha256: String,
+}
+
+struct PromotedDraftAsset {
+    record: DraftAssetRecord,
+    id: String,
+    shard: String,
+    temporary_path: PathBuf,
+    final_path: PathBuf,
+}
+
 pub struct AssetService {
     database: Database,
     assets_root: PathBuf,
     trash_root: PathBuf,
+    drafts_root: PathBuf,
 }
 
 impl AssetService {
@@ -135,15 +188,230 @@ impl AssetService {
     ) -> Result<Self, AppError> {
         let assets_root = app_data_dir.as_ref().join("assets");
         let trash_root = assets_root.join(".trash");
+        let drafts_root = assets_root.join(".draft");
         fs::create_dir_all(&trash_root).map_err(|_| AppError::Storage)?;
+        fs::create_dir_all(&drafts_root).map_err(|_| AppError::Storage)?;
         let service = Self {
             database,
             assets_root,
             trash_root,
+            drafts_root,
         };
         service.recover_staged_deletions()?;
         service.cleanup_stale_temp_files(STALE_TEMP_AGE)?;
+        service.cleanup_stale_drafts(STALE_DRAFT_AGE)?;
         Ok(service)
+    }
+
+    pub fn create_draft(&self) -> Result<QuestionDraftDto, AppError> {
+        let id = new_id();
+        fs::create_dir(self.draft_directory(&id)?).map_err(|_| AppError::Storage)?;
+        Ok(QuestionDraftDto { id })
+    }
+
+    pub fn import_draft(
+        &self,
+        request: ImportQuestionDraftAssetRequest,
+    ) -> Result<DraftQuestionAssetDto, AppError> {
+        if request.source_path.trim().is_empty() {
+            return Err(AppError::Validation(
+                "a source file must be selected".to_owned(),
+            ));
+        }
+        let directory = self.draft_directory(&request.draft_id)?;
+        if !directory.is_dir() {
+            return Err(AppError::NotFound("question draft".to_owned()));
+        }
+        let records = self.list_draft_records(&request.draft_id)?;
+        if records.len() >= MAX_ASSETS_PER_QUESTION {
+            return Err(AppError::Conflict(
+                "a question can have at most ten assets".to_owned(),
+            ));
+        }
+        let source = Path::new(&request.source_path);
+        let profile = source_profile(source)?;
+        let source_hash = hash_file(source)?;
+        if records.iter().any(|record| record.sha256 == source_hash) {
+            return Err(AppError::Conflict(
+                "this file is already attached to the draft".to_owned(),
+            ));
+        }
+
+        let id = new_id();
+        let final_path = directory.join(format!("{id}.{}", profile.extension));
+        let temporary_path = directory.join(format!("{id}.tmp"));
+        let (copied_bytes, copied_hash) = match copy_and_hash(source, &temporary_path) {
+            Ok(value) => value,
+            Err(error) => {
+                remove_file_quietly(&temporary_path);
+                return Err(error);
+            }
+        };
+        if copied_bytes != profile.size_bytes || copied_hash != source_hash {
+            remove_file_quietly(&temporary_path);
+            return Err(AppError::AssetCorrupted);
+        }
+        if fs::rename(&temporary_path, &final_path).is_err() {
+            remove_file_quietly(&temporary_path);
+            return Err(AppError::Storage);
+        }
+        let record = DraftAssetRecord {
+            id: id.clone(),
+            extension: profile.extension,
+            asset_type: profile.kind.asset_type().to_owned(),
+            display_name: profile.display_name,
+            mime_type: profile.kind.mime_type().to_owned(),
+            size_bytes: profile.size_bytes,
+            sha256: source_hash,
+        };
+        if let Err(error) = self.write_draft_record(&request.draft_id, &record) {
+            remove_file_quietly(&final_path);
+            return Err(error);
+        }
+        self.draft_dto(&request.draft_id, record)
+    }
+
+    pub fn delete_draft_asset(
+        &self,
+        request: DeleteQuestionDraftAssetRequest,
+    ) -> Result<(), AppError> {
+        let record = self.draft_record(&request.draft_id, &request.draft_asset_id)?;
+        let directory = self.draft_directory(&request.draft_id)?;
+        let asset_path = directory.join(format!("{}.{}", record.id, record.extension));
+        let record_path = self.draft_record_path(&request.draft_id, &record.id)?;
+        if !asset_path.is_file() {
+            return Err(AppError::AssetCorrupted);
+        }
+        let staged_path = directory.join(format!("{}.delete", record.id));
+        if staged_path.exists() || fs::rename(&asset_path, &staged_path).is_err() {
+            return Err(AppError::Storage);
+        }
+        if fs::remove_file(&record_path).is_err() {
+            let _ = fs::rename(&staged_path, &asset_path);
+            return Err(AppError::Storage);
+        }
+        if fs::remove_file(&staged_path).is_err() {
+            let _ = fs::rename(&staged_path, &asset_path);
+            let _ = self.write_draft_record(&request.draft_id, &record);
+            return Err(AppError::Storage);
+        }
+        Ok(())
+    }
+
+    pub fn discard_draft(&self, draft_id: String) -> Result<(), AppError> {
+        let directory = self.draft_directory(&draft_id)?;
+        if directory.exists() {
+            fs::remove_dir_all(directory).map_err(|_| AppError::Storage)?;
+        }
+        Ok(())
+    }
+
+    pub fn validate_draft(&self, draft_id: &str) -> Result<(), AppError> {
+        for record in self.list_draft_records(draft_id)? {
+            self.verify_draft_record(draft_id, &record)?;
+        }
+        Ok(())
+    }
+
+    pub fn promote_draft(
+        &self,
+        question_id: &str,
+        draft_id: &str,
+    ) -> Result<Vec<QuestionAssetDto>, AppError> {
+        if QuestionRepository::get(&self.database, question_id)?.is_none() {
+            return Err(AppError::NotFound("question".to_owned()));
+        }
+        let records = self.list_draft_records(draft_id)?;
+        if records.len() > MAX_ASSETS_PER_QUESTION {
+            return Err(AppError::Conflict(
+                "a question can have at most ten assets".to_owned(),
+            ));
+        }
+        let mut known_hashes = HashSet::new();
+        for record in &records {
+            self.verify_draft_record(draft_id, record)?;
+            if !known_hashes.insert(record.sha256.as_str()) {
+                return Err(AppError::Conflict(
+                    "this file is already attached to the draft".to_owned(),
+                ));
+            }
+        }
+
+        let mut staged = Vec::new();
+        for record in &records {
+            let id = new_id();
+            let shard = id.get(..2).ok_or(AppError::Storage)?.to_owned();
+            let directory = self.assets_root.join(&shard);
+            fs::create_dir_all(&directory).map_err(|_| AppError::Storage)?;
+            let temporary_path = directory.join(format!("{id}.tmp"));
+            let final_path = directory.join(format!("{id}.{}", record.extension));
+            let source = self.draft_asset_path(draft_id, record)?;
+            match copy_and_hash(&source, &temporary_path) {
+                Ok((bytes, hash)) if bytes == record.size_bytes && hash == record.sha256 => {}
+                Ok(_) => {
+                    remove_file_quietly(&temporary_path);
+                    self.remove_promotion_files(&staged);
+                    return Err(AppError::AssetCorrupted);
+                }
+                Err(error) => {
+                    remove_file_quietly(&temporary_path);
+                    self.remove_promotion_files(&staged);
+                    return Err(error);
+                }
+            }
+            staged.push(PromotedDraftAsset {
+                record: record.clone(),
+                id,
+                shard,
+                temporary_path,
+                final_path,
+            });
+        }
+
+        let mut created = Vec::new();
+        for (position, planned) in staged.iter().enumerate() {
+            if fs::rename(&planned.temporary_path, &planned.final_path).is_err() {
+                self.remove_promotion_files(&staged);
+                return Err(AppError::Storage);
+            }
+            let asset = QuestionAssetRepository::create(
+                &self.database,
+                NewQuestionAsset {
+                    id: planned.id.clone(),
+                    question_id: question_id.to_owned(),
+                    asset_type: planned.record.asset_type.clone(),
+                    storage_path: format!(
+                        "assets/{}/{}.{}",
+                        planned.shard, planned.id, planned.record.extension
+                    ),
+                    display_name: planned.record.display_name.clone(),
+                    mime_type: planned.record.mime_type.clone(),
+                    size_bytes: i64::try_from(planned.record.size_bytes)
+                        .map_err(|_| AppError::FileTooLarge)?,
+                    sha256: planned.record.sha256.clone(),
+                    position: i64::try_from(position).map_err(|_| AppError::Storage)?,
+                    page_reference: None,
+                },
+            );
+            match asset {
+                Ok(asset) => created.push(self.dto(asset)),
+                Err(error) => {
+                    for asset in &created {
+                        let _ = QuestionAssetRepository::delete(&self.database, &asset.id);
+                    }
+                    self.remove_promotion_files(&staged);
+                    return Err(error);
+                }
+            }
+        }
+        if let Err(error) = self.discard_draft(draft_id.to_owned()) {
+            for asset in &created {
+                let _ = QuestionAssetRepository::delete(&self.database, &asset.id);
+            }
+            self.remove_promotion_files(&staged);
+            return Err(error);
+        }
+        Ok(created)
     }
 
     pub fn import(
@@ -472,6 +740,157 @@ impl AssetService {
         }
         Ok(())
     }
+
+    fn cleanup_stale_drafts(&self, minimum_age: Duration) -> Result<(), AppError> {
+        let now = SystemTime::now();
+        for entry in fs::read_dir(&self.drafts_root).map_err(|_| AppError::Storage)? {
+            let entry = entry.map_err(|_| AppError::Storage)?;
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let modified = entry.metadata().map_err(|_| AppError::Storage)?.modified();
+            if modified
+                .ok()
+                .and_then(|time| now.duration_since(time).ok())
+                .is_some_and(|age| age >= minimum_age)
+            {
+                fs::remove_dir_all(path).map_err(|_| AppError::Storage)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn draft_directory(&self, draft_id: &str) -> Result<PathBuf, AppError> {
+        uuid::Uuid::parse_str(draft_id)
+            .map_err(|_| AppError::Validation("question draft ID is invalid".to_owned()))?;
+        Ok(self.drafts_root.join(draft_id))
+    }
+
+    fn draft_record_path(&self, draft_id: &str, draft_asset_id: &str) -> Result<PathBuf, AppError> {
+        uuid::Uuid::parse_str(draft_asset_id)
+            .map_err(|_| AppError::Validation("draft asset ID is invalid".to_owned()))?;
+        Ok(self
+            .draft_directory(draft_id)?
+            .join(format!("{draft_asset_id}.json")))
+    }
+
+    fn draft_asset_path(
+        &self,
+        draft_id: &str,
+        record: &DraftAssetRecord,
+    ) -> Result<PathBuf, AppError> {
+        let kind = MediaKind::from_extension(&record.extension).ok_or(AppError::AssetCorrupted)?;
+        if kind.asset_type() != record.asset_type || kind.mime_type() != record.mime_type {
+            return Err(AppError::AssetCorrupted);
+        }
+        Ok(self
+            .draft_directory(draft_id)?
+            .join(format!("{}.{}", record.id, record.extension)))
+    }
+
+    fn list_draft_records(&self, draft_id: &str) -> Result<Vec<DraftAssetRecord>, AppError> {
+        let directory = self.draft_directory(draft_id)?;
+        if !directory.is_dir() {
+            return Err(AppError::NotFound("question draft".to_owned()));
+        }
+        let mut records = Vec::new();
+        for entry in fs::read_dir(directory).map_err(|_| AppError::Storage)? {
+            let entry = entry.map_err(|_| AppError::Storage)?;
+            let path = entry.path();
+            if path.extension().and_then(|extension| extension.to_str()) != Some("json") {
+                continue;
+            }
+            let stem = path.file_stem().and_then(|value| value.to_str());
+            let Some(id) = stem else {
+                return Err(AppError::AssetCorrupted);
+            };
+            let record = self.draft_record(draft_id, id)?;
+            if record.id != id {
+                return Err(AppError::AssetCorrupted);
+            }
+            records.push(record);
+        }
+        records.sort_by(|left, right| left.id.cmp(&right.id));
+        Ok(records)
+    }
+
+    fn draft_record(
+        &self,
+        draft_id: &str,
+        draft_asset_id: &str,
+    ) -> Result<DraftAssetRecord, AppError> {
+        let path = self.draft_record_path(draft_id, draft_asset_id)?;
+        let bytes = fs::read(path).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                AppError::NotFound("draft asset".to_owned())
+            } else {
+                AppError::Storage
+            }
+        })?;
+        serde_json::from_slice(&bytes).map_err(|_| AppError::AssetCorrupted)
+    }
+
+    fn write_draft_record(
+        &self,
+        draft_id: &str,
+        record: &DraftAssetRecord,
+    ) -> Result<(), AppError> {
+        let path = self.draft_record_path(draft_id, &record.id)?;
+        let bytes = serde_json::to_vec(record).map_err(|_| AppError::Storage)?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .map_err(|_| AppError::Storage)?;
+        file.write_all(&bytes).map_err(|_| AppError::Storage)?;
+        file.flush().map_err(|_| AppError::Storage)
+    }
+
+    fn verify_draft_record(
+        &self,
+        draft_id: &str,
+        record: &DraftAssetRecord,
+    ) -> Result<(), AppError> {
+        let path = self.draft_asset_path(draft_id, record)?;
+        let profile = source_profile(&path).map_err(|error| match error {
+            AppError::UnsupportedMediaType | AppError::FileTooLarge => AppError::AssetCorrupted,
+            other => other,
+        })?;
+        if profile.extension != record.extension
+            || profile.kind.asset_type() != record.asset_type
+            || profile.kind.mime_type() != record.mime_type
+            || profile.size_bytes != record.size_bytes
+            || hash_file(&path)? != record.sha256
+        {
+            return Err(AppError::AssetCorrupted);
+        }
+        Ok(())
+    }
+
+    fn draft_dto(
+        &self,
+        draft_id: &str,
+        record: DraftAssetRecord,
+    ) -> Result<DraftQuestionAssetDto, AppError> {
+        let path = self.draft_asset_path(draft_id, &record)?;
+        Ok(DraftQuestionAssetDto {
+            id: record.id,
+            draft_id: draft_id.to_owned(),
+            asset_type: record.asset_type,
+            display_name: record.display_name,
+            mime_type: record.mime_type,
+            size_bytes: i64::try_from(record.size_bytes).map_err(|_| AppError::FileTooLarge)?,
+            asset_url: asset_protocol_url(&path)?,
+        })
+    }
+
+    fn remove_promotion_files(&self, staged: &[PromotedDraftAsset]) {
+        for item in staged {
+            remove_file_quietly(&item.temporary_path);
+            remove_file_quietly(&item.final_path);
+        }
+    }
 }
 
 fn source_profile(source: &Path) -> Result<SourceProfile, AppError> {
@@ -709,6 +1128,108 @@ mod tests {
     }
 
     #[test]
+    fn imports_and_discards_draft_assets_without_formal_metadata() {
+        let (directory, service, question) = setup();
+        let image = write_fixture(directory.path(), "diagram.png", PNG);
+        let pdf = write_fixture(directory.path(), "chapter.pdf", PDF);
+        let draft = service.create_draft().expect("draft");
+        let image_asset = service
+            .import_draft(ImportQuestionDraftAssetRequest {
+                draft_id: draft.id.clone(),
+                source_path: image.display().to_string(),
+            })
+            .expect("draft image");
+        let pdf_asset = service
+            .import_draft(ImportQuestionDraftAssetRequest {
+                draft_id: draft.id.clone(),
+                source_path: pdf.display().to_string(),
+            })
+            .expect("draft pdf");
+
+        assert!(image.exists());
+        assert!(pdf.exists());
+        assert_eq!(image_asset.asset_type, "image");
+        assert_eq!(pdf_asset.asset_type, "pdf");
+        assert!(service
+            .draft_asset_path(
+                &draft.id,
+                &service
+                    .draft_record(&draft.id, &image_asset.id)
+                    .expect("record"),
+            )
+            .expect("draft path")
+            .exists());
+        assert!(
+            QuestionAssetRepository::list_by_question(&service.database, &question.id)
+                .expect("formal assets")
+                .is_empty()
+        );
+        assert!(matches!(
+            service.import_draft(ImportQuestionDraftAssetRequest {
+                draft_id: draft.id.clone(),
+                source_path: image.display().to_string(),
+            }),
+            Err(AppError::Conflict(_))
+        ));
+
+        service.discard_draft(draft.id.clone()).expect("discard");
+        assert!(!service
+            .draft_directory(&draft.id)
+            .expect("draft path")
+            .exists());
+        assert!(QuestionRepository::get(&service.database, &question.id)
+            .expect("question")
+            .is_some());
+        assert!(
+            QuestionAssetRepository::list_by_question(&service.database, &question.id)
+                .expect("formal assets")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn keeps_draft_and_removes_final_files_when_promotion_metadata_fails() {
+        let (directory, service, question) = setup();
+        let image = write_fixture(directory.path(), "diagram.png", PNG);
+        let draft = service.create_draft().expect("draft");
+        let imported = service
+            .import_draft(ImportQuestionDraftAssetRequest {
+                draft_id: draft.id.clone(),
+                source_path: image.display().to_string(),
+            })
+            .expect("draft asset");
+        let connection = service.database.connection().expect("connection");
+        connection
+            .execute_batch("CREATE TRIGGER reject_draft_asset_insert BEFORE INSERT ON question_assets BEGIN SELECT RAISE(ABORT, 'reject'); END;")
+            .expect("trigger");
+
+        assert!(service.promote_draft(&question.id, &draft.id).is_err());
+        assert!(
+            QuestionAssetRepository::list_by_question(&service.database, &question.id)
+                .expect("formal assets")
+                .is_empty()
+        );
+        assert!(service
+            .draft_asset_path(
+                &draft.id,
+                &service
+                    .draft_record(&draft.id, &imported.id)
+                    .expect("record"),
+            )
+            .expect("draft path")
+            .exists());
+        let formal_file_count = fs::read_dir(&service.assets_root)
+            .expect("assets root")
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name() != ".draft" && entry.file_name() != ".trash")
+            .filter_map(|entry| fs::read_dir(entry.path()).ok())
+            .flat_map(|entries| entries.filter_map(Result::ok))
+            .filter(|entry| entry.path().is_file())
+            .count();
+        assert_eq!(formal_file_count, 0);
+    }
+
+    #[test]
     fn rejects_invalid_signatures_unsupported_types_and_size_limits() {
         let (directory, service, question) = setup();
         let renamed = write_fixture(directory.path(), "not-image.png", b"not an image");
@@ -804,8 +1325,16 @@ mod tests {
         service
             .cleanup_stale_temp_files(Duration::ZERO)
             .expect("temp cleanup");
+        let draft = service.create_draft().expect("draft");
+        service
+            .cleanup_stale_drafts(Duration::ZERO)
+            .expect("draft cleanup");
         assert!(!orphan.exists());
         assert!(!temporary.exists());
+        assert!(!service
+            .draft_directory(&draft.id)
+            .expect("draft path")
+            .exists());
         assert!(directory.path().exists());
     }
 

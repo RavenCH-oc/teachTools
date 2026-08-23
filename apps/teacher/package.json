@@ -20,7 +20,9 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:tauri-frontend": "pnpm --filter @classtools/student build && vite",
     "build": "vite build",
+    "build:tauri-frontend": "pnpm --filter @classtools/student build && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src vite.config.ts",

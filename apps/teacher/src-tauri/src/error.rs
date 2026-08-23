@@ -46,6 +46,8 @@ pub enum AppError {
     SeatAlreadyJoined,
     #[error("local session participant authentication failed")]
     AuthenticationFailed,
+    #[error("live question is locked")]
+    QuestionLocked,
     #[error("student static assets are unavailable")]
     StudentAssetsUnavailable,
 }
@@ -142,6 +144,7 @@ impl Serialize for AppError {
             Self::IdentityMismatch => ("identity_mismatch", "The supplied identity does not match.", false),
             Self::SeatAlreadyJoined => ("seat_already_joined", "This seat has already joined the classroom.", false),
             Self::AuthenticationFailed => ("authentication_failed", "Participant authentication failed.", false),
+            Self::QuestionLocked => ("question_locked", "The question is no longer accepting answers.", false),
             Self::StudentAssetsUnavailable => (
                 "student_assets_unavailable",
                 "The student application is not available. Build it before starting the local server.",

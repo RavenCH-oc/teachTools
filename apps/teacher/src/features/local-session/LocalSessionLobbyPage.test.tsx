@@ -38,7 +38,7 @@ describe("LocalSessionLobbyPage", () => {
   afterEach(() => cleanup());
 
   it("renders numeric roster seats with online presence without a stale seat validation banner", async () => {
-    render(<LocalSessionLobbyPage api={apiFixture()} classrooms={[]} onError={vi.fn()} onClearError={vi.fn()} />);
+    render(<LocalSessionLobbyPage api={apiFixture()} classrooms={[]} onError={vi.fn()} onClearError={vi.fn()} onOpenLiveQuiz={vi.fn()} />);
 
     expect(await screen.findByText("1 號 Test")).toBeInTheDocument();
     expect(screen.getByText("2 號 T")).toBeInTheDocument();
@@ -46,5 +46,20 @@ describe("LocalSessionLobbyPage", () => {
     expect(screen.getByText("離線")).toBeInTheDocument();
     expect(screen.queryByText(/座號必須為正整數/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Seat number must be a positive whole number/)).not.toBeInTheDocument();
+  });
+
+  it("renders an ACTIVE session as in progress and returns to the same Live Quiz", async () => {
+    const api = apiFixture();
+    vi.mocked(api.getActiveLocalSession).mockResolvedValue({ ...session, state: "ACTIVE" });
+    const openLiveQuiz = vi.fn();
+    render(<LocalSessionLobbyPage api={api} classrooms={[]} onError={vi.fn()} onClearError={vi.fn()} onOpenLiveQuiz={openLiveQuiz} />);
+
+    expect(await screen.findByRole("heading", { name: "課堂進行中" })).toBeInTheDocument();
+    expect(screen.getByText("學生已進入作答流程；不會建立第二個課堂或重新啟動伺服器。")).toBeInTheDocument();
+    expect(screen.queryByText("第二步：建立課堂")).not.toBeInTheDocument();
+    screen.getByRole("button", { name: "返回即時測驗" }).click();
+    expect(openLiveQuiz).toHaveBeenCalledOnce();
+    expect(api.createLocalSession).not.toHaveBeenCalled();
+    expect(api.startLocalServer).not.toHaveBeenCalled();
   });
 });

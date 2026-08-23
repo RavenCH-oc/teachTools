@@ -18,8 +18,12 @@ use tokio::sync::oneshot;
 use tower_http::limit::RequestBodyLimitLayer;
 use uuid::Uuid;
 
-use crate::application::{LocalSessionService, StudentAssetLocation, StudentAssetProvider};
+use crate::application::{
+    LiveQuizService, LocalSessionService, QuestionPublicView, QuestionRevealView, SessionSyncDto,
+    StudentAssetLocation, StudentAssetProvider, SubmissionAckDto,
+};
 use crate::error::AppError;
+use crate::question_domain::StudentAnswer;
 
 pub const LOCAL_PROTOCOL_VERSION: u8 = 1;
 const MAX_MESSAGE_BYTES: usize = 64 * 1024;
@@ -36,6 +40,14 @@ fn transport_debug(category: &str) {
 
 #[cfg(not(debug_assertions))]
 fn transport_debug(_: &str) {}
+
+#[cfg(debug_assertions)]
+fn transport_connection_debug(connection_id: Uuid, category: &str) {
+    eprintln!("Local transport [{connection_id}]: {category}");
+}
+
+#[cfg(not(debug_assertions))]
+fn transport_connection_debug(_: Uuid, _: &str) {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -138,15 +150,21 @@ impl LocalServerStatus {
 pub struct LocalServerService {
     lifecycle: Arc<Mutex<ServerLifecycle>>,
     session: Arc<LocalSessionService>,
+    quiz: Arc<LiveQuizService>,
     student_assets: StudentAssetLocation,
     presence: PresenceRegistry,
 }
 
 impl LocalServerService {
-    pub fn new(session: Arc<LocalSessionService>, student_assets: StudentAssetLocation) -> Self {
+    pub fn new(
+        session: Arc<LocalSessionService>,
+        quiz: Arc<LiveQuizService>,
+        student_assets: StudentAssetLocation,
+    ) -> Self {
         Self {
             lifecycle: Arc::new(Mutex::new(ServerLifecycle::Stopped)),
             session,
+            quiz,
             student_assets,
             presence: PresenceRegistry::default(),
         }
@@ -166,7 +184,7 @@ impl LocalServerService {
     }
 
     pub async fn stop(&self) -> Result<LocalServerStatus, AppError> {
-        if self.session.has_open_lobby()? {
+        if self.session.has_nonterminal_session()? {
             return Err(AppError::Conflict(
                 "end the local session before stopping the server".to_owned(),
             ));
@@ -255,6 +273,7 @@ impl LocalServerService {
         let router_state = Arc::new(TransportState {
             server_instance_id,
             session: Arc::clone(&self.session),
+            quiz: Arc::clone(&self.quiz),
             assets,
             presence: self.presence.clone(),
             limiter: JoinRateLimiter::default(),
@@ -307,6 +326,7 @@ impl LocalServerService {
 struct TransportState {
     server_instance_id: String,
     session: Arc<LocalSessionService>,
+    quiz: Arc<LiveQuizService>,
     assets: StudentAssetProvider,
     presence: PresenceRegistry,
     limiter: JoinRateLimiter,
@@ -456,6 +476,7 @@ fn router(state: Arc<TransportState>) -> Router {
         .route("/student/", get(student_root))
         .route("/student/join/{join_code}", get(student_join_page))
         .route("/student/assets/{file_name}", get(student_asset))
+        .route("/api/v1/session-assets/{asset_id}", get(session_asset))
         .route("/api/v1/join/{join_code}", get(join_info).post(join))
         .fallback(not_found)
         .layer(RequestBodyLimitLayer::new(MAX_HTTP_BODY_BYTES))
@@ -557,12 +578,84 @@ async fn join_info(
     .await
     {
         Ok(info) => with_static_security(Json(info).into_response()),
+        Err(AppError::SessionNotOpen) => public_error(
+            StatusCode::CONFLICT,
+            "SESSION_NOT_OPEN",
+            "課堂目前未開放新加入。",
+        ),
         Err(_) => public_error(
             StatusCode::NOT_FOUND,
             "JOIN_CODE_INVALID",
             "課堂代碼無效或課堂尚未開放。",
         ),
     }
+}
+
+async fn session_asset(
+    State(state): State<Arc<TransportState>>,
+    Path(asset_id): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let Some((session_id, participant_id, credential)) = asset_credentials(&headers) else {
+        return with_static_security(
+            (StatusCode::UNAUTHORIZED, "Authentication required.").into_response(),
+        );
+    };
+    let session = Arc::clone(&state.session);
+    let server_instance_id = state.server_instance_id.clone();
+    let authentication_session_id = session_id.clone();
+    let authenticated = blocking(move || {
+        session.authenticate(
+            &authentication_session_id,
+            &participant_id,
+            &credential,
+            &server_instance_id,
+        )
+    })
+    .await;
+    if authenticated.is_err() {
+        return with_static_security(
+            (StatusCode::UNAUTHORIZED, "Authentication required.").into_response(),
+        );
+    }
+    let quiz = Arc::clone(&state.quiz);
+    match blocking(move || quiz.read_asset_for_session(&asset_id, &session_id)).await {
+        Ok((bytes, mime_type)) => {
+            let mut response = bytes.into_response();
+            if let Ok(value) = HeaderValue::from_str(&mime_type) {
+                response.headers_mut().insert(header::CONTENT_TYPE, value);
+            }
+            response.headers_mut().insert(
+                "x-content-type-options",
+                HeaderValue::from_static("nosniff"),
+            );
+            response
+                .headers_mut()
+                .insert("cache-control", HeaderValue::from_static("no-store"));
+            response
+        }
+        Err(_) => with_static_security((StatusCode::NOT_FOUND, "Not found.").into_response()),
+    }
+}
+
+fn asset_credentials(headers: &HeaderMap) -> Option<(String, String, String)> {
+    let session_id = headers
+        .get("x-classroom-session")?
+        .to_str()
+        .ok()?
+        .to_owned();
+    let participant_id = headers
+        .get("x-classroom-participant")?
+        .to_str()
+        .ok()?
+        .to_owned();
+    let credential = headers
+        .get(header::AUTHORIZATION)?
+        .to_str()
+        .ok()?
+        .strip_prefix("Bearer ")?
+        .to_owned();
+    Some((session_id, participant_id, credential))
 }
 
 #[derive(Deserialize)]
@@ -719,8 +812,8 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
         authenticate_socket(&mut socket, Arc::clone(&state)),
     )
     .await;
-    let participant_id = match authentication {
-        Ok(SocketAuthentication::Authenticated(participant_id)) => participant_id,
+    let authenticated = match authentication {
+        Ok(SocketAuthentication::Authenticated(value)) => value,
         Ok(SocketAuthentication::Rejected(code)) => {
             transport_debug("participant authentication rejected");
             let _ = send_transport_error(&mut socket, code).await;
@@ -736,30 +829,87 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
             return;
         }
     };
-    let connection_id = state.presence.connect(&participant_id);
+    let connection_id = authenticated.connection_id;
+    transport_connection_debug(connection_id, "participant_authenticated");
+    if authenticated.session_state == "ACTIVE" {
+        let initial_sync = {
+            let quiz = Arc::clone(&state.quiz);
+            let participant_id = authenticated.participant_id.clone();
+            let session_id = authenticated.session_id.clone();
+            blocking(move || quiz.sync(&participant_id, &session_id, "ACTIVE")).await
+        };
+        match initial_sync {
+            Ok(sync) => {
+                if !send_server_message(
+                    &mut socket,
+                    &ServerMessage::SessionSync {
+                        protocol_version: LOCAL_PROTOCOL_VERSION,
+                        sync: Box::new(sync),
+                    },
+                )
+                .await
+                {
+                    state
+                        .presence
+                        .disconnect(&authenticated.participant_id, connection_id);
+                    return;
+                }
+            }
+            Err(_) => {
+                state
+                    .presence
+                    .disconnect(&authenticated.participant_id, connection_id);
+                return;
+            }
+        }
+    }
     transport_debug("presence lease created");
     let mut events = state.session.subscribe();
-    loop {
+    let mut quiz_events = state.quiz.subscribe();
+    let exit_reason = loop {
         tokio::select! {
             next = socket.recv() => {
-                let Some(next) = next else { break; };
-                if !handle_authenticated_socket_message(&mut socket, next, &state.presence, &participant_id, connection_id).await { break; }
+                let Some(next) = next else { break "socket_receive_closed"; };
+                if !handle_authenticated_socket_message(&mut socket, next, &state, &authenticated, connection_id).await { break "message_handler_stopped"; }
             }
             event = events.recv() => match event {
                 Ok(event) => {
-                    if !send_server_message(&mut socket, &ServerMessage::SessionStateChanged { protocol_version: LOCAL_PROTOCOL_VERSION, session_id: event.session_id, state: event.state }).await { break; }
+                    if !send_server_message(&mut socket, &ServerMessage::SessionStateChanged { protocol_version: LOCAL_PROTOCOL_VERSION, session_id: event.session_id, state: event.state }).await { break "session_event_send_failed"; }
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break "session_event_channel_closed",
+            },
+            event = quiz_events.recv() => match event {
+                Ok(event) if event.session_id == authenticated.session_id => {
+                    let quiz = Arc::clone(&state.quiz);
+                    let participant_id = authenticated.participant_id.clone();
+                    let session_id = authenticated.session_id.clone();
+                    match blocking(move || quiz.sync(&participant_id, &session_id, "ACTIVE")).await {
+                        Ok(sync) => if !send_quiz_sync(&mut socket, sync).await { break "quiz_sync_send_failed"; },
+                        Err(_) => break "quiz_sync_failed",
+                    }
+                }
+                Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break "quiz_event_channel_closed",
             },
         }
-    }
-    state.presence.disconnect(&participant_id, connection_id);
+    };
+    transport_connection_debug(connection_id, exit_reason);
+    state
+        .presence
+        .disconnect(&authenticated.participant_id, connection_id);
+    transport_connection_debug(connection_id, "socket_closed");
     transport_debug("presence lease removed; socket closed");
 }
 
+struct SocketParticipant {
+    participant_id: String,
+    session_id: String,
+    session_state: String,
+    connection_id: Uuid,
+}
 enum SocketAuthentication {
-    Authenticated(String),
+    Authenticated(SocketParticipant),
     Rejected(&'static str),
     Disconnected,
 }
@@ -806,6 +956,12 @@ async fn authenticate_socket(
                         .await
                         {
                             Ok(authenticated) => {
+                                let session_id = authenticated.participant.session_id.clone();
+                                let session_state = authenticated.session_state.clone();
+                                let authenticated_participant_id =
+                                    authenticated.participant.participant_id.clone();
+                                let connection_id =
+                                    state.presence.connect(&authenticated_participant_id);
                                 if !send_server_message(
                                     socket,
                                     &ServerMessage::ParticipantAuthenticated {
@@ -817,10 +973,18 @@ async fn authenticate_socket(
                                 )
                                 .await
                                 {
+                                    state
+                                        .presence
+                                        .disconnect(&authenticated_participant_id, connection_id);
                                     return SocketAuthentication::Disconnected;
                                 }
                                 transport_debug("participant authentication succeeded");
-                                return SocketAuthentication::Authenticated(participant_id);
+                                return SocketAuthentication::Authenticated(SocketParticipant {
+                                    participant_id: authenticated_participant_id,
+                                    session_id,
+                                    session_state,
+                                    connection_id,
+                                });
                             }
                             Err(error) => {
                                 return SocketAuthentication::Rejected(authentication_error_code(
@@ -828,6 +992,9 @@ async fn authenticate_socket(
                                 ));
                             }
                         }
+                    }
+                    Ok(ClientMessage::SubmitAnswer { .. }) => {
+                        return SocketAuthentication::Rejected("PROTOCOL_ERROR")
                     }
                     Err(()) => {
                         return SocketAuthentication::Rejected("PROTOCOL_ERROR");
@@ -847,15 +1014,18 @@ async fn authenticate_socket(
 async fn handle_authenticated_socket_message(
     socket: &mut WebSocket,
     next: Result<Message, axum::Error>,
-    presence: &PresenceRegistry,
-    participant_id: &str,
+    state: &TransportState,
+    participant: &SocketParticipant,
     connection_id: Uuid,
 ) -> bool {
     match next {
         Ok(Message::Text(text)) if text.len() <= MAX_MESSAGE_BYTES => {
             match parse_client_message(&text) {
                 Ok(ClientMessage::Ping { request_id, .. }) => {
-                    presence.heartbeat(participant_id, connection_id);
+                    transport_connection_debug(connection_id, "ping_received");
+                    state
+                        .presence
+                        .heartbeat(&participant.participant_id, connection_id);
                     send_server_message(
                         socket,
                         &ServerMessage::Pong {
@@ -864,6 +1034,48 @@ async fn handle_authenticated_socket_message(
                         },
                     )
                     .await
+                }
+                Ok(ClientMessage::SubmitAnswer {
+                    submission_id,
+                    session_question_id,
+                    answer,
+                    ..
+                }) => {
+                    transport_connection_debug(connection_id, "SUBMIT_FRAME_RECEIVED");
+                    let quiz = Arc::clone(&state.quiz);
+                    let participant_id = participant.participant_id.clone();
+                    let session_id = participant.session_id.clone();
+                    transport_connection_debug(connection_id, "SUBMIT_SERVICE_ENTERED");
+                    match blocking(move || {
+                        quiz.submit(
+                            participant_id,
+                            session_id,
+                            session_question_id,
+                            submission_id,
+                            answer,
+                        )
+                    })
+                    .await
+                    {
+                        Ok(ack) => {
+                            transport_connection_debug(connection_id, "SUBMIT_PERSISTED");
+                            send_submission_acknowledgement(socket, connection_id, ack).await
+                        }
+                        Err(error) => {
+                            transport_connection_debug(connection_id, "submission_rejected");
+                            let sent =
+                                send_transport_error(socket, submission_error_code(&error)).await;
+                            transport_connection_debug(
+                                connection_id,
+                                if sent {
+                                    "application_error_sent"
+                                } else {
+                                    "application_error_send_failed"
+                                },
+                            );
+                            sent
+                        }
+                    }
                 }
                 _ => {
                     let _ = send_protocol_error(socket).await;
@@ -878,6 +1090,62 @@ async fn handle_authenticated_socket_message(
         Ok(Message::Close(_)) | Err(_) => false,
         Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => true,
     }
+}
+
+async fn send_quiz_sync(socket: &mut WebSocket, sync: SessionSyncDto) -> bool {
+    let revealed = sync.reveal.is_some();
+    if !send_server_message(
+        socket,
+        &ServerMessage::SessionSync {
+            protocol_version: LOCAL_PROTOCOL_VERSION,
+            sync: Box::new(sync.clone()),
+        },
+    )
+    .await
+    {
+        return false;
+    }
+    if let Some(question) = sync.current_question {
+        if !send_server_message(
+            socket,
+            &ServerMessage::QuestionStateChanged {
+                protocol_version: LOCAL_PROTOCOL_VERSION,
+                question,
+            },
+        )
+        .await
+        {
+            return false;
+        }
+    }
+    if let Some(reveal) = sync.reveal {
+        if !send_server_message(
+            socket,
+            &ServerMessage::QuestionRevealed {
+                protocol_version: LOCAL_PROTOCOL_VERSION,
+                reveal,
+            },
+        )
+        .await
+        {
+            return false;
+        }
+    }
+    if let Some(result) = sync.own_latest_submission {
+        if revealed
+            && !send_server_message(
+                socket,
+                &ServerMessage::SubmissionResult {
+                    protocol_version: LOCAL_PROTOCOL_VERSION,
+                    result,
+                },
+            )
+            .await
+        {
+            return false;
+        }
+    }
+    true
 }
 
 async fn send_protocol_error(socket: &mut WebSocket) -> bool {
@@ -900,6 +1168,15 @@ fn authentication_error_code(error: &AppError) -> &'static str {
     }
 }
 
+fn submission_error_code(error: &AppError) -> &'static str {
+    match error {
+        AppError::QuestionLocked => "QUESTION_LOCKED",
+        AppError::Conflict(_) => "SUBMISSION_CONFLICT",
+        AppError::Validation(_) => "INVALID_ANSWER",
+        _ => "PROTOCOL_ERROR",
+    }
+}
+
 async fn send_transport_error(socket: &mut WebSocket, code: &'static str) -> bool {
     send_server_message(
         socket,
@@ -910,6 +1187,40 @@ async fn send_transport_error(socket: &mut WebSocket, code: &'static str) -> boo
         },
     )
     .await
+}
+
+async fn send_submission_acknowledgement(
+    socket: &mut WebSocket,
+    connection_id: Uuid,
+    acknowledgement: SubmissionAckDto,
+) -> bool {
+    let message = ServerMessage::SubmissionAcknowledged {
+        protocol_version: LOCAL_PROTOCOL_VERSION,
+        acknowledgement,
+    };
+    let serialized = match serde_json::to_string(&message) {
+        Ok(value) => {
+            transport_connection_debug(connection_id, "submission_acknowledgement_serialized");
+            value
+        }
+        Err(_) => {
+            transport_connection_debug(
+                connection_id,
+                "submission_acknowledgement_serialize_failed",
+            );
+            return false;
+        }
+    };
+    let sent = socket.send(Message::Text(serialized.into())).await.is_ok();
+    transport_connection_debug(
+        connection_id,
+        if sent {
+            "SUBMIT_ACK_SENT"
+        } else {
+            "submission_acknowledgement_send_failed"
+        },
+    );
+    sent
 }
 
 async fn send_server_message(socket: &mut WebSocket, message: &ServerMessage) -> bool {
@@ -947,6 +1258,20 @@ fn parse_client_message(text: &str) -> Result<ClientMessage, ()> {
             && credential
                 .bytes()
                 .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_') =>
+        {
+            Ok(message)
+        }
+        ClientMessage::SubmitAnswer {
+            protocol_version,
+            request_id,
+            submission_id,
+            session_question_id,
+            ..
+        } if *protocol_version == LOCAL_PROTOCOL_VERSION
+            && !request_id.trim().is_empty()
+            && request_id.len() <= 120
+            && Uuid::parse_str(submission_id).is_ok()
+            && Uuid::parse_str(session_question_id).is_ok() =>
         {
             Ok(message)
         }
@@ -1017,6 +1342,13 @@ enum ClientMessage {
         participant_id: String,
         credential: String,
     },
+    SubmitAnswer {
+        protocol_version: u8,
+        request_id: String,
+        submission_id: String,
+        session_question_id: String,
+        answer: StudentAnswer,
+    },
 }
 
 #[derive(Serialize)]
@@ -1044,6 +1376,26 @@ enum ServerMessage {
         protocol_version: u8,
         session_id: String,
         state: String,
+    },
+    SessionSync {
+        protocol_version: u8,
+        sync: Box<SessionSyncDto>,
+    },
+    QuestionStateChanged {
+        protocol_version: u8,
+        question: QuestionPublicView,
+    },
+    QuestionRevealed {
+        protocol_version: u8,
+        reveal: QuestionRevealView,
+    },
+    SubmissionAcknowledged {
+        protocol_version: u8,
+        acknowledgement: SubmissionAckDto,
+    },
+    SubmissionResult {
+        protocol_version: u8,
+        result: crate::application::OwnSubmissionResultDto,
     },
     Error {
         protocol_version: u8,
@@ -1208,13 +1560,80 @@ mod tests {
             },
         )
         .expect("student");
+        let quiz = LiveQuizService::initialize(database.clone(), &directory).expect("quiz service");
         let session = LocalSessionService::initialize(database).expect("session service");
         (
             LocalServerService::new(
                 session,
+                quiz,
                 StudentAssetLocation::from_root(directory.join("student")),
             ),
             classroom.id,
+        )
+    }
+
+    fn test_service_with_roster_and_question() -> (LocalServerService, String, String) {
+        let directory = tempfile::tempdir().expect("test directory").keep();
+        std::fs::create_dir_all(directory.join("student/assets"))
+            .expect("student assets directory");
+        std::fs::write(directory.join("student/index.html"), "<main>student</main>")
+            .expect("student index");
+        let database = crate::infrastructure::persistence::database::Database::open(
+            directory.join("classroom.sqlite3"),
+        );
+        database.initialize().expect("database");
+        let classroom =
+            crate::infrastructure::persistence::repositories::ClassroomRepository::create(
+                &database,
+                crate::infrastructure::persistence::repositories::NewClassroom {
+                    name: "3A".to_owned(),
+                    academic_year: None,
+                },
+            )
+            .expect("classroom");
+        crate::infrastructure::persistence::repositories::StudentRepository::create(
+            &database,
+            crate::infrastructure::persistence::repositories::NewStudent {
+                class_id: classroom.id.clone(),
+                seat_number: 12,
+                name: "王小明".to_owned(),
+            },
+        )
+        .expect("student");
+        let set = crate::infrastructure::persistence::repositories::QuestionSetRepository::create(
+            &database,
+            crate::infrastructure::persistence::repositories::NewQuestionSet {
+                lesson_id: None,
+                title: "Live quiz".to_owned(),
+                description: None,
+            },
+        )
+        .expect("question set");
+        let question =
+            crate::infrastructure::persistence::repositories::QuestionRepository::create(
+                &database,
+                crate::infrastructure::persistence::repositories::NewQuestion {
+                    question_set_id: set.id,
+                    question_type: "true_false".to_owned(),
+                    prompt: "地球是圓的。".to_owned(),
+                    points: 1,
+                    position: 0,
+                    answer_config: serde_json::json!({"correctAnswer": true}),
+                    grading_config: serde_json::json!({}),
+                    metadata: serde_json::json!({}),
+                },
+            )
+            .expect("question");
+        let quiz = LiveQuizService::initialize(database.clone(), &directory).expect("quiz service");
+        let session = LocalSessionService::initialize(database).expect("session service");
+        (
+            LocalServerService::new(
+                session,
+                quiz,
+                StudentAssetLocation::from_root(directory.join("student")),
+            ),
+            classroom.id,
+            question.id,
         )
     }
 
@@ -1291,6 +1710,224 @@ mod tests {
             .expect("malformed payload sends");
         assert_protocol_error(&receive_text(&mut socket).await);
 
+        service.stop().await.expect("server stops");
+    }
+
+    #[tokio::test]
+    async fn websocket_submit_answer_matches_frontend_wire_and_updates_teacher_progress() {
+        let (service, classroom_id, source_question_id) = test_service_with_roster_and_question();
+        let status = service
+            .start_on(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), false)
+            .await
+            .expect("server starts");
+        let port = status.port.expect("port");
+        let server_id = status.server_instance_id.clone().expect("server id");
+        let session = service
+            .session
+            .create(classroom_id, server_id.clone())
+            .expect("session");
+        let lobby = service
+            .session
+            .open_lobby(session.id, server_id.clone())
+            .expect("lobby");
+        let joined = http_join(port, &lobby.join_code, 12, "王小明").await;
+        service
+            .session
+            .start(lobby.id.clone(), server_id)
+            .expect("session starts");
+        let snapshot = service
+            .quiz
+            .publish(lobby.id.clone(), source_question_id)
+            .expect("question publishes");
+        let opened = service.quiz.open(snapshot.id).expect("question opens");
+
+        let (mut socket, _) = connect_same_origin(port).await;
+        assert_server_hello(
+            &receive_text(&mut socket).await,
+            status.server_instance_id.as_deref().expect("server id"),
+        );
+        socket
+            .send(ClientWebSocketMessage::Text(
+                format!("{{\"protocolVersion\":1,\"type\":\"participant_auth\",\"requestId\":\"auth-live-1\",\"sessionId\":\"{}\",\"participantId\":\"{}\",\"credential\":\"{}\"}}", joined.session_id, joined.participant_id, joined.credential).into(),
+            ))
+            .await
+            .expect("auth sends");
+        assert!(receive_text(&mut socket)
+            .await
+            .contains("participant_authenticated"));
+        let sync = receive_text(&mut socket).await;
+        assert!(sync.contains("\"type\":\"session_sync\""));
+        assert!(sync.contains("\"sessionQuestionId\""));
+        assert!(sync.contains("\"state\":\"OPEN\""));
+
+        let submission_id = Uuid::now_v7().to_string();
+        let session_question_id = opened.id.clone();
+        let submit = serde_json::json!({
+            "protocolVersion": 1,
+            "type": "submit_answer",
+            "requestId": "request-live-submit-1",
+            "submissionId": submission_id.clone(),
+            "sessionQuestionId": session_question_id,
+            "answer": {"type": "true_false", "value": true}
+        });
+        assert!(parse_client_message(&submit.to_string()).is_ok());
+        socket
+            .send(ClientWebSocketMessage::Text(submit.to_string().into()))
+            .await
+            .expect("answer sends");
+        let acknowledgement = receive_text(&mut socket).await;
+        assert!(acknowledgement.contains("\"type\":\"submission_acknowledged\""));
+        assert!(acknowledgement.contains(&format!("\"submissionId\":\"{submission_id}\"")));
+        assert!(acknowledgement.contains("\"accepted\":true"));
+        assert!(acknowledgement.contains("\"gradingStatus\":\"graded\""));
+        let acknowledgement_json: serde_json::Value =
+            serde_json::from_str(&acknowledgement).expect("acknowledgement json");
+        assert_eq!(acknowledgement_json["protocolVersion"], 1);
+        assert_eq!(
+            acknowledgement_json["acknowledgement"]["sessionQuestionId"],
+            opened.id
+        );
+        assert!(acknowledgement_json["acknowledgement"]["submittedAt"]
+            .as_str()
+            .is_some_and(|value| {
+                time::OffsetDateTime::parse(value, &time::format_description::well_known::Rfc3339)
+                    .is_ok()
+                    && value.ends_with('Z')
+            }));
+        socket
+            .send(ClientWebSocketMessage::Text(
+                "{\"protocolVersion\":1,\"type\":\"ping\",\"requestId\":\"after-ack\"}".into(),
+            ))
+            .await
+            .expect("post-ack ping sends");
+        assert!(receive_until(&mut socket, "\"type\":\"pong\"")
+            .await
+            .contains("after-ack"));
+
+        let invalid_submission = serde_json::json!({
+            "protocolVersion": 1,
+            "type": "submit_answer",
+            "requestId": "request-live-invalid",
+            "submissionId": Uuid::now_v7().to_string(),
+            "sessionQuestionId": opened.id.clone(),
+            "answer": {"type": "essay", "text": "invalid for true false"}
+        });
+        socket
+            .send(ClientWebSocketMessage::Text(
+                invalid_submission.to_string().into(),
+            ))
+            .await
+            .expect("invalid answer sends");
+        assert!(receive_until(&mut socket, "\"code\":\"INVALID_ANSWER\"")
+            .await
+            .contains("error"));
+        socket
+            .send(ClientWebSocketMessage::Text(
+                "{\"protocolVersion\":1,\"type\":\"ping\",\"requestId\":\"after-invalid\"}".into(),
+            ))
+            .await
+            .expect("post-invalid ping sends");
+        assert!(receive_until(&mut socket, "\"type\":\"pong\"")
+            .await
+            .contains("after-invalid"));
+
+        let conflicting_submission = serde_json::json!({
+            "protocolVersion": 1,
+            "type": "submit_answer",
+            "requestId": "request-live-conflict",
+            "submissionId": submission_id.clone(),
+            "sessionQuestionId": opened.id.clone(),
+            "answer": {"type": "true_false", "value": false}
+        });
+        socket
+            .send(ClientWebSocketMessage::Text(
+                conflicting_submission.to_string().into(),
+            ))
+            .await
+            .expect("conflicting answer sends");
+        assert!(
+            receive_until(&mut socket, "\"code\":\"SUBMISSION_CONFLICT\"")
+                .await
+                .contains("error")
+        );
+        socket
+            .send(ClientWebSocketMessage::Text(
+                "{\"protocolVersion\":1,\"type\":\"ping\",\"requestId\":\"after-conflict\"}".into(),
+            ))
+            .await
+            .expect("post-conflict ping sends");
+        assert!(receive_until(&mut socket, "\"type\":\"pong\"")
+            .await
+            .contains("after-conflict"));
+
+        let progress = service
+            .quiz
+            .teacher_progress(opened.id.clone(), 1)
+            .expect("progress");
+        assert_eq!(progress.answered_count, 1);
+        assert_eq!(progress.participant_count, 1);
+        let revision_two_id = Uuid::now_v7().to_string();
+        let revision_two = serde_json::json!({
+            "protocolVersion": 1,
+            "type": "submit_answer",
+            "requestId": "request-live-submit-2",
+            "submissionId": revision_two_id,
+            "sessionQuestionId": opened.id.clone(),
+            "answer": {"type": "true_false", "value": false}
+        });
+        socket
+            .send(ClientWebSocketMessage::Text(
+                revision_two.to_string().into(),
+            ))
+            .await
+            .expect("revision sends");
+        let revision_acknowledgement = receive_text(&mut socket).await;
+        assert!(revision_acknowledgement.contains("\"type\":\"submission_acknowledged\""));
+        let revision_progress = service
+            .quiz
+            .teacher_progress(opened.id.clone(), 1)
+            .expect("revision progress");
+        assert_eq!(revision_progress.answered_count, 1);
+        assert_eq!(revision_progress.participant_count, 1);
+        service
+            .quiz
+            .lock(opened.id.clone())
+            .expect("question locks");
+        let locked_submission = serde_json::json!({
+            "protocolVersion": 1,
+            "type": "submit_answer",
+            "requestId": "request-live-locked",
+            "submissionId": Uuid::now_v7().to_string(),
+            "sessionQuestionId": opened.id.clone(),
+            "answer": {"type": "true_false", "value": true}
+        });
+        socket
+            .send(ClientWebSocketMessage::Text(
+                locked_submission.to_string().into(),
+            ))
+            .await
+            .expect("locked answer sends");
+        assert!(receive_until(&mut socket, "\"code\":\"QUESTION_LOCKED\"")
+            .await
+            .contains("error"));
+        socket
+            .send(ClientWebSocketMessage::Text(
+                "{\"protocolVersion\":1,\"type\":\"ping\",\"requestId\":\"after-locked\"}".into(),
+            ))
+            .await
+            .expect("post-locked ping sends");
+        assert!(receive_until(&mut socket, "\"type\":\"pong\"")
+            .await
+            .contains("after-locked"));
+        let sync = service
+            .quiz
+            .sync(&joined.participant_id, &lobby.id, "ACTIVE")
+            .expect("student sync");
+        assert_eq!(sync.own_latest_submission.expect("submission").revision, 2);
+        service
+            .session
+            .end(lobby.id, "teacher_ended")
+            .expect("session ends");
         service.stop().await.expect("server stops");
     }
 
@@ -1374,6 +2011,57 @@ mod tests {
             .expect("server restarts");
         assert_ne!(restarted.server_instance_id, first.server_instance_id);
         service.stop().await.expect("server stops after restart");
+    }
+
+    #[tokio::test]
+    async fn normal_stop_requires_ending_lobby_or_active_session() {
+        let (service, classroom_id) = test_service_with_roster();
+        let status = service
+            .start_on(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), false)
+            .await
+            .expect("server starts");
+        let server_id = status.server_instance_id.clone().expect("server id");
+        let created = service
+            .session
+            .create(classroom_id, server_id.clone())
+            .expect("session creates");
+        let lobby = service
+            .session
+            .open_lobby(created.id, server_id.clone())
+            .expect("lobby opens");
+
+        assert!(matches!(service.stop().await, Err(AppError::Conflict(_))));
+        assert!(
+            service
+                .status()
+                .expect("status after lobby stop rejection")
+                .running
+        );
+
+        let active = service
+            .session
+            .start(lobby.id.clone(), server_id)
+            .expect("session starts");
+        assert_eq!(active.state, "ACTIVE");
+        assert!(matches!(service.stop().await, Err(AppError::Conflict(_))));
+        assert!(
+            service
+                .status()
+                .expect("status after active stop rejection")
+                .running
+        );
+
+        service
+            .session
+            .end(lobby.id, "teacher_ended")
+            .expect("session ends");
+        assert!(
+            !service
+                .stop()
+                .await
+                .expect("server stops after end")
+                .running
+        );
     }
 
     #[test]
@@ -1548,6 +2236,50 @@ mod tests {
         service.stop().await.expect("server stops");
     }
 
+    #[tokio::test]
+    async fn active_session_join_info_reports_no_new_join() {
+        let (service, classroom_id) = test_service_with_roster();
+        let status = service
+            .start_on(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), false)
+            .await
+            .expect("server starts");
+        let port = status.port.expect("port");
+        let server_id = status.server_instance_id.clone().expect("server id");
+        let session = service
+            .session
+            .create(classroom_id, server_id.clone())
+            .expect("session creates");
+        let session = service
+            .session
+            .open_lobby(session.id, server_id.clone())
+            .expect("lobby opens");
+        service
+            .session
+            .start(session.id.clone(), server_id)
+            .expect("session starts");
+
+        let response = http_raw_request(
+            port,
+            format!(
+                "GET /api/v1/join/{} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n",
+                session.join_code
+            ),
+        )
+        .await;
+        assert!(response.starts_with("HTTP/1.1 409"), "{response}");
+        assert!(
+            response.contains("\"code\":\"SESSION_NOT_OPEN\""),
+            "{response}"
+        );
+        assert!(!response.contains("JOIN_CODE_INVALID"), "{response}");
+
+        service
+            .session
+            .end(session.id, "teacher_ended")
+            .expect("session ends");
+        service.stop().await.expect("server stops");
+    }
+
     #[test]
     fn protocol_fixture_and_network_classification_match_the_contract() {
         let fixtures: ProtocolFixtures = serde_json::from_str(include_str!(concat!(
@@ -1657,6 +2389,16 @@ mod tests {
             Some(Ok(ClientWebSocketMessage::Text(text))) => text.to_string(),
             _ => panic!("expected text message"),
         }
+    }
+
+    async fn receive_until(socket: &mut TestSocket, needle: &str) -> String {
+        for _ in 0..8 {
+            let text = receive_text(socket).await;
+            if text.contains(needle) {
+                return text;
+            }
+        }
+        panic!("expected websocket message containing {needle}");
     }
 
     fn assert_server_hello(text: &str, server_instance_id: &str) {

@@ -3,11 +3,11 @@ import { questionDraftSchema } from "@classtools/validation";
 import { newStableId } from "./ids";
 
 export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
-  true_false: "True / False",
-  single_choice: "Single choice",
-  multiple_choice: "Multiple choice",
-  fill_blank: "Fill in the blank",
-  essay: "Essay",
+  true_false: "是非題",
+  single_choice: "單選題",
+  multiple_choice: "複選題",
+  fill_blank: "填空題",
+  essay: "申論題",
 };
 
 export function defaultConfig(type: QuestionType): QuestionDraft["answerConfig"] {
@@ -42,7 +42,20 @@ export function questionToPublicView(question: Question, assets: QuestionAsset[]
 export function validateDraft(draft: QuestionDraft): string[] {
   const result = questionDraftSchema.safeParse(draft);
   if (result.success) return [];
-  return result.error.issues.map((issue) => `${issue.path.join(".") || "Question"}: ${issue.message}`);
+  return result.error.issues.map((issue) => `${issue.path.join(".") || "題目"}: ${issue.message}`);
+}
+
+/** Keep schema paths available to tests/logging, but never expose them as the primary UI error. */
+export function questionValidationMessage(draft: QuestionDraft, validationError: string): string {
+  if (draft.type === "fill_blank" && validationError.includes("acceptedAnswers")) {
+    return validationError.includes("unique after normalization")
+      ? "每個填空的可接受答案不可重複。"
+      : "每個填空至少需要一個可接受答案。";
+  }
+  if (validationError.includes("prompt")) return "請輸入題目內容。";
+  if (validationError.includes("points")) return "分數必須是正整數。";
+  if (validationError.includes("options")) return "請檢查選項與正確答案設定。";
+  return "題目資料無效，請檢查欄位後再試。";
 }
 
 export function asCreateInput(draft: QuestionDraft): CreateQuestionInput {
@@ -50,5 +63,5 @@ export function asCreateInput(draft: QuestionDraft): CreateQuestionInput {
 }
 
 export function displaySet(set: QuestionSet, lessonName?: string): string {
-  return `${set.title}${lessonName ? ` · ${lessonName}` : " · Standalone"}`;
+  return `${set.title}${lessonName ? ` · ${lessonName}` : " · 不綁定課程單元"}`;
 }

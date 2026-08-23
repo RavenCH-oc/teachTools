@@ -71,6 +71,12 @@ pub struct CreateQuestionRequest {
 }
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CreateQuestionWithDraftAssetsRequest {
+    pub question: CreateQuestionRequest,
+    pub draft_id: String,
+}
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateQuestionRequest {
     pub question_set_id: String,
     #[serde(rename = "type")]
@@ -286,6 +292,46 @@ impl PersistenceService {
         )?;
         question_dto(raw)
     }
+    pub fn create_question_with_draft_assets(
+        &self,
+        request: CreateQuestionWithDraftAssetsRequest,
+    ) -> Result<QuestionDto, AppError> {
+        let question = request.question;
+        validate_question_input(
+            &self.database,
+            &question.question_set_id,
+            &question.question_type,
+            &question.prompt,
+            question.points,
+            question.position,
+            question.config_version,
+            &question.answer_config,
+            &question.grading_config,
+            &question.metadata,
+        )?;
+        self.assets.validate_draft(&request.draft_id)?;
+        let raw = QuestionRepository::create(
+            &self.database,
+            NewQuestion {
+                question_set_id: question.question_set_id,
+                question_type: type_name(&question.question_type).to_owned(),
+                prompt: question.prompt.trim().to_owned(),
+                points: question.points,
+                position: question.position,
+                answer_config: serde_json::to_value(question.answer_config)
+                    .map_err(|_| AppError::Validation("answer config must be JSON".to_owned()))?,
+                grading_config: question.grading_config,
+                metadata: question.metadata,
+            },
+        )?;
+        if let Err(error) = self.assets.promote_draft(&raw.id, &request.draft_id) {
+            if QuestionRepository::delete(&self.database, &raw.id).is_err() {
+                return Err(AppError::Storage);
+            }
+            return Err(error);
+        }
+        question_dto(raw)
+    }
     pub fn update_question(
         &self,
         id: String,
@@ -376,6 +422,8 @@ impl From<QuestionSet> for QuestionSetDto {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
     use crate::question_domain::{
         ChoiceOption, EssayConfig, FillBlankConfig, FillBlankDefinition, FillBlankNormalization,
@@ -546,6 +594,185 @@ mod tests {
                 .expect("delete question");
         }
         service.delete_question_set(set.id).expect("delete set");
+    }
+
+    #[test]
+    fn creates_question_and_promotes_draft_assets_as_one_application_operation() {
+        let directory = tempfile::tempdir().expect("directory");
+        let service = PersistenceService::initialize(directory.path()).expect("service");
+        let set = service
+            .create_question_set(CreateQuestionSetRequest {
+                lesson_id: None,
+                title: "Set".to_owned(),
+                description: None,
+            })
+            .expect("set");
+        let source = directory.path().join("diagram.png");
+        fs::write(&source, b"\x89PNG\r\n\x1a\nfixture").expect("source");
+        let draft = service.create_question_draft().expect("draft");
+        let imported = service
+            .import_question_draft_asset(crate::application::ImportQuestionDraftAssetRequest {
+                draft_id: draft.id.clone(),
+                source_path: source.display().to_string(),
+            })
+            .expect("draft asset");
+
+        let created = service
+            .create_question_with_draft_assets(CreateQuestionWithDraftAssetsRequest {
+                question: request(
+                    &set.id,
+                    QuestionType::TrueFalse,
+                    QuestionConfiguration::TrueFalse(TrueFalseConfig {
+                        correct_answer: true,
+                    }),
+                    1,
+                ),
+                draft_id: draft.id.clone(),
+            })
+            .expect("create with draft assets");
+
+        assert!(source.exists());
+        let assets = service
+            .list_question_assets(created.id.clone())
+            .expect("formal assets");
+        assert_eq!(assets.len(), 1);
+        assert_ne!(assets[0].id, imported.id);
+        assert_eq!(assets[0].display_name, "diagram.png");
+        assert!(!directory
+            .path()
+            .join("assets")
+            .join(".draft")
+            .join(draft.id)
+            .exists());
+    }
+
+    #[test]
+    fn fill_blank_can_import_pdf_before_answer_validation_then_promote_after_completion() {
+        let directory = tempfile::tempdir().expect("directory");
+        let service = PersistenceService::initialize(directory.path()).expect("service");
+        let set = service
+            .create_question_set(CreateQuestionSetRequest {
+                lesson_id: None,
+                title: "Set".to_owned(),
+                description: None,
+            })
+            .expect("set");
+        let source = directory.path().join("worksheet.pdf");
+        fs::write(&source, b"%PDF-1.4\nfixture").expect("source");
+        let draft = service.create_question_draft().expect("draft");
+        let imported = service
+            .import_question_draft_asset(crate::application::ImportQuestionDraftAssetRequest {
+                draft_id: draft.id.clone(),
+                source_path: source.display().to_string(),
+            })
+            .expect("PDF draft asset");
+        assert_eq!(imported.asset_type, "pdf");
+
+        let empty_answers = QuestionConfiguration::FillBlank(FillBlankConfig {
+            blanks: vec![FillBlankDefinition {
+                id: "blank-1".to_owned(),
+                accepted_answers: vec![],
+            }],
+            normalization: FillBlankNormalization {
+                trim: true,
+                unicode_normalization: "NFKC".to_owned(),
+                case_sensitive: false,
+            },
+        });
+        assert!(matches!(
+            service.create_question_with_draft_assets(CreateQuestionWithDraftAssetsRequest {
+                question: request(&set.id, QuestionType::FillBlank, empty_answers, 1),
+                draft_id: draft.id.clone(),
+            }),
+            Err(AppError::Validation(_))
+        ));
+        assert!(directory
+            .path()
+            .join("assets")
+            .join(".draft")
+            .join(&draft.id)
+            .is_dir());
+
+        let completed = service
+            .create_question_with_draft_assets(CreateQuestionWithDraftAssetsRequest {
+                question: request(
+                    &set.id,
+                    QuestionType::FillBlank,
+                    QuestionConfiguration::FillBlank(FillBlankConfig {
+                        blanks: vec![FillBlankDefinition {
+                            id: "blank-1".to_owned(),
+                            accepted_answers: vec!["答案".to_owned()],
+                        }],
+                        normalization: FillBlankNormalization {
+                            trim: true,
+                            unicode_normalization: "NFKC".to_owned(),
+                            case_sensitive: false,
+                        },
+                    }),
+                    1,
+                ),
+                draft_id: draft.id.clone(),
+            })
+            .expect("completed FillBlank question");
+        let assets = service
+            .list_question_assets(completed.id)
+            .expect("formal assets");
+        assert_eq!(assets.len(), 1);
+        assert_eq!(assets[0].asset_type, "pdf");
+        assert_eq!(assets[0].display_name, "worksheet.pdf");
+    }
+
+    #[test]
+    fn promotion_failure_removes_new_question_and_preserves_the_draft() {
+        let directory = tempfile::tempdir().expect("directory");
+        let service = PersistenceService::initialize(directory.path()).expect("service");
+        let set = service
+            .create_question_set(CreateQuestionSetRequest {
+                lesson_id: None,
+                title: "Set".to_owned(),
+                description: None,
+            })
+            .expect("set");
+        let source = directory.path().join("diagram.png");
+        fs::write(&source, b"\x89PNG\r\n\x1a\nfixture").expect("source");
+        let draft = service.create_question_draft().expect("draft");
+        service
+            .import_question_draft_asset(crate::application::ImportQuestionDraftAssetRequest {
+                draft_id: draft.id.clone(),
+                source_path: source.display().to_string(),
+            })
+            .expect("draft asset");
+        let database = service.database_for_local_session();
+        database
+            .connection()
+            .expect("connection")
+            .execute_batch("CREATE TRIGGER reject_draft_asset_insert BEFORE INSERT ON question_assets BEGIN SELECT RAISE(ABORT, 'reject'); END;")
+            .expect("trigger");
+
+        assert!(service
+            .create_question_with_draft_assets(CreateQuestionWithDraftAssetsRequest {
+                question: request(
+                    &set.id,
+                    QuestionType::TrueFalse,
+                    QuestionConfiguration::TrueFalse(TrueFalseConfig {
+                        correct_answer: true,
+                    }),
+                    1,
+                ),
+                draft_id: draft.id.clone(),
+            })
+            .is_err());
+        assert!(service
+            .list_questions(set.id)
+            .expect("questions")
+            .is_empty());
+        assert!(directory
+            .path()
+            .join("assets")
+            .join(".draft")
+            .join(draft.id)
+            .is_dir());
+        assert!(source.exists());
     }
 
     #[test]

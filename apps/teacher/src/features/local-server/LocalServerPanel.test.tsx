@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { LocalServerPanel } from "./LocalServerPanel";
+import { TeacherApiError } from "../../services/teacherApi";
 import type { LocalServerStatus, TeacherApi } from "../../types/teacher";
 
 const stopped: LocalServerStatus = {
@@ -18,8 +19,8 @@ function apiFixture(): TeacherApi {
     listStudents: vi.fn(), createStudent: vi.fn(), updateStudent: vi.fn(), deleteStudent: vi.fn(), listCourses: vi.fn(), createCourse: vi.fn(), updateCourse: vi.fn(), deleteCourse: vi.fn(),
     listLessons: vi.fn(), listAllLessons: vi.fn(), createLesson: vi.fn(), updateLesson: vi.fn(), deleteLesson: vi.fn(),
     listQuestionSets: vi.fn(), getQuestionSet: vi.fn(), createQuestionSet: vi.fn(), updateQuestionSet: vi.fn(), deleteQuestionSet: vi.fn(),
-    listQuestions: vi.fn(), getQuestion: vi.fn(), createQuestion: vi.fn(), updateQuestion: vi.fn(), deleteQuestion: vi.fn(), reorderQuestions: vi.fn(),
-    listQuestionAssets: vi.fn(), importQuestionAsset: vi.fn(), deleteQuestionAsset: vi.fn(), getQuestionAssetPreview: vi.fn(), updateQuestionAssetPageReference: vi.fn(),
+    listQuestions: vi.fn(), getQuestion: vi.fn(), createQuestion: vi.fn(), createQuestionWithDraftAssets: vi.fn(), updateQuestion: vi.fn(), deleteQuestion: vi.fn(), reorderQuestions: vi.fn(),
+    listQuestionAssets: vi.fn(), importQuestionAsset: vi.fn(), createQuestionDraft: vi.fn(), importQuestionDraftAsset: vi.fn(), deleteQuestionDraftAsset: vi.fn(), discardQuestionDraft: vi.fn(), deleteQuestionAsset: vi.fn(), getQuestionAssetPreview: vi.fn(), updateQuestionAssetPageReference: vi.fn(),
     getLocalServerStatus: vi.fn().mockResolvedValue(stopped), startLocalServer: vi.fn().mockResolvedValue(running), stopLocalServer: vi.fn().mockResolvedValue(stopped),
     createLocalSession: vi.fn(), openLocalSessionLobby: vi.fn(), getActiveLocalSession: vi.fn().mockResolvedValue(null), endLocalSession: vi.fn(), listLocalSessionParticipants: vi.fn().mockResolvedValue([]),
   };
@@ -35,5 +36,18 @@ describe("LocalServerPanel", () => {
     await waitFor(() => expect(screen.getByText("http://192.168.1.30:41234")).toBeInTheDocument());
     expect(api.startLocalServer).toHaveBeenCalledTimes(1);
     expect(screen.getByText("ws://127.0.0.1:41234/ws")).toBeInTheDocument();
+  });
+
+  it("keeps the running server visible when the backend rejects a normal stop for an active session", async () => {
+    const api = apiFixture();
+    vi.mocked(api.getLocalServerStatus).mockResolvedValue(running);
+    vi.mocked(api.stopLocalServer).mockRejectedValue(new TeacherApiError({ code: "conflict", message: "The operation conflicts with existing data." }));
+    render(<LocalServerPanel api={api} />);
+    await screen.findByText("http://192.168.1.30:41234");
+
+    fireEvent.click(screen.getByRole("button", { name: "停止伺服器" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("請先結束目前課堂，才能停止伺服器。");
+    expect(screen.getByText("執行中")).toBeInTheDocument();
+    expect(api.stopLocalServer).toHaveBeenCalledOnce();
   });
 });

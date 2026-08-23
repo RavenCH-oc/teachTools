@@ -9,21 +9,28 @@ use crate::infrastructure::persistence::repositories::{
     NewClassroom, NewCourse, NewLesson, NewStudent, Student, StudentRepository,
 };
 mod assets;
+mod live_quiz;
 mod local_server;
 mod local_session;
 mod questions;
 mod student_assets;
 pub use assets::{
-    ImportQuestionAssetRequest, QuestionAssetDto, QuestionAssetPreviewDto,
+    DeleteQuestionDraftAssetRequest, DraftQuestionAssetDto, ImportQuestionAssetRequest,
+    ImportQuestionDraftAssetRequest, QuestionAssetDto, QuestionAssetPreviewDto, QuestionDraftDto,
     UpdateQuestionAssetPageReferenceRequest,
+};
+pub use live_quiz::{
+    LiveQuizService, OwnSubmissionResultDto, QuestionPublicView, QuestionRevealView,
+    SessionQuestionDto, SessionSyncDto, SubmissionAckDto, TeacherQuestionProgressDto,
 };
 pub use local_server::{LocalServerService, LocalServerStatus};
 pub use local_session::{
     LocalSessionDto, LocalSessionService, ParticipantSelfView, TeacherParticipantDto,
 };
 pub use questions::{
-    CreateQuestionRequest, CreateQuestionSetRequest, QuestionDto, QuestionSetDto,
-    ReorderQuestionsRequest, UpdateQuestionRequest, UpdateQuestionSetRequest,
+    CreateQuestionRequest, CreateQuestionSetRequest, CreateQuestionWithDraftAssetsRequest,
+    QuestionDto, QuestionSetDto, ReorderQuestionsRequest, UpdateQuestionRequest,
+    UpdateQuestionSetRequest,
 };
 pub use student_assets::StudentAssetLocation;
 pub(crate) use student_assets::StudentAssetProvider;
@@ -199,6 +206,24 @@ impl PersistenceService {
         request: ImportQuestionAssetRequest,
     ) -> Result<QuestionAssetDto, AppError> {
         self.assets.import(request)
+    }
+    pub fn create_question_draft(&self) -> Result<QuestionDraftDto, AppError> {
+        self.assets.create_draft()
+    }
+    pub fn import_question_draft_asset(
+        &self,
+        request: ImportQuestionDraftAssetRequest,
+    ) -> Result<DraftQuestionAssetDto, AppError> {
+        self.assets.import_draft(request)
+    }
+    pub fn delete_question_draft_asset(
+        &self,
+        request: DeleteQuestionDraftAssetRequest,
+    ) -> Result<(), AppError> {
+        self.assets.delete_draft_asset(request)
+    }
+    pub fn discard_question_draft(&self, draft_id: String) -> Result<(), AppError> {
+        self.assets.discard_draft(draft_id)
     }
     pub fn delete_question_asset(&self, asset_id: String) -> Result<(), AppError> {
         self.assets.delete(asset_id)

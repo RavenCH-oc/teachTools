@@ -6,8 +6,9 @@ mod question_domain;
 
 use application::{
     CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateQuestionRequest,
-    CreateQuestionSetRequest, CreateStudentRequest, ImportQuestionAssetRequest,
-    LocalDatabaseStatus, LocalServerService, LocalServerStatus, LocalSessionDto,
+    CreateQuestionSetRequest, CreateQuestionWithDraftAssetsRequest, CreateStudentRequest,
+    DeleteQuestionDraftAssetRequest, ImportQuestionAssetRequest, ImportQuestionDraftAssetRequest,
+    LiveQuizService, LocalDatabaseStatus, LocalServerService, LocalServerStatus, LocalSessionDto,
     LocalSessionService, PersistenceService, ReorderQuestionsRequest, UpdateClassroomRequest,
     UpdateCourseRequest, UpdateLessonRequest, UpdateQuestionAssetPageReferenceRequest,
     UpdateQuestionRequest, UpdateQuestionSetRequest, UpdateStudentRequest,
@@ -26,7 +27,7 @@ pub struct RuntimeInfo {
 fn get_app_runtime_info() -> RuntimeInfo {
     RuntimeInfo {
         app_name: "Classroom",
-        phase: "Phase 8",
+        phase: "Phase 9",
     }
 }
 
@@ -82,6 +83,75 @@ fn open_local_session_lobby(
         return Err(AppError::ServerStartFailed);
     };
     sessions.open_lobby(session_id, server_instance_id)
+}
+
+#[tauri::command]
+fn start_local_session(
+    session_id: String,
+    sessions: tauri::State<'_, std::sync::Arc<LocalSessionService>>,
+    server: tauri::State<'_, LocalServerService>,
+) -> Result<LocalSessionDto, AppError> {
+    let status = server.status()?;
+    let Some(server_instance_id) = status.server_instance_id else {
+        return Err(AppError::ServerStartFailed);
+    };
+    sessions.start(session_id, server_instance_id)
+}
+
+#[tauri::command]
+fn publish_session_question(
+    session_id: String,
+    source_question_id: String,
+    quiz: tauri::State<'_, std::sync::Arc<LiveQuizService>>,
+) -> Result<application::SessionQuestionDto, AppError> {
+    quiz.publish(session_id, source_question_id)
+}
+#[tauri::command]
+fn list_session_questions(
+    session_id: String,
+    quiz: tauri::State<'_, std::sync::Arc<LiveQuizService>>,
+) -> Result<Vec<application::SessionQuestionDto>, AppError> {
+    quiz.list(session_id)
+}
+#[tauri::command]
+fn open_session_question(
+    session_question_id: String,
+    quiz: tauri::State<'_, std::sync::Arc<LiveQuizService>>,
+) -> Result<application::SessionQuestionDto, AppError> {
+    quiz.open(session_question_id)
+}
+#[tauri::command]
+fn lock_session_question(
+    session_question_id: String,
+    quiz: tauri::State<'_, std::sync::Arc<LiveQuizService>>,
+) -> Result<application::SessionQuestionDto, AppError> {
+    quiz.lock(session_question_id)
+}
+#[tauri::command]
+fn reopen_session_question(
+    session_question_id: String,
+    quiz: tauri::State<'_, std::sync::Arc<LiveQuizService>>,
+) -> Result<application::SessionQuestionDto, AppError> {
+    quiz.reopen(session_question_id)
+}
+#[tauri::command]
+fn reveal_session_question(
+    session_question_id: String,
+    quiz: tauri::State<'_, std::sync::Arc<LiveQuizService>>,
+) -> Result<application::SessionQuestionDto, AppError> {
+    quiz.reveal(session_question_id)
+}
+#[tauri::command]
+fn get_session_question_progress(
+    session_question_id: String,
+    session_id: String,
+    quiz: tauri::State<'_, std::sync::Arc<LiveQuizService>>,
+    sessions: tauri::State<'_, std::sync::Arc<LocalSessionService>>,
+) -> Result<application::TeacherQuestionProgressDto, AppError> {
+    quiz.teacher_progress(
+        session_question_id,
+        sessions.list_participants(&session_id)?.len(),
+    )
 }
 
 #[tauri::command]
@@ -281,6 +351,13 @@ fn create_question(
     state.create_question(request)
 }
 #[tauri::command]
+fn create_question_with_draft_assets(
+    state: tauri::State<'_, PersistenceService>,
+    request: CreateQuestionWithDraftAssetsRequest,
+) -> Result<application::QuestionDto, AppError> {
+    state.create_question_with_draft_assets(request)
+}
+#[tauri::command]
 fn update_question(
     state: tauri::State<'_, PersistenceService>,
     id: String,
@@ -320,6 +397,37 @@ fn import_question_asset(
 }
 
 #[tauri::command]
+fn create_question_draft(
+    state: tauri::State<'_, PersistenceService>,
+) -> Result<application::QuestionDraftDto, AppError> {
+    state.create_question_draft()
+}
+
+#[tauri::command]
+fn import_question_draft_asset(
+    state: tauri::State<'_, PersistenceService>,
+    request: ImportQuestionDraftAssetRequest,
+) -> Result<application::DraftQuestionAssetDto, AppError> {
+    state.import_question_draft_asset(request)
+}
+
+#[tauri::command]
+fn delete_question_draft_asset(
+    state: tauri::State<'_, PersistenceService>,
+    request: DeleteQuestionDraftAssetRequest,
+) -> Result<(), AppError> {
+    state.delete_question_draft_asset(request)
+}
+
+#[tauri::command]
+fn discard_question_draft(
+    state: tauri::State<'_, PersistenceService>,
+    draft_id: String,
+) -> Result<(), AppError> {
+    state.discard_question_draft(draft_id)
+}
+
+#[tauri::command]
 fn delete_question_asset(
     state: tauri::State<'_, PersistenceService>,
     asset_id: String,
@@ -352,14 +460,18 @@ pub fn run() -> Result<(), String> {
                 .path()
                 .app_data_dir()
                 .map_err(|error| AppError::Initialization(error.to_string()))?;
-            let service = PersistenceService::initialize(app_data_dir)?;
+            let service = PersistenceService::initialize(&app_data_dir)?;
             let sessions = LocalSessionService::initialize(service.database_for_local_session())?;
+            let quiz =
+                LiveQuizService::initialize(service.database_for_local_session(), app_data_dir)?;
             let student_assets =
                 application::StudentAssetLocation::development_or_bundle(app.handle())?;
             app.manage(LocalServerService::new(
                 std::sync::Arc::clone(&sessions),
+                std::sync::Arc::clone(&quiz),
                 student_assets,
             ));
+            app.manage(quiz);
             app.manage(sessions);
             app.manage(service);
             Ok(())
@@ -372,9 +484,17 @@ pub fn run() -> Result<(), String> {
             get_local_server_status,
             create_local_session,
             open_local_session_lobby,
+            start_local_session,
             get_active_local_session,
             end_local_session,
             list_local_session_participants,
+            publish_session_question,
+            list_session_questions,
+            open_session_question,
+            lock_session_question,
+            reopen_session_question,
+            reveal_session_question,
+            get_session_question_progress,
             list_classrooms,
             create_classroom,
             update_classroom,
@@ -400,11 +520,16 @@ pub fn run() -> Result<(), String> {
             list_questions,
             get_question,
             create_question,
+            create_question_with_draft_assets,
             update_question,
             delete_question,
             reorder_questions,
             list_question_assets,
             import_question_asset,
+            create_question_draft,
+            import_question_draft_asset,
+            delete_question_draft_asset,
+            discard_question_draft,
             delete_question_asset,
             get_question_asset_preview,
             update_question_asset_page_reference
@@ -446,10 +571,10 @@ mod tests {
     fn runtime_info_has_the_phase_marker() {
         let info = RuntimeInfo {
             app_name: "Classroom",
-            phase: "Phase 8",
+            phase: "Phase 9",
         };
         assert_eq!(info.app_name, "Classroom");
-        assert_eq!(info.phase, "Phase 8");
+        assert_eq!(info.phase, "Phase 9");
     }
 
     #[test]

@@ -97,6 +97,7 @@ function serverErrorMessage(cause: unknown): string {
   if (cause instanceof TeacherApiError) {
     if (cause.code === "server_bind_failed") return "無法啟動本機教室伺服器。請確認網路可用後再試一次。";
     if (cause.code === "server_shutdown_failed") return "伺服器未能正常停止。請重新讀取狀態後再試一次。";
+    if (cause.code === "conflict") return "請先結束目前課堂，才能停止伺服器。";
     return "本機教室伺服器操作未完成。請重試。";
   }
   return "無法讀取或變更本機教室伺服器狀態。";

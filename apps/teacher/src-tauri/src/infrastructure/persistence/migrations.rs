@@ -7,11 +7,14 @@ const INITIAL_SCHEMA: &str = include_str!("../../../migrations/0001_initial_loca
 const QUESTION_ASSETS_FOUNDATION: &str =
     include_str!("../../../migrations/0002_question_assets_foundation.sql");
 const LOCAL_SESSION_LOBBY: &str = include_str!("../../../migrations/0003_local_session_lobby.sql");
+const LIVE_QUIZ_FOUNDATION: &str =
+    include_str!("../../../migrations/0004_live_quiz_foundation.sql");
 
 struct Migration {
     version: i64,
     id: &'static str,
     sql: &'static str,
+    requires_foreign_key_pause: bool,
 }
 
 const MIGRATIONS: &[Migration] = &[
@@ -19,16 +22,25 @@ const MIGRATIONS: &[Migration] = &[
         version: 1,
         id: "0001_initial_local_schema",
         sql: INITIAL_SCHEMA,
+        requires_foreign_key_pause: false,
     },
     Migration {
         version: 2,
         id: "0002_question_assets_foundation",
         sql: QUESTION_ASSETS_FOUNDATION,
+        requires_foreign_key_pause: false,
     },
     Migration {
         version: 3,
         id: "0003_local_session_lobby",
         sql: LOCAL_SESSION_LOBBY,
+        requires_foreign_key_pause: false,
+    },
+    Migration {
+        version: 4,
+        id: "0004_live_quiz_foundation",
+        sql: LIVE_QUIZ_FOUNDATION,
+        requires_foreign_key_pause: true,
     },
 ];
 
@@ -62,6 +74,9 @@ pub fn run(connection: &mut Connection) -> Result<(), AppError> {
             continue;
         }
 
+        if migration.requires_foreign_key_pause {
+            connection.execute_batch("PRAGMA foreign_keys = OFF")?;
+        }
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         transaction.execute_batch(migration.sql).map_err(|_| {
             AppError::MigrationFailed(format!("migration {} failed", migration.version))
@@ -72,9 +87,13 @@ pub fn run(connection: &mut Connection) -> Result<(), AppError> {
                 rusqlite::params![migration.version, migration.id, expected_checksum, utc_now()],
             )
             .map_err(|_| AppError::MigrationFailed(format!("migration {} metadata failed", migration.version)))?;
-        transaction.commit().map_err(|_| {
+        let committed = transaction.commit().map_err(|_| {
             AppError::MigrationFailed(format!("migration {} commit failed", migration.version))
-        })?;
+        });
+        if migration.requires_foreign_key_pause {
+            let _ = connection.execute_batch("PRAGMA foreign_keys = ON");
+        }
+        committed?;
     }
     Ok(())
 }
@@ -104,6 +123,9 @@ pub fn verify(connection: &Connection) -> Result<(), AppError> {
         "group_presets",
         "local_sessions",
         "session_participants",
+        "session_questions",
+        "session_question_assets",
+        "submissions",
     ] {
         let exists: i64 = connection.query_row(
             "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
@@ -159,13 +181,13 @@ mod tests {
         let mut connection = Connection::open_in_memory().expect("connection");
         run(&mut connection).expect("first run");
         run(&mut connection).expect("second run");
-        assert_eq!(super::current_version(&connection).expect("version"), 3);
+        assert_eq!(super::current_version(&connection).expect("version"), 4);
         assert_eq!(
             connection
                 .query_row("SELECT count(*) FROM schema_migrations", [], |row| row
                     .get::<_, i64>(0))
                 .expect("count"),
-            3
+            4
         );
     }
 
@@ -202,7 +224,7 @@ mod tests {
 
         run(&mut connection).expect("upgrade");
 
-        assert_eq!(super::current_version(&connection).expect("version"), 3);
+        assert_eq!(super::current_version(&connection).expect("version"), 4);
         assert!(connection
             .prepare("SELECT name FROM pragma_table_info('question_assets') WHERE name = 'sha256'")
             .expect("statement")
@@ -237,10 +259,52 @@ mod tests {
         }
         run(&mut connection).expect("upgrade");
         run(&mut connection).expect("reopen no-op");
-        assert_eq!(super::current_version(&connection).expect("version"), 3);
+        assert_eq!(super::current_version(&connection).expect("version"), 4);
         assert!(connection.prepare("SELECT 1 FROM local_sessions").is_ok());
         assert!(connection
             .prepare("SELECT 1 FROM session_participants")
             .is_ok());
+    }
+
+    #[test]
+    fn upgrades_a_v3_database_with_participants_to_live_quiz_schema() {
+        let mut connection = Connection::open_in_memory().expect("connection");
+        connection
+            .execute_batch(super::INITIAL_SCHEMA)
+            .expect("v1 schema");
+        connection
+            .execute_batch(super::QUESTION_ASSETS_FOUNDATION)
+            .expect("v2 schema");
+        connection
+            .execute_batch(super::LOCAL_SESSION_LOBBY)
+            .expect("v3 schema");
+        connection.execute_batch("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY NOT NULL, migration_id TEXT NOT NULL UNIQUE, checksum TEXT NOT NULL, applied_at TEXT NOT NULL)").expect("migration table");
+        for migration in &super::MIGRATIONS[..3] {
+            connection.execute("INSERT INTO schema_migrations(version,migration_id,checksum,applied_at) VALUES (?1,?2,?3,'now')", rusqlite::params![migration.version,migration.id,super::checksum(migration.sql)]).expect("metadata");
+        }
+        connection.execute("INSERT INTO classes(id,name,created_at,updated_at) VALUES ('class','Class','now','now')", []).expect("class");
+        connection.execute("INSERT INTO students(id,class_id,seat_number,name,created_at,updated_at) VALUES ('student','class',1,'Ada','now','now')", []).expect("student");
+        connection.execute("INSERT INTO local_sessions(id,classroom_id,server_instance_id,state,join_mode,join_code,created_at,updated_at) VALUES ('session','class','server','LOBBY','roster_match','ABCDEFGH','now','now')", []).expect("session");
+        connection.execute("INSERT INTO session_participants(id,session_id,student_id,seat_number,display_name,credential_hash,joined_at,updated_at) VALUES ('participant','session','student',1,'Ada','hash','now','now')", []).expect("participant");
+        run(&mut connection).expect("upgrade v3");
+        assert_eq!(super::current_version(&connection).expect("version"), 4);
+        let state: String = connection
+            .query_row(
+                "SELECT state FROM local_sessions WHERE id='session'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("session survives");
+        assert_eq!(state, "LOBBY");
+        connection
+            .execute(
+                "UPDATE local_sessions SET state='ACTIVE' WHERE id='session'",
+                [],
+            )
+            .expect("active is accepted");
+        assert!(connection
+            .prepare("SELECT 1 FROM session_questions")
+            .is_ok());
+        assert!(connection.prepare("SELECT 1 FROM submissions").is_ok());
     }
 }

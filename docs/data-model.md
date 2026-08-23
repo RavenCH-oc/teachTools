@@ -43,3 +43,8 @@ Question 在 TypeScript domain 中使用 discriminated union，而非以一串 t
 ## Submission 與 Grade
 
 Submission 有穩定 submission_id，作為 retry 與 idempotency 的鍵。學生端只送出答案，不可送出 authoritative score 或 correct 值；權威 backend 產生 Grade、score、correct 與統計。重送、取代答案、題目鎖定後的行為及衝突回應，由 SessionBackend contract 定義並由兩種 backend 一致實作。
+# Phase 9 live quiz tables
+
+`session_questions` stores a validated immutable source snapshot with a nullable traceability link to `questions`. `session_question_assets` owns copied managed media under the application data directory. `submissions` stores immutable answer revisions; its UUID primary key provides idempotency, and `(session_question_id, participant_id, revision)` provides ordered per-student history.
+
+The database enforces a single active local session and a single `OPEN`/`LOCKED` session question through partial unique indexes. Correct answer and grading snapshot columns are teacher/backend-only and are never projected into Student public views.

@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.classtools.teacher",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "pnpm run dev:tauri-frontend",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm run build:tauri-frontend",
     "frontendDist": "../dist"
   },
   "app": {

@@ -10,7 +10,7 @@ const uuidSchema = z.string().uuid();
 export const sessionPublicViewSchema = z.object({
   sessionId: uuidSchema,
   classroomName: z.string().trim().min(1).max(200),
-  state: z.enum(["CREATED", "LOBBY", "ENDED"]),
+  state: z.enum(["CREATED", "LOBBY", "ACTIVE", "ENDED"]),
   joinMode: z.literal("roster_match"),
   serverInstanceId: uuidSchema,
   protocolVersion: protocolVersionSchema,
@@ -47,7 +47,33 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
     participantId: uuidSchema,
     credential: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   }).strict(),
+  z.object({
+    protocolVersion: protocolVersionSchema,
+    type: z.literal("submit_answer"),
+    requestId: requestIdSchema,
+    submissionId: uuidSchema,
+    sessionQuestionId: uuidSchema,
+    answer: z.discriminatedUnion("type", [
+      z.object({ type: z.literal("true_false"), value: z.boolean() }).strict(),
+      z.object({ type: z.literal("single_choice"), optionId: z.string().trim().min(1).max(120) }).strict(),
+      z.object({ type: z.literal("multiple_choice"), optionIds: z.array(z.string().trim().min(1).max(120)).max(100) }).strict(),
+      z.object({ type: z.literal("fill_blank"), values: z.record(z.string().trim().min(1).max(120), z.string().max(10_000)) }).strict(),
+      z.object({ type: z.literal("essay"), text: z.string().max(100_000) }).strict(),
+    ]),
+  }).strict(),
 ]);
+
+export const sessionQuestionAssetSchema = z.object({
+  id: uuidSchema, assetType: z.enum(["image", "pdf"]), displayName: z.string().trim().min(1).max(500),
+  mimeType: z.string().trim().min(1).max(200), sizeBytes: z.number().int().positive(), position: z.number().int().nonnegative(), pageReference: z.number().int().positive().nullable(),
+}).strict();
+export const questionPublicViewSchema = z.object({
+  sessionQuestionId: uuidSchema, type: z.enum(["true_false", "single_choice", "multiple_choice", "fill_blank", "essay"]), prompt: z.string().trim().min(1).max(20_000), points: z.number().int().positive(), state: z.enum(["OPEN", "LOCKED", "REVEALED"]),
+  options: z.array(z.object({ id: z.string().trim().min(1).max(120), text: z.string().trim().min(1).max(20_000) }).strict()), blanks: z.array(z.string().trim().min(1).max(120)), assets: z.array(sessionQuestionAssetSchema),
+}).strict();
+export const ownSubmissionResultSchema = z.object({ submissionId: uuidSchema, revision: z.number().int().positive(), gradingStatus: z.enum(["graded", "pending"]), isCorrect: z.boolean().nullable(), score: z.number().int().nonnegative().nullable(), maxScore: z.number().int().positive(), answer: z.unknown() }).strict();
+export const questionRevealViewSchema = z.object({ ...questionPublicViewSchema.shape, correctAnswer: z.unknown().nullable() }).strict();
+export const sessionSyncSchema = z.object({ sessionState: z.enum(["LOBBY", "ACTIVE", "ENDED"]), currentQuestion: questionPublicViewSchema.nullable(), ownLatestSubmission: ownSubmissionResultSchema.nullable(), reveal: questionRevealViewSchema.nullable() }).strict();
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
   z.object({
@@ -60,14 +86,19 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("participant_authenticated"),
     participant: participantSelfViewSchema,
     classroomName: z.string().trim().min(1).max(200),
-    sessionState: z.literal("LOBBY"),
+    sessionState: z.enum(["LOBBY", "ACTIVE"]),
   }).strict(),
   z.object({
     protocolVersion: protocolVersionSchema,
     type: z.literal("session_state_changed"),
     sessionId: uuidSchema,
-    state: z.literal("ENDED"),
+    state: z.enum(["ACTIVE", "ENDED"]),
   }).strict(),
+  z.object({ protocolVersion: protocolVersionSchema, type: z.literal("session_sync"), sync: sessionSyncSchema }).strict(),
+  z.object({ protocolVersion: protocolVersionSchema, type: z.literal("question_state_changed"), question: questionPublicViewSchema }).strict(),
+  z.object({ protocolVersion: protocolVersionSchema, type: z.literal("question_revealed"), reveal: questionRevealViewSchema }).strict(),
+  z.object({ protocolVersion: protocolVersionSchema, type: z.literal("submission_acknowledged"), acknowledgement: z.object({ submissionId: uuidSchema, sessionQuestionId: uuidSchema, revision: z.number().int().positive(), accepted: z.literal(true), submittedAt: z.string().datetime(), gradingStatus: z.enum(["graded", "pending"]) }).strict() }).strict(),
+  z.object({ protocolVersion: protocolVersionSchema, type: z.literal("submission_result"), result: ownSubmissionResultSchema }).strict(),
   z.object({
     protocolVersion: protocolVersionSchema,
     type: z.literal("pong"),
@@ -76,7 +107,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
   z.object({
     protocolVersion: protocolVersionSchema,
     type: z.literal("error"),
-    code: z.enum(["PROTOCOL_ERROR", "AUTH_FAILED", "AUTH_TIMEOUT", "SESSION_ENDED", "SERVER_INSTANCE_MISMATCH"]),
+    code: z.enum(["PROTOCOL_ERROR", "AUTH_FAILED", "AUTH_TIMEOUT", "SESSION_ENDED", "SERVER_INSTANCE_MISMATCH", "QUESTION_LOCKED", "INVALID_ANSWER", "SUBMISSION_CONFLICT"]),
     message: z.string().trim().min(1).max(200),
   }).strict(),
 ]);
@@ -86,6 +117,9 @@ export type ServerMessage = z.infer<typeof serverMessageSchema>;
 export type SessionPublicView = z.infer<typeof sessionPublicViewSchema>;
 export type ParticipantSelfView = z.infer<typeof participantSelfViewSchema>;
 export type JoinSuccess = z.infer<typeof joinSuccessSchema>;
+export type StudentAnswer = z.infer<typeof clientMessageSchema> extends infer Message ? Extract<Message, { type: "submit_answer" }> extends { answer: infer Answer } ? Answer : never : never;
+export type QuestionPublicView = z.infer<typeof questionPublicViewSchema>;
+export type SessionSync = z.infer<typeof sessionSyncSchema>;
 
 /**
  * The production SessionBackend contract is still deferred. Phase 7 defines

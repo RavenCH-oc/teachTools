@@ -136,17 +136,26 @@ impl LocalSessionService {
         Ok(session.into())
     }
 
+    pub fn start(
+        &self,
+        session_id: String,
+        server_instance_id: String,
+    ) -> Result<LocalSessionDto, AppError> {
+        let session =
+            LocalSessionRepository::start(&self.database, &session_id, &server_instance_id)?;
+        let _ = self.events.send(SessionStateChanged {
+            session_id: session.id.clone(),
+            state: session.state.clone(),
+        });
+        Ok(session.into())
+    }
+
     pub fn active(&self) -> Result<Option<LocalSessionDto>, AppError> {
         Ok(LocalSessionRepository::get_active(&self.database)?.map(Into::into))
     }
 
-    pub fn has_open_lobby(&self) -> Result<bool, AppError> {
-        Ok(matches!(
-            LocalSessionRepository::get_active(&self.database)?
-                .as_ref()
-                .map(|session| session.state.as_str()),
-            Some("LOBBY")
-        ))
+    pub fn has_nonterminal_session(&self) -> Result<bool, AppError> {
+        Ok(LocalSessionRepository::get_active(&self.database)?.is_some())
     }
 
     pub fn end_active_for_exit(&self) -> Result<(), AppError> {
@@ -230,7 +239,7 @@ impl LocalSessionService {
         if session.server_instance_id != server_instance_id {
             return Err(AppError::ServerInstanceMismatch);
         }
-        if session.state != "LOBBY" {
+        if session.state != "LOBBY" && session.state != "ACTIVE" {
             return Err(AppError::SessionNotOpen);
         }
         let Some(participant) =
@@ -396,7 +405,7 @@ mod tests {
         let (service, classroom_id) = service();
         let server_id = Uuid::now_v7().to_string();
         let session = service
-            .create(classroom_id, server_id.clone())
+            .create(classroom_id.clone(), server_id.clone())
             .expect("session");
         assert!(service
             .create("missing".to_owned(), server_id.clone())
@@ -407,6 +416,18 @@ mod tests {
         let joined = service
             .join(&session.join_code, 12, " 王小明 ", &server_id)
             .expect("join");
+        let started = service
+            .start(session.id.clone(), server_id.clone())
+            .expect("start");
+        assert_eq!(started.id, session.id);
+        assert_eq!(started.state, "ACTIVE");
+        let active = service
+            .active()
+            .expect("active query")
+            .expect("active session");
+        assert_eq!(active.id, session.id);
+        assert_eq!(active.state, "ACTIVE");
+        assert!(service.create(classroom_id, server_id.clone()).is_err());
         assert_eq!(
             URL_SAFE_NO_PAD
                 .decode(&joined.credential)
