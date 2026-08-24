@@ -9,6 +9,7 @@ use crate::infrastructure::persistence::repositories::{
     NewClassroom, NewCourse, NewLesson, NewStudent, Student, StudentRepository,
 };
 mod assets;
+pub(crate) mod grouping;
 mod live_quiz;
 mod local_server;
 mod local_session;

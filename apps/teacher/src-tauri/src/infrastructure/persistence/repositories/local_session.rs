@@ -201,15 +201,21 @@ impl LocalSessionRepository {
         id: &str,
         reason: &str,
     ) -> Result<LocalSessionRecord, AppError> {
-        let connection = database.connection()?;
+        let mut connection = database.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let now = now_utc();
-        let changed = connection.execute(
+        let changed = transaction.execute(
             "UPDATE local_sessions SET state = 'ENDED', ended_at = ?1, ended_reason = ?2, updated_at = ?1 WHERE id = ?3 AND state IN ('CREATED', 'LOBBY', 'ACTIVE')",
             params![now, reason, id],
         )?;
         if changed == 0 {
             return Err(AppError::SessionNotOpen);
         }
+        transaction.execute(
+            "UPDATE session_grouping_drafts SET state='CANCELLED',updated_at=?1 WHERE session_id=?2 AND state IN ('DRAFT','OPEN')",
+            params![now, id],
+        )?;
+        transaction.commit()?;
         Self::get_by_id(database, id)?.ok_or(AppError::Storage)
     }
 
@@ -231,12 +237,27 @@ impl LocalSessionRepository {
     }
 
     pub fn end_stale_sessions(database: &Database) -> Result<(), AppError> {
-        let connection = database.connection()?;
+        let mut connection = database.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let now = now_utc();
-        connection.execute(
-            "UPDATE local_sessions SET state = 'ENDED', ended_at = ?1, ended_reason = 'server_restart', updated_at = ?1 WHERE state IN ('CREATED', 'LOBBY', 'ACTIVE')",
-            [now],
+        let mut stale_sessions = transaction.prepare(
+            "SELECT id FROM local_sessions WHERE state IN ('CREATED', 'LOBBY', 'ACTIVE')",
         )?;
+        let stale_session_ids = stale_sessions
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(stale_sessions);
+        transaction.execute(
+            "UPDATE local_sessions SET state = 'ENDED', ended_at = ?1, ended_reason = 'server_restart', updated_at = ?1 WHERE state IN ('CREATED', 'LOBBY', 'ACTIVE')",
+            [now.clone()],
+        )?;
+        for session_id in stale_session_ids {
+            transaction.execute(
+                "UPDATE session_grouping_drafts SET state='CANCELLED',updated_at=?1 WHERE session_id=?2 AND state IN ('DRAFT','OPEN')",
+                params![now, session_id],
+            )?;
+        }
+        transaction.commit()?;
         Ok(())
     }
 

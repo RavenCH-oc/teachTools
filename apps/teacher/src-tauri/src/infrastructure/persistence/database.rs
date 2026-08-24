@@ -85,6 +85,6 @@ mod tests {
         database.initialize().expect("database initializes");
         let reopened = Database::open(directory.path().join("classroom.sqlite3"));
         reopened.initialize().expect("database reopens");
-        assert_eq!(reopened.status().expect("status").schema_version, 4);
+        assert_eq!(reopened.status().expect("status").schema_version, 5);
     }
 }

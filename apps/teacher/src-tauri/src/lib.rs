@@ -4,6 +4,7 @@ mod grading;
 mod infrastructure;
 mod question_domain;
 
+use application::grouping::GroupingService;
 use application::{
     CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateQuestionRequest,
     CreateQuestionSetRequest, CreateQuestionWithDraftAssetsRequest, CreateStudentRequest,
@@ -524,6 +525,7 @@ pub fn run() -> Result<(), String> {
             let statistics = std::sync::Arc::new(StatisticsService::initialize(
                 service.database_for_local_session(),
             ));
+            let grouping = GroupingService::initialize(service.database_for_local_session());
             let student_assets =
                 application::StudentAssetLocation::development_or_bundle(app.handle())?;
             app.manage(LocalServerService::new(
@@ -534,6 +536,7 @@ pub fn run() -> Result<(), String> {
             app.manage(quiz);
             app.manage(sessions);
             app.manage(statistics);
+            app.manage(grouping);
             app.manage(service);
             Ok(())
         })

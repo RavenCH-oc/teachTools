@@ -50,6 +50,28 @@ pub enum AppError {
     QuestionLocked,
     #[error("student static assets are unavailable")]
     StudentAssetsUnavailable,
+    #[error("group preset was not found")]
+    GroupPresetNotFound,
+    #[error("group was not found")]
+    GroupNotFound,
+    #[error("participant was not found")]
+    ParticipantNotFound,
+    #[error("participant belongs to another session")]
+    ParticipantSessionMismatch,
+    #[error("student belongs to another classroom")]
+    StudentClassroomMismatch,
+    #[error("participant is already assigned to a group")]
+    AlreadyGrouped,
+    #[error("group has reached its capacity")]
+    GroupFull,
+    #[error("grouping draft is not open")]
+    DraftNotOpen,
+    #[error("an active grouping draft already exists")]
+    ActiveDraftExists,
+    #[error("the session has ended")]
+    SessionEnded,
+    #[error("grouping revision could not be created")]
+    RevisionConflict,
 }
 
 impl From<rusqlite::Error> for AppError {
@@ -148,6 +170,33 @@ impl Serialize for AppError {
             Self::StudentAssetsUnavailable => (
                 "student_assets_unavailable",
                 "The student application is not available. Build it before starting the local server.",
+                true,
+            ),
+            Self::GroupPresetNotFound => ("group_preset_not_found", "The group preset was not found.", false),
+            Self::GroupNotFound => ("group_not_found", "The group was not found.", false),
+            Self::ParticipantNotFound => ("participant_not_found", "The participant was not found.", false),
+            Self::ParticipantSessionMismatch => (
+                "participant_session_mismatch",
+                "The participant does not belong to this session.",
+                false,
+            ),
+            Self::StudentClassroomMismatch => (
+                "student_classroom_mismatch",
+                "The student does not belong to this classroom.",
+                false,
+            ),
+            Self::AlreadyGrouped => ("already_grouped", "The participant is already assigned to a group.", false),
+            Self::GroupFull => ("group_full", "The selected group is full.", false),
+            Self::DraftNotOpen => ("draft_not_open", "The grouping draft is not open.", false),
+            Self::ActiveDraftExists => (
+                "active_draft_exists",
+                "An active grouping draft already exists for this session.",
+                false,
+            ),
+            Self::SessionEnded => ("session_ended", "The classroom session has ended.", false),
+            Self::RevisionConflict => (
+                "revision_conflict",
+                "The grouping revision could not be created. Refresh and try again.",
                 true,
             ),
         };

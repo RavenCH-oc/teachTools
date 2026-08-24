@@ -9,6 +9,7 @@ const QUESTION_ASSETS_FOUNDATION: &str =
 const LOCAL_SESSION_LOBBY: &str = include_str!("../../../migrations/0003_local_session_lobby.sql");
 const LIVE_QUIZ_FOUNDATION: &str =
     include_str!("../../../migrations/0004_live_quiz_foundation.sql");
+const GROUPING_FOUNDATION: &str = include_str!("../../../migrations/0005_grouping_foundation.sql");
 
 struct Migration {
     version: i64,
@@ -41,6 +42,12 @@ const MIGRATIONS: &[Migration] = &[
         id: "0004_live_quiz_foundation",
         sql: LIVE_QUIZ_FOUNDATION,
         requires_foreign_key_pause: true,
+    },
+    Migration {
+        version: 5,
+        id: "0005_grouping_foundation",
+        sql: GROUPING_FOUNDATION,
+        requires_foreign_key_pause: false,
     },
 ];
 
@@ -126,6 +133,14 @@ pub fn verify(connection: &Connection) -> Result<(), AppError> {
         "session_questions",
         "session_question_assets",
         "submissions",
+        "group_preset_groups",
+        "group_preset_members",
+        "session_grouping_drafts",
+        "session_grouping_draft_groups",
+        "session_grouping_draft_members",
+        "session_group_sets",
+        "session_groups",
+        "session_group_members",
     ] {
         let exists: i64 = connection.query_row(
             "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
@@ -181,13 +196,13 @@ mod tests {
         let mut connection = Connection::open_in_memory().expect("connection");
         run(&mut connection).expect("first run");
         run(&mut connection).expect("second run");
-        assert_eq!(super::current_version(&connection).expect("version"), 4);
+        assert_eq!(super::current_version(&connection).expect("version"), 5);
         assert_eq!(
             connection
                 .query_row("SELECT count(*) FROM schema_migrations", [], |row| row
                     .get::<_, i64>(0))
                 .expect("count"),
-            4
+            5
         );
     }
 
@@ -224,7 +239,7 @@ mod tests {
 
         run(&mut connection).expect("upgrade");
 
-        assert_eq!(super::current_version(&connection).expect("version"), 4);
+        assert_eq!(super::current_version(&connection).expect("version"), 5);
         assert!(connection
             .prepare("SELECT name FROM pragma_table_info('question_assets') WHERE name = 'sha256'")
             .expect("statement")
@@ -259,7 +274,7 @@ mod tests {
         }
         run(&mut connection).expect("upgrade");
         run(&mut connection).expect("reopen no-op");
-        assert_eq!(super::current_version(&connection).expect("version"), 4);
+        assert_eq!(super::current_version(&connection).expect("version"), 5);
         assert!(connection.prepare("SELECT 1 FROM local_sessions").is_ok());
         assert!(connection
             .prepare("SELECT 1 FROM session_participants")
@@ -287,7 +302,7 @@ mod tests {
         connection.execute("INSERT INTO local_sessions(id,classroom_id,server_instance_id,state,join_mode,join_code,created_at,updated_at) VALUES ('session','class','server','LOBBY','roster_match','ABCDEFGH','now','now')", []).expect("session");
         connection.execute("INSERT INTO session_participants(id,session_id,student_id,seat_number,display_name,credential_hash,joined_at,updated_at) VALUES ('participant','session','student',1,'Ada','hash','now','now')", []).expect("participant");
         run(&mut connection).expect("upgrade v3");
-        assert_eq!(super::current_version(&connection).expect("version"), 4);
+        assert_eq!(super::current_version(&connection).expect("version"), 5);
         let state: String = connection
             .query_row(
                 "SELECT state FROM local_sessions WHERE id='session'",
@@ -306,5 +321,49 @@ mod tests {
             .prepare("SELECT 1 FROM session_questions")
             .is_ok());
         assert!(connection.prepare("SELECT 1 FROM submissions").is_ok());
+    }
+
+    #[test]
+    fn upgrades_a_v4_database_to_grouping_foundation() {
+        let mut connection = Connection::open_in_memory().expect("connection");
+        connection
+            .execute_batch(super::INITIAL_SCHEMA)
+            .expect("v1 schema");
+        connection
+            .execute_batch(super::QUESTION_ASSETS_FOUNDATION)
+            .expect("v2 schema");
+        connection
+            .execute_batch(super::LOCAL_SESSION_LOBBY)
+            .expect("v3 schema");
+        connection
+            .execute_batch(super::LIVE_QUIZ_FOUNDATION)
+            .expect("v4 schema");
+        connection
+            .execute_batch("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY NOT NULL, migration_id TEXT NOT NULL UNIQUE, checksum TEXT NOT NULL, applied_at TEXT NOT NULL)")
+            .expect("migration table");
+        for migration in &super::MIGRATIONS[..4] {
+            connection
+                .execute(
+                    "INSERT INTO schema_migrations(version,migration_id,checksum,applied_at) VALUES (?1,?2,?3,'now')",
+                    rusqlite::params![migration.version, migration.id, super::checksum(migration.sql)],
+                )
+                .expect("metadata");
+        }
+        run(&mut connection).expect("upgrade v4");
+        assert_eq!(super::current_version(&connection).expect("version"), 5);
+        for table in [
+            "group_preset_groups",
+            "group_preset_members",
+            "session_grouping_drafts",
+            "session_grouping_draft_groups",
+            "session_grouping_draft_members",
+            "session_group_sets",
+            "session_groups",
+            "session_group_members",
+        ] {
+            assert!(connection
+                .prepare(&format!("SELECT 1 FROM {table}"))
+                .is_ok());
+        }
     }
 }

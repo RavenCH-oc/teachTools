@@ -1,5 +1,6 @@
 pub(crate) mod classroom;
 mod course;
+pub(crate) mod grouping;
 mod lesson;
 pub(crate) mod live_quiz;
 pub(crate) mod local_session;
@@ -11,6 +12,10 @@ pub(crate) mod student;
 
 pub use classroom::{Classroom, ClassroomRepository, NewClassroom};
 pub use course::{Course, CourseRepository, NewCourse};
+pub use grouping::{
+    DraftGroup, GroupPreset, GroupingRepository, NewDraftGroup, NewPresetGroup, PresetGroup,
+    PresetMember, SessionGroupSet, SessionGroupingDraft, UnassignedParticipant,
+};
 pub use lesson::{Lesson, LessonRepository, NewLesson};
 pub use live_quiz::{
     LiveQuizRepository, NewSessionQuestion, NewSessionQuestionAsset, NewSubmission,

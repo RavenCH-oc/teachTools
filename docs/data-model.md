@@ -2,7 +2,7 @@
 
 ## 分類與所有權
 
-領域模型分為持久課堂資料與 session runtime 資料。Classroom、Student、Course、Lesson、QuestionSet、Question、QuestionAsset、Rubric 與 Group preset 為 SQLite 長期資料。Session、SessionQuestion、Participant、Submission、Grade、StudentQuestion、StudentQuestionVote、Group、GroupMember、PeerReviewAssignment 與 PeerReview 在 session 期間是 backend runtime 資料；結束後按 archive policy 匯入 SQLite 歷史資料。
+領域模型分為持久課堂資料與 session runtime 資料。Classroom、Student、Course、Lesson、QuestionSet、Question、QuestionAsset、Rubric 與 Group preset 為 SQLite 長期資料。Phase 11A 另以 SQLite 保存 SessionGroupingDraft 與 immutable SessionGroupSet revisions；即時 Group/GroupMember transport/runtime projection 仍屬 backend session boundary。Session、SessionQuestion、Participant、Submission、Grade、StudentQuestion、StudentQuestionVote、PeerReviewAssignment 與 PeerReview 在 session 期間是 backend runtime 資料；結束後按各自 archive policy 保留或匯入 SQLite 歷史資料。
 
 每個 aggregate 都要有明確 root 和 transaction boundary。Session 是 runtime aggregate root；QuestionSet 是教師題庫 aggregate root；Student 是名冊 aggregate root。Persistence DTO 不得直接等同 domain entity，transport DTO 也不得取代 domain model。
 
@@ -18,7 +18,10 @@
 | Participant | session 範圍內的參與者，可選擇關聯 Student |
 | Submission / Grade | 作答及權威評分結果 |
 | StudentQuestion / StudentQuestionVote | 學生提問及投票 |
-| Group / GroupMember | session runtime 分組 |
+| GroupPreset / PresetGroup / PresetMember | Classroom 可重用的 Student 分組 preset |
+| SessionGroupingDraft | Session 範圍、可變更的 Participant 分組準備資料 |
+| SessionGroupSet / SessionGroup / SessionGroupMember | immutable、可保留多 revision 的 Participant 分組 snapshot |
+| Group / GroupMember | session runtime 分組 projection |
 | PeerReviewAssignment / PeerReview | 同儕互評的指派及送出結果 |
 | Rubric / RubricCriterion | 可重用評分規準 |
 
