@@ -22,6 +22,19 @@ pub struct LocalSessionRecord {
 }
 
 #[derive(Debug, Clone)]
+pub struct SessionHistoryRecord {
+    pub session_id: String,
+    pub classroom_id: String,
+    pub classroom_name: String,
+    pub state: String,
+    pub created_at: String,
+    pub lobby_opened_at: Option<String>,
+    pub ended_at: Option<String>,
+    pub participant_count: i64,
+    pub eligible_question_count: i64,
+}
+
+#[derive(Debug, Clone)]
 pub struct ParticipantRecord {
     pub id: String,
     pub session_id: String,
@@ -131,6 +144,39 @@ impl LocalSessionRepository {
             )
             .optional()
             .map_err(Into::into)
+    }
+
+    pub fn list_history(
+        database: &Database,
+        classroom_id: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<SessionHistoryRecord>, AppError> {
+        let connection = database.connection()?;
+        let mut statement = connection.prepare(
+            "SELECT s.id,s.classroom_id,c.name,s.state,s.created_at,s.lobby_opened_at,s.ended_at,
+                (SELECT COUNT(*) FROM session_participants p WHERE p.session_id=s.id),
+                (SELECT COUNT(*) FROM session_questions q WHERE q.session_id=s.id AND q.state IN ('OPEN','LOCKED','REVEALED'))
+             FROM local_sessions s JOIN classes c ON c.id=s.classroom_id
+             WHERE s.classroom_id=?1 AND s.state='ENDED' AND s.ended_at IS NOT NULL
+             ORDER BY s.ended_at DESC, s.id DESC LIMIT ?2 OFFSET ?3",
+        )?;
+        let rows = statement
+            .query_map(params![classroom_id, limit, offset], |row| {
+                Ok(SessionHistoryRecord {
+                    session_id: row.get(0)?,
+                    classroom_id: row.get(1)?,
+                    classroom_name: row.get(2)?,
+                    state: row.get(3)?,
+                    created_at: row.get(4)?,
+                    lobby_opened_at: row.get(5)?,
+                    ended_at: row.get(6)?,
+                    participant_count: row.get(7)?,
+                    eligible_question_count: row.get(8)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 
     pub fn open_lobby(

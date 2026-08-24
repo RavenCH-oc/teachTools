@@ -24,6 +24,17 @@ export interface LocalSession {
   endedAt: string | null;
   endedReason: string | null;
 }
+export interface SessionHistory {
+  sessionId: string;
+  classroomId: string;
+  classroomName: string;
+  state: "ENDED";
+  createdAt: string;
+  lobbyOpenedAt: string | null;
+  endedAt: string;
+  participantCount: number;
+  eligibleQuestionCount: number;
+}
 export interface LocalSessionParticipant {
   participantId: string;
   studentId: string | null;
@@ -137,6 +148,7 @@ export interface TeacherApi {
   openLocalSessionLobby(sessionId: string): Promise<LocalSession>
   startLocalSession?(sessionId: string): Promise<LocalSession>
   getActiveLocalSession(): Promise<LocalSession | null>
+  listClassroomSessionHistory?(classroomId: string, limit?: number, offset?: number): Promise<SessionHistory[]>
   endLocalSession(sessionId: string): Promise<LocalSession>
   listLocalSessionParticipants(sessionId: string): Promise<LocalSessionParticipant[]>
   publishSessionQuestion?(sessionId: string, sourceQuestionId: string): Promise<SessionQuestion>

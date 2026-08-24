@@ -9,10 +9,10 @@ use application::{
     CreateQuestionSetRequest, CreateQuestionWithDraftAssetsRequest, CreateStudentRequest,
     DeleteQuestionDraftAssetRequest, ImportQuestionAssetRequest, ImportQuestionDraftAssetRequest,
     LiveQuizService, LocalDatabaseStatus, LocalServerService, LocalServerStatus, LocalSessionDto,
-    LocalSessionService, PersistenceService, ReorderQuestionsRequest, StatisticsService,
-    UpdateClassroomRequest, UpdateCourseRequest, UpdateLessonRequest,
+    LocalSessionService, PersistenceService, ReorderQuestionsRequest, SessionHistoryDto,
+    StatisticsService, UpdateClassroomRequest, UpdateCourseRequest, UpdateLessonRequest,
     UpdateQuestionAssetPageReferenceRequest, UpdateQuestionRequest, UpdateQuestionSetRequest,
-    UpdateStudentRequest,
+    UpdateStudentRequest, DEFAULT_HISTORY_LIMIT,
 };
 use error::AppError;
 use serde::Serialize;
@@ -202,6 +202,20 @@ fn get_active_local_session(
     sessions: tauri::State<'_, std::sync::Arc<LocalSessionService>>,
 ) -> Result<Option<LocalSessionDto>, AppError> {
     sessions.active()
+}
+
+#[tauri::command]
+fn list_classroom_session_history(
+    classroom_id: String,
+    limit: Option<i64>,
+    offset: Option<i64>,
+    sessions: tauri::State<'_, std::sync::Arc<LocalSessionService>>,
+) -> Result<Vec<SessionHistoryDto>, AppError> {
+    sessions.list_history(
+        classroom_id,
+        limit.unwrap_or(DEFAULT_HISTORY_LIMIT),
+        offset.unwrap_or(0),
+    )
 }
 
 #[tauri::command]
@@ -533,6 +547,7 @@ pub fn run() -> Result<(), String> {
             open_local_session_lobby,
             start_local_session,
             get_active_local_session,
+            list_classroom_session_history,
             end_local_session,
             list_local_session_participants,
             publish_session_question,

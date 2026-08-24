@@ -26,7 +26,8 @@ pub use live_quiz::{
 };
 pub use local_server::{LocalServerService, LocalServerStatus};
 pub use local_session::{
-    LocalSessionDto, LocalSessionService, ParticipantSelfView, TeacherParticipantDto,
+    LocalSessionDto, LocalSessionService, ParticipantSelfView, SessionHistoryDto,
+    TeacherParticipantDto, DEFAULT_HISTORY_LIMIT,
 };
 pub use questions::{
     CreateQuestionRequest, CreateQuestionSetRequest, CreateQuestionWithDraftAssetsRequest,

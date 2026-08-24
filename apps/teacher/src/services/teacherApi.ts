@@ -27,6 +27,7 @@ export const teacherApi: TeacherApi = {
   openLocalSessionLobby: (sessionId) => call("open_local_session_lobby", { sessionId }),
   startLocalSession: (sessionId) => call("start_local_session", { sessionId }),
   getActiveLocalSession: () => call("get_active_local_session"),
+  listClassroomSessionHistory: (classroomId, limit = 30, offset = 0) => call("list_classroom_session_history", { classroomId, limit, offset }),
   endLocalSession: (sessionId) => call("end_local_session", { sessionId }),
   listLocalSessionParticipants: (sessionId) => call("list_local_session_participants", { sessionId }),
   publishSessionQuestion: (sessionId, sourceQuestionId) => call("publish_session_question", { sessionId, sourceQuestionId }),

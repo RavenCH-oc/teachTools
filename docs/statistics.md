@@ -17,3 +17,9 @@ True/false, single-choice, and multiple-choice questions expose an option distri
 Difficulty ranking includes only questions with at least one graded latest submission and sorts by ascending accuracy, then descending graded count, then question position and ID for deterministic output.
 
 The Phase 10A contract is Teacher-only. No Student HTTP route, public DTO, WebSocket message, protocol version, or migration is changed. Future export/reporting is a separate requirement and is not implemented in this phase.
+
+## Phase 10C session analysis
+
+Teacher session history is a bounded, read-only query over persisted SQLite `local_sessions` rows. Only `ENDED` sessions in the selected classroom are returned, newest first by durable `ended_at`; history pages default to 30 records and never exceed 50. The history DTO contains classroom/session metadata and aggregate counts only, not join codes, credentials, connection details, filesystem paths, or submissions. No separate history persistence model or migration is used.
+
+The Session Analysis page reuses the Phase 10A statistics queries and snapshot question records. An `ACTIVE` session refreshes with one completion-based request at a time every two seconds; an `ENDED` session is loaded once. While the current question is `OPEN`, participation metrics and question basics remain visible but detailed correctness, score, distribution, difficulty, and participant grading fields are hidden. `LOCKED`, `REVEALED`, and ended sessions may show the complete Teacher analysis. Essay answers remain pending until authoritative grading, and no ranking or export is provided.
