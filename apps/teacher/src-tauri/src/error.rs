@@ -52,8 +52,14 @@ pub enum AppError {
     StudentAssetsUnavailable,
     #[error("group preset was not found")]
     GroupPresetNotFound,
+    #[error("group preset name conflicts with an existing preset")]
+    GroupPresetNameConflict,
     #[error("group was not found")]
     GroupNotFound,
+    #[error("group name conflicts with another group")]
+    GroupNameConflict,
+    #[error("student was not found")]
+    StudentNotFound,
     #[error("participant was not found")]
     ParticipantNotFound,
     #[error("participant belongs to another session")]
@@ -173,7 +179,18 @@ impl Serialize for AppError {
                 true,
             ),
             Self::GroupPresetNotFound => ("group_preset_not_found", "The group preset was not found.", false),
+            Self::GroupPresetNameConflict => (
+                "group_preset_name_conflict",
+                "A group preset with this name already exists in the classroom.",
+                false,
+            ),
             Self::GroupNotFound => ("group_not_found", "The group was not found.", false),
+            Self::GroupNameConflict => (
+                "group_name_conflict",
+                "A group with this name already exists in the preset.",
+                false,
+            ),
+            Self::StudentNotFound => ("student_not_found", "The student was not found.", false),
             Self::ParticipantNotFound => ("participant_not_found", "The participant was not found.", false),
             Self::ParticipantSessionMismatch => (
                 "participant_session_mismatch",

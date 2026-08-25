@@ -12,6 +12,8 @@ Phase 11A建立分組的本機 persistence/application foundation；本階段沒
 
 Group name 會 trim、限制長度並在同一 preset 內保持唯一；position 在同一 preset 內唯一且 deterministic。Student 只能加入同 Classroom 的 preset，且同一 Student 在同一 preset 最多屬於一組。刪除 Student 會 cascade 移除 preset membership，但保留 preset 與其 groups；刪除 preset 會安全 cascade children。
 
+Phase 11B 的 Teacher preset manager 以 Classroom ownership 查詢所有 preset。Teacher 在 frontend 使用 `PresetEditorDraft` 編輯名稱、groups、positions 與 Student assignments；按下儲存時由單一 transactional application operation 驗證並 replace normalized groups/memberships。既有 group ID 在未刪除時保留，新 group 只在成功 commit 時建立；刪除 group 會讓其 Student 回到未分組，不會刪除 Student。預設名稱與組別名稱使用 trim/NFKC normalized duplicate policy；同一 Classroom 不允許重複 preset name。Student list 依 `seat_number ASC`、name、ID deterministic 排序，新加入 Classroom 的 Student 不會自動加入任何 preset。
+
 ## Session draft
 
 `SessionGroupingDraft` 屬於單一 Session，狀態只有 `DRAFT`、`OPEN`、`FINALIZED`、`CANCELLED`。一個 Session 最多一個非終端 draft。Draft groups 有 name、position 與 optional capacity；未分組 participant 不建立虛擬 group。

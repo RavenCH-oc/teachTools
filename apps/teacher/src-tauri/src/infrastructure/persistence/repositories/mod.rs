@@ -13,8 +13,8 @@ pub(crate) mod student;
 pub use classroom::{Classroom, ClassroomRepository, NewClassroom};
 pub use course::{Course, CourseRepository, NewCourse};
 pub use grouping::{
-    DraftGroup, GroupPreset, GroupingRepository, NewDraftGroup, NewPresetGroup, PresetGroup,
-    PresetMember, SessionGroupSet, SessionGroupingDraft, UnassignedParticipant,
+    DraftGroup, GroupPreset, GroupPresetSummary, GroupingRepository, NewDraftGroup, PresetGroup,
+    PresetMember, SessionGroupSet, SessionGroupingDraft, UnassignedParticipant, UpdatePresetGroup,
 };
 pub use lesson::{Lesson, LessonRepository, NewLesson};
 pub use live_quiz::{

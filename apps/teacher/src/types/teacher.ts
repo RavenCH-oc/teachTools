@@ -125,6 +125,44 @@ export interface CreateClassroomRequest { name: string; academic_year?: string |
 export interface CreateStudentRequest { class_id: string; seat_number: number; name: string }
 export interface CreateCourseRequest { name: string; description?: string | null }
 export interface CreateLessonRequest { course_id: string; title: string; description?: string | null; position: number }
+export interface GroupPresetSummary {
+  id: string;
+  classroomId: string;
+  name: string;
+  groupCount: number;
+  assignedStudentCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface GroupPresetGroup {
+  id: string;
+  presetId: string;
+  name: string;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface GroupPresetMember {
+  id: string;
+  presetId: string;
+  groupId: string;
+  studentId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface GroupPresetDetail {
+  preset: GroupPresetSummary;
+  groups: GroupPresetGroup[];
+  members: GroupPresetMember[];
+}
+export interface CreateGroupPresetRequest { classroomId: string; name: string }
+export interface UpdateGroupPresetRequest {
+  classroomId: string;
+  presetId: string;
+  name: string;
+  groups: Array<{ key: string; id?: string; name: string; position: number }>;
+  assignments: Array<{ groupId: string; studentId: string }>;
+}
 import type { CreateQuestionInput, CreateQuestionSetInput, Question, QuestionAsset, QuestionAssetPreview, QuestionSet, UpdateQuestionInput, UpdateQuestionSetInput } from "@classtools/domain";
 export type { Question, QuestionAsset, QuestionAssetPreview, QuestionSet } from "@classtools/domain";
 
@@ -171,6 +209,11 @@ export interface TeacherApi {
   createStudent(request: CreateStudentRequest): Promise<Student>
   updateStudent(id: string, request: Omit<CreateStudentRequest, "class_id">): Promise<Student>
   deleteStudent(id: string): Promise<void>
+  listGroupPresets?(classroomId: string): Promise<GroupPresetSummary[]>
+  getGroupPreset?(classroomId: string, presetId: string): Promise<GroupPresetDetail>
+  createGroupPreset?(request: CreateGroupPresetRequest): Promise<GroupPresetDetail>
+  updateGroupPreset?(request: UpdateGroupPresetRequest): Promise<GroupPresetDetail>
+  deleteGroupPreset?(classroomId: string, presetId: string): Promise<void>
   listCourses(): Promise<Course[]>
   createCourse(request: CreateCourseRequest): Promise<Course>
   updateCourse(id: string, request: CreateCourseRequest): Promise<Course>

@@ -137,4 +137,31 @@ describe("Teacher basic data workspace", () => {
     expect(liveQuiz).not.toBeNull();
     expect((liveQuiz?.compareDocumentPosition(breadcrumb) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it("asks before leaving a dirty Group Preset editor", async () => {
+    const classroom = { id: "019fe920-0e14-7e40-8a9d-367f86c03bcc", name: "三年甲班", academic_year: null, created_at: "2026-08-11T00:00:00Z", updated_at: "2026-08-11T00:00:00Z" };
+    const preset = { id: "preset-1", classroomId: classroom.id, name: "平時分組", groupCount: 1, assignedStudentCount: 0, createdAt: "2026-08-11T00:00:00Z", updatedAt: "2026-08-11T00:00:00Z" };
+    const api = mockApi({
+      listClassrooms: vi.fn().mockResolvedValue([classroom]),
+      listGroupPresets: vi.fn().mockResolvedValue([preset]),
+      getGroupPreset: vi.fn().mockResolvedValue({ preset, groups: [{ id: "group-1", presetId: preset.id, name: "第一組", position: 0, createdAt: preset.createdAt, updatedAt: preset.updatedAt }], members: [] }),
+      listStudents: vi.fn().mockResolvedValue([]),
+    });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    try {
+      render(<App api={api} />);
+      await screen.findByText("本機儲存空間已就緒");
+      fireEvent.click(screen.getByRole("button", { name: "分組設定" }));
+      await screen.findByRole("heading", { name: "編輯「平時分組」" });
+      fireEvent.click(screen.getByRole("button", { name: "新增組別" }));
+      fireEvent.click(screen.getByRole("button", { name: "首頁" }));
+      expect(confirm).toHaveBeenCalledWith("尚有未儲存的變更，確定要離開嗎？");
+      expect(screen.getByRole("heading", { name: /編輯/ })).toBeInTheDocument();
+      confirm.mockReturnValue(true);
+      fireEvent.click(screen.getByRole("button", { name: "首頁" }));
+      await screen.findByText("準備好開始下一堂課。");
+    } finally {
+      confirm.mockRestore();
+    }
+  });
 });

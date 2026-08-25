@@ -1,5 +1,5 @@
 use rusqlite::{params, OptionalExtension, Transaction, TransactionBehavior};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use unicode_normalization::UnicodeNormalization;
 
@@ -42,7 +42,17 @@ pub struct GroupPreset {
     pub id: String,
     pub classroom_id: String,
     pub name: String,
-    pub configuration: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GroupPresetSummary {
+    pub id: String,
+    pub classroom_id: String,
+    pub name: String,
+    pub group_count: i64,
+    pub assigned_student_count: i64,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -70,6 +80,14 @@ pub struct PresetMember {
 #[derive(Debug, Clone)]
 pub struct NewPresetGroup {
     pub id: String,
+    pub name: String,
+    pub position: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct UpdatePresetGroup {
+    pub key: String,
+    pub id: Option<String>,
     pub name: String,
     pub position: i64,
 }
@@ -172,10 +190,11 @@ impl GroupingRepository {
         if !classroom_exists {
             return Err(AppError::NotFound("classroom".to_owned()));
         }
+        ensure_unique_preset_name(&transaction, classroom_id, name, None)?;
         let preset_id = new_id();
         let now = now_utc();
         transaction.execute(
-            "INSERT INTO group_presets(id,class_id,name,configuration,created_at,updated_at) VALUES (?1,?2,?3,'{}',?4,?4)",
+            "INSERT INTO group_presets(id,class_id,name,created_at,updated_at) VALUES (?1,?2,?3,?4,?4)",
             params![preset_id, classroom_id, name.trim(), now],
         ).map_err(map_write_error)?;
         for group in groups {
@@ -194,10 +213,30 @@ impl GroupingRepository {
     ) -> Result<Vec<GroupPreset>, AppError> {
         let connection = database.connection()?;
         let mut statement = connection.prepare(
-            "SELECT id,class_id,name,configuration,created_at,updated_at FROM group_presets WHERE class_id=?1 ORDER BY name,id",
+            "SELECT id,class_id,name,created_at,updated_at FROM group_presets WHERE class_id=?1 ORDER BY name,id",
         )?;
         let rows = statement
             .query_map([classroom_id], preset_from_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    pub fn list_preset_summaries(
+        database: &Database,
+        classroom_id: &str,
+    ) -> Result<Vec<GroupPresetSummary>, AppError> {
+        let connection = database.connection()?;
+        let mut statement = connection.prepare(
+            "SELECT p.id,p.class_id,p.name,
+                (SELECT COUNT(*) FROM group_preset_groups g WHERE g.preset_id=p.id),
+                (SELECT COUNT(*) FROM group_preset_members m WHERE m.preset_id=p.id),
+                p.created_at,p.updated_at
+             FROM group_presets p
+             WHERE p.class_id=?1
+             ORDER BY p.name,p.id",
+        )?;
+        let rows = statement
+            .query_map([classroom_id], preset_summary_from_row)?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
@@ -209,12 +248,174 @@ impl GroupingRepository {
         let connection = database.connection()?;
         connection
             .query_row(
-                "SELECT id,class_id,name,configuration,created_at,updated_at FROM group_presets WHERE id=?1",
+                "SELECT id,class_id,name,created_at,updated_at FROM group_presets WHERE id=?1",
                 [preset_id],
                 preset_from_row,
             )
             .optional()
             .map_err(Into::into)
+    }
+
+    pub fn get_preset_for_classroom(
+        database: &Database,
+        classroom_id: &str,
+        preset_id: &str,
+    ) -> Result<Option<GroupPreset>, AppError> {
+        let connection = database.connection()?;
+        connection
+            .query_row(
+                "SELECT id,class_id,name,created_at,updated_at
+                 FROM group_presets
+                 WHERE id=?1 AND class_id=?2",
+                params![preset_id, classroom_id],
+                preset_from_row,
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    pub fn update_preset(
+        database: &Database,
+        classroom_id: &str,
+        preset_id: &str,
+        name: &str,
+        groups: &[UpdatePresetGroup],
+        assignments: &[(String, String)],
+    ) -> Result<GroupPreset, AppError> {
+        validate_name(name)?;
+        validate_update_group_inputs(groups)?;
+        validate_assignment_inputs(assignments)?;
+
+        let mut connection = database.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let preset_classroom: Option<String> = transaction
+            .query_row(
+                "SELECT class_id FROM group_presets WHERE id=?1",
+                [preset_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(preset_classroom) = preset_classroom else {
+            return Err(AppError::GroupPresetNotFound);
+        };
+        if preset_classroom != classroom_id {
+            return Err(AppError::GroupPresetNotFound);
+        }
+        ensure_unique_preset_name(&transaction, classroom_id, name, Some(preset_id))?;
+
+        let existing_group_ids = transaction
+            .prepare("SELECT id FROM group_preset_groups WHERE preset_id=?1")?
+            .query_map([preset_id], |row| row.get::<_, String>(0))?
+            .collect::<Result<HashSet<_>, _>>()?;
+        let mut group_ids_by_key = HashMap::new();
+        let mut retained_group_ids = HashSet::new();
+        for group in groups {
+            let group_id = group.id.clone().unwrap_or_else(new_id);
+            if group_ids_by_key
+                .insert(group.key.clone(), group_id.clone())
+                .is_some()
+            {
+                return Err(AppError::Validation("group keys must be unique".to_owned()));
+            }
+            if existing_group_ids.contains(&group_id) {
+                retained_group_ids.insert(group_id);
+            } else if group.id.is_some() {
+                let already_used: Option<String> = transaction
+                    .query_row(
+                        "SELECT id FROM group_preset_groups WHERE id=?1",
+                        [&group_id],
+                        |row| row.get(0),
+                    )
+                    .optional()?;
+                if already_used.is_some() {
+                    return Err(AppError::GroupNotFound);
+                }
+            }
+        }
+        for (group_key, student_id) in assignments {
+            if !group_ids_by_key.contains_key(group_key) {
+                return Err(AppError::GroupNotFound);
+            }
+            let student_class: Option<String> = transaction
+                .query_row(
+                    "SELECT class_id FROM students WHERE id=?1",
+                    [student_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            let Some(student_class) = student_class else {
+                return Err(AppError::StudentNotFound);
+            };
+            if student_class != classroom_id {
+                return Err(AppError::StudentClassroomMismatch);
+            }
+        }
+
+        let now = now_utc();
+        transaction.execute(
+            "UPDATE group_presets SET name=?1,updated_at=?2 WHERE id=?3 AND class_id=?4",
+            params![name.trim(), now, preset_id, classroom_id],
+        )?;
+        transaction.execute(
+            "DELETE FROM group_preset_members WHERE preset_id=?1",
+            [preset_id],
+        )?;
+
+        for group_id in &existing_group_ids {
+            if !retained_group_ids.contains(group_id) {
+                transaction.execute(
+                    "DELETE FROM group_preset_groups WHERE preset_id=?1 AND id=?2",
+                    params![preset_id, group_id],
+                )?;
+            }
+        }
+
+        // Stage existing names/positions first so swaps and reorders never hit
+        // the unique constraints before the final values are applied.
+        for (index, group_id) in retained_group_ids.iter().enumerate() {
+            transaction.execute(
+                "UPDATE group_preset_groups
+                 SET name=?1,position=?2,updated_at=?3
+                 WHERE preset_id=?4 AND id=?5",
+                params![
+                    format!("__pending_group_{}_{}", preset_id, index),
+                    i64::MAX - index as i64,
+                    now,
+                    preset_id,
+                    group_id
+                ],
+            )?;
+        }
+
+        for group in groups {
+            let group_id = group_ids_by_key.get(&group.key).ok_or(AppError::Storage)?;
+            if !existing_group_ids.contains(group_id) {
+                transaction.execute(
+                    "INSERT INTO group_preset_groups(id,preset_id,name,position,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?5)",
+                    params![group_id, preset_id, group.name.trim(), group.position, now],
+                ).map_err(map_write_error)?;
+            }
+            transaction
+                .execute(
+                    "UPDATE group_preset_groups
+                 SET name=?1,position=?2,updated_at=?3
+                 WHERE preset_id=?4 AND id=?5",
+                    params![group.name.trim(), group.position, now, preset_id, group_id],
+                )
+                .map_err(map_write_error)?;
+        }
+
+        for (group_key, student_id) in assignments {
+            let group_id = group_ids_by_key.get(group_key).ok_or(AppError::Storage)?;
+            transaction
+                .execute(
+                    "INSERT INTO group_preset_members(id,preset_id,group_id,student_id,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?5)",
+                    params![new_id(), preset_id, group_id, student_id, now],
+                )
+                .map_err(map_write_error)?;
+        }
+        transaction.commit()?;
+        Self::get_preset(database, preset_id)?.ok_or(AppError::Storage)
     }
 
     pub fn list_preset_groups(
@@ -306,6 +507,22 @@ impl GroupingRepository {
     pub fn delete_preset(database: &Database, preset_id: &str) -> Result<(), AppError> {
         let connection = database.connection()?;
         if connection.execute("DELETE FROM group_presets WHERE id=?1", [preset_id])? == 0 {
+            return Err(AppError::GroupPresetNotFound);
+        }
+        Ok(())
+    }
+
+    pub fn delete_preset_for_classroom(
+        database: &Database,
+        classroom_id: &str,
+        preset_id: &str,
+    ) -> Result<(), AppError> {
+        let connection = database.connection()?;
+        if connection.execute(
+            "DELETE FROM group_presets WHERE id=?1 AND class_id=?2",
+            params![preset_id, classroom_id],
+        )? == 0
+        {
             return Err(AppError::GroupPresetNotFound);
         }
         Ok(())
@@ -758,15 +975,62 @@ impl GroupingRepository {
 
 fn validate_group_inputs(groups: &[NewPresetGroup]) -> Result<(), AppError> {
     let mut names = HashSet::new();
+    let mut positions = HashSet::new();
     for group in groups {
         validate_name(&group.name)?;
         if !names.insert(normalized_name(&group.name)) {
-            return Err(AppError::Conflict("group names must be unique".to_owned()));
+            return Err(AppError::GroupNameConflict);
         }
         if group.position < 0 {
             return Err(AppError::Validation(
                 "group position must not be negative".to_owned(),
             ));
+        }
+        if !positions.insert(group.position) {
+            return Err(AppError::Conflict(
+                "group positions must be unique".to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_update_group_inputs(groups: &[UpdatePresetGroup]) -> Result<(), AppError> {
+    let mut keys = HashSet::new();
+    let mut names = HashSet::new();
+    let mut positions = HashSet::new();
+    for group in groups {
+        if group.key.trim().is_empty() {
+            return Err(AppError::Validation(
+                "group key must not be empty".to_owned(),
+            ));
+        }
+        if !keys.insert(group.key.clone()) {
+            return Err(AppError::Validation("group keys must be unique".to_owned()));
+        }
+        validate_name(&group.name)?;
+        if !names.insert(normalized_name(&group.name)) {
+            return Err(AppError::GroupNameConflict);
+        }
+        if group.position < 0 {
+            return Err(AppError::Validation(
+                "group position must not be negative".to_owned(),
+            ));
+        }
+        if !positions.insert(group.position) {
+            return Err(AppError::Conflict(
+                "group positions must be unique".to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_assignment_inputs(assignments: &[(String, String)]) -> Result<(), AppError> {
+    let mut students = HashSet::new();
+    for (_, student_id) in assignments {
+        if !students.insert(student_id) {
+            return Err(AppError::AlreadyGrouped);
         }
     }
     Ok(())
@@ -795,6 +1059,29 @@ fn validate_draft_group_inputs(groups: &[NewDraftGroup]) -> Result<(), AppError>
 
 fn normalized_name(name: &str) -> String {
     name.trim().nfkc().collect::<String>()
+}
+
+fn ensure_unique_preset_name(
+    transaction: &Transaction<'_>,
+    classroom_id: &str,
+    name: &str,
+    excluded_preset_id: Option<&str>,
+) -> Result<(), AppError> {
+    let normalized = normalized_name(name);
+    let mut statement =
+        transaction.prepare("SELECT id,name FROM group_presets WHERE class_id=?1")?;
+    let rows = statement.query_map([classroom_id], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    for row in rows {
+        let (preset_id, existing_name) = row?;
+        if excluded_preset_id != Some(preset_id.as_str())
+            && normalized_name(&existing_name) == normalized
+        {
+            return Err(AppError::GroupPresetNameConflict);
+        }
+    }
+    Ok(())
 }
 
 fn insert_draft_groups(
@@ -838,9 +1125,20 @@ fn preset_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<GroupPreset> {
         id: row.get(0)?,
         classroom_id: row.get(1)?,
         name: row.get(2)?,
-        configuration: row.get(3)?,
-        created_at: row.get(4)?,
-        updated_at: row.get(5)?,
+        created_at: row.get(3)?,
+        updated_at: row.get(4)?,
+    })
+}
+
+fn preset_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<GroupPresetSummary> {
+    Ok(GroupPresetSummary {
+        id: row.get(0)?,
+        classroom_id: row.get(1)?,
+        name: row.get(2)?,
+        group_count: row.get(3)?,
+        assigned_student_count: row.get(4)?,
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
     })
 }
 
@@ -1263,6 +1561,262 @@ mod tests {
             )
             .expect("groups");
         assert_eq!(group_count, 0);
+    }
+
+    #[test]
+    fn preset_update_is_atomic_preserves_ids_and_enforces_ownership() {
+        let fixture = fixture();
+        let student_ids =
+            LocalSessionRepository::list_participants(&fixture.database, &fixture.session_id)
+                .expect("participants")
+                .into_iter()
+                .map(|participant| participant.student_id.expect("student"))
+                .collect::<Vec<_>>();
+        let preset = GroupingRepository::create_preset(
+            &fixture.database,
+            &fixture.classroom_id,
+            "平時分組",
+            &[
+                NewPresetGroup {
+                    id: new_id(),
+                    name: "第一組".to_owned(),
+                    position: 0,
+                },
+                NewPresetGroup {
+                    id: new_id(),
+                    name: "第二組".to_owned(),
+                    position: 1,
+                },
+            ],
+        )
+        .expect("preset");
+        let groups =
+            GroupingRepository::list_preset_groups(&fixture.database, &preset.id).expect("groups");
+        let first_group_id = groups[0].id.clone();
+        let second_group_id = groups[1].id.clone();
+
+        GroupingRepository::update_preset(
+            &fixture.database,
+            &fixture.classroom_id,
+            &preset.id,
+            "  平時分組更新  ",
+            &[
+                UpdatePresetGroup {
+                    key: first_group_id.clone(),
+                    id: Some(first_group_id.clone()),
+                    name: "第二組".to_owned(),
+                    position: 1,
+                },
+                UpdatePresetGroup {
+                    key: second_group_id.clone(),
+                    id: Some(second_group_id.clone()),
+                    name: "第一組".to_owned(),
+                    position: 0,
+                },
+                UpdatePresetGroup {
+                    key: "new-group".to_owned(),
+                    id: None,
+                    name: "第三組".to_owned(),
+                    position: 2,
+                },
+            ],
+            &[
+                (first_group_id.clone(), student_ids[0].clone()),
+                (second_group_id.clone(), student_ids[1].clone()),
+                ("new-group".to_owned(), student_ids[2].clone()),
+            ],
+        )
+        .expect("update");
+        let updated = GroupingRepository::get_preset(&fixture.database, &preset.id)
+            .expect("updated preset")
+            .expect("preset exists");
+        assert_eq!(updated.name, "平時分組更新");
+        let updated_groups = GroupingRepository::list_preset_groups(&fixture.database, &preset.id)
+            .expect("updated groups");
+        assert_eq!(updated_groups[0].id, second_group_id);
+        assert_eq!(updated_groups[1].id, first_group_id);
+        assert_eq!(updated_groups[2].name, "第三組");
+        assert_eq!(
+            GroupingRepository::list_preset_members(&fixture.database, &preset.id)
+                .expect("members")
+                .len(),
+            3
+        );
+
+        let other_service =
+            PersistenceService::initialize(fixture.database.path().parent().expect("parent"))
+                .expect("other service");
+        let other_classroom = other_service
+            .create_classroom(CreateClassroomRequest {
+                name: "11B".to_owned(),
+                academic_year: None,
+            })
+            .expect("other classroom");
+        assert!(matches!(
+            GroupingRepository::update_preset(
+                &fixture.database,
+                &other_classroom.id,
+                &preset.id,
+                "wrong classroom",
+                &[],
+                &[],
+            ),
+            Err(AppError::GroupPresetNotFound)
+        ));
+        assert!(matches!(
+            GroupingRepository::create_preset(
+                &fixture.database,
+                &fixture.classroom_id,
+                " 平時分組更新 ",
+                &[],
+            ),
+            Err(AppError::GroupPresetNameConflict)
+        ));
+        assert!(GroupingRepository::create_preset(
+            &fixture.database,
+            &other_classroom.id,
+            "平時分組更新",
+            &[],
+        )
+        .is_ok());
+
+        let invalid_student = other_service
+            .create_student(CreateStudentRequest {
+                class_id: other_classroom.id,
+                seat_number: 1,
+                name: "Other".to_owned(),
+            })
+            .expect("other student");
+        assert!(matches!(
+            GroupingRepository::update_preset(
+                &fixture.database,
+                &fixture.classroom_id,
+                &preset.id,
+                "should rollback",
+                &[UpdatePresetGroup {
+                    key: second_group_id.clone(),
+                    id: Some(second_group_id.clone()),
+                    name: "暫存名稱".to_owned(),
+                    position: 0,
+                },],
+                &[(second_group_id.clone(), invalid_student.id)],
+            ),
+            Err(AppError::StudentClassroomMismatch)
+        ));
+        let unchanged = GroupingRepository::get_preset(&fixture.database, &preset.id)
+            .expect("unchanged preset")
+            .expect("preset exists");
+        assert_eq!(unchanged.name, "平時分組更新");
+        assert_eq!(
+            GroupingRepository::list_preset_groups(&fixture.database, &preset.id)
+                .expect("groups")
+                .len(),
+            3
+        );
+    }
+
+    #[test]
+    fn deleting_group_unassigns_students_and_preset_delete_keeps_session_snapshots() {
+        let fixture = fixture();
+        let student_id =
+            LocalSessionRepository::list_participants(&fixture.database, &fixture.session_id)
+                .expect("participants")[0]
+                .student_id
+                .clone()
+                .expect("student");
+        let preset = GroupingRepository::create_preset(
+            &fixture.database,
+            &fixture.classroom_id,
+            "保留學生",
+            &[NewPresetGroup {
+                id: new_id(),
+                name: "第一組".to_owned(),
+                position: 0,
+            }],
+        )
+        .expect("preset");
+        let group_id = GroupingRepository::list_preset_groups(&fixture.database, &preset.id)
+            .expect("groups")[0]
+            .id
+            .clone();
+        GroupingRepository::update_preset(
+            &fixture.database,
+            &fixture.classroom_id,
+            &preset.id,
+            &preset.name,
+            &[UpdatePresetGroup {
+                key: group_id.clone(),
+                id: Some(group_id.clone()),
+                name: "第一組".to_owned(),
+                position: 0,
+            }],
+            &[(group_id, student_id.clone())],
+        )
+        .expect("assign");
+        let service =
+            PersistenceService::initialize(fixture.database.path().parent().expect("parent"))
+                .expect("service");
+        service
+            .create_student(CreateStudentRequest {
+                class_id: fixture.classroom_id.clone(),
+                seat_number: 99,
+                name: "New student".to_owned(),
+            })
+            .expect("new student");
+
+        GroupingRepository::update_preset(
+            &fixture.database,
+            &fixture.classroom_id,
+            &preset.id,
+            &preset.name,
+            &[],
+            &[],
+        )
+        .expect("delete group");
+        assert!(
+            GroupingRepository::list_preset_groups(&fixture.database, &preset.id)
+                .expect("groups")
+                .is_empty()
+        );
+        assert!(
+            GroupingRepository::list_preset_members(&fixture.database, &preset.id)
+                .expect("members")
+                .is_empty()
+        );
+        assert_eq!(
+            service
+                .list_students(fixture.classroom_id.clone())
+                .expect("students")
+                .len(),
+            5
+        );
+
+        fixture
+            .database
+            .connection()
+            .expect("connection")
+            .execute(
+                "INSERT INTO session_group_sets(id,session_id,revision,created_at) VALUES ('set-1',?1,1,'now')",
+                [&fixture.session_id],
+            )
+            .expect("snapshot");
+        GroupingRepository::delete_preset_for_classroom(
+            &fixture.database,
+            &fixture.classroom_id,
+            &preset.id,
+        )
+        .expect("delete preset");
+        let snapshot_count: i64 = fixture
+            .database
+            .connection()
+            .expect("connection")
+            .query_row(
+                "SELECT COUNT(*) FROM session_group_sets WHERE id='set-1'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("snapshot count");
+        assert_eq!(snapshot_count, 1);
     }
 
     #[test]

@@ -4,7 +4,7 @@ mod grading;
 mod infrastructure;
 mod question_domain;
 
-use application::grouping::GroupingService;
+use application::grouping::{CreateGroupPresetRequest, GroupingService, UpdateGroupPresetRequest};
 use application::{
     CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateQuestionRequest,
     CreateQuestionSetRequest, CreateQuestionWithDraftAssetsRequest, CreateStudentRequest,
@@ -38,6 +38,48 @@ fn get_local_database_status(
     state: tauri::State<'_, PersistenceService>,
 ) -> Result<LocalDatabaseStatus, AppError> {
     state.status()
+}
+
+#[tauri::command]
+fn list_group_presets(
+    classroom_id: String,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<Vec<application::grouping::GroupPresetDto>, AppError> {
+    grouping.list_presets(&classroom_id)
+}
+
+#[tauri::command]
+fn get_group_preset(
+    classroom_id: String,
+    preset_id: String,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::GroupPresetDetailDto, AppError> {
+    grouping.get_preset_detail(&classroom_id, &preset_id)
+}
+
+#[tauri::command]
+fn create_group_preset(
+    request: CreateGroupPresetRequest,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::GroupPresetDetailDto, AppError> {
+    grouping.create_preset(request)
+}
+
+#[tauri::command]
+fn update_group_preset(
+    request: UpdateGroupPresetRequest,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::GroupPresetDetailDto, AppError> {
+    grouping.update_preset(request)
+}
+
+#[tauri::command]
+fn delete_group_preset(
+    classroom_id: String,
+    preset_id: String,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<(), AppError> {
+    grouping.delete_preset(&classroom_id, &preset_id)
 }
 
 #[tauri::command]
@@ -543,6 +585,11 @@ pub fn run() -> Result<(), String> {
         .invoke_handler(tauri::generate_handler![
             get_app_runtime_info,
             get_local_database_status,
+            list_group_presets,
+            get_group_preset,
+            create_group_preset,
+            update_group_preset,
+            delete_group_preset,
             start_local_server,
             stop_local_server,
             get_local_server_status,
