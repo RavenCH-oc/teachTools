@@ -267,6 +267,25 @@ button.overview-card:hover { border-color: #78bbb4; transform: translateY(-2px);
 .analysis-distribution { display: grid; gap: 9px; max-width: 620px; }
 .analysis-empty { color: #71828d; font-size: .84rem; margin: 0; }
 .analysis-safe-banner { background: #fff4dd; border: 1px solid #efd79d; border-radius: 11px; color: #765626; font-size: .84rem; line-height: 1.55; padding: 12px 14px; }
+.session-grouping-page { display: grid; gap: 16px; }
+.session-grouping-current, .session-grouping-source, .session-grouping-draft { display: grid; gap: 16px; }
+.session-grouping-source-row { align-items: end; display: flex; flex-wrap: wrap; gap: 12px; }
+.session-grouping-source-row .field { min-width: 190px; }
+.session-grouping-group-list { display: grid; gap: 9px; }
+.session-grouping-group { align-items: center; background: #f5f8f9; border: 1px solid #e2ebed; border-radius: 10px; display: flex; flex-wrap: wrap; gap: 10px; padding: 11px 13px; }
+.session-grouping-group strong { color: #193f5d; min-width: 120px; }
+.session-grouping-group span { color: #607384; flex: 1; font-size: .8rem; min-width: 150px; }
+.session-grouping-group input { color: #193f5d; flex: 1; font-weight: 700; min-width: 140px; }
+.session-grouping-capacity { align-items: center; color: #607384; display: flex; font-size: .72rem; gap: 6px; }
+.session-grouping-capacity input { font-weight: 500; min-width: 62px; width: 62px; }
+.session-grouping-editor, .session-grouping-table { display: grid; gap: 12px; }
+.session-grouping-table { border-top: 1px solid #edf1f3; padding-top: 14px; }
+.session-grouping-table h4 { color: #193f5d; margin: 0; }
+.session-grouping-row { align-items: center; border-top: 1px solid #edf1f3; color: #526676; display: flex; gap: 14px; justify-content: space-between; padding: 9px 0; }
+.session-grouping-row span { min-width: 0; }
+.session-grouping-row select { max-width: 230px; }
+.session-grouping-warning { background: #fff4dd; border: 1px solid #efd79d; border-radius: 10px; color: #765626; margin: 0; padding: 11px 13px; }
+.muted { color: #71828d; font-size: .8rem; margin: 0; }
 .difficult-list { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
 .difficult-list li { align-items: center; border-top: 1px solid #edf1f3; color: #243f52; display: flex; gap: 16px; justify-content: space-between; padding: 12px 0; }
 .difficult-list strong { color: #8c4d32; font-size: .76rem; white-space: nowrap; }
@@ -274,4 +293,4 @@ button.overview-card:hover { border-color: #78bbb4; transform: translateY(-2px);
 @media (max-width: 1150px) { .question-bank-layout { grid-template-columns: minmax(190px, .7fr) minmax(260px, 1fr); } .question-bank-layout > .editor-column { grid-column: 1 / -1; } .grouping-layout { grid-template-columns: minmax(220px, .7fr) minmax(390px, 1.3fr); } }
 @media (max-width: 850px) { .teacher-body { display: block; } .teacher-nav { border-bottom: 1px solid #dbe5ea; border-right: 0; display: flex; gap: 5px; overflow-x: auto; padding: 10px 13px; } .nav-item { flex: 0 0 auto; width: auto; } .nav-item span, .nav-divider { display: none; } .split-layout, .overview-grid, .grouping-layout { grid-template-columns: 1fr; } }
 @media (max-width: 850px) { .statistics-details .statistics-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .teacher-header { padding: 20px; } .teacher-main { padding: 27px 18px 42px; } .page-heading { display: block; } .ready-pill { margin-top: 18px; } .entity-list li { align-items: flex-start; } .row-actions { flex-direction: column; gap: 2px; } .live-source-row, .live-question-row { align-items: stretch; flex-direction: column; } .statistics-heading { display: block; } .statistics-stale { display: block; margin-top: 8px; text-align: left; } .statistics-metrics, .statistics-details .statistics-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .session-history-list li, .difficult-list li { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 560px) { .teacher-header { padding: 20px; } .teacher-main { padding: 27px 18px 42px; } .page-heading { display: block; } .ready-pill { margin-top: 18px; } .entity-list li { align-items: flex-start; } .row-actions { flex-direction: column; gap: 2px; } .live-source-row, .live-question-row { align-items: stretch; flex-direction: column; } .statistics-heading { display: block; } .statistics-stale { display: block; margin-top: 8px; text-align: left; } .statistics-metrics, .statistics-details .statistics-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .session-history-list li, .difficult-list li { align-items: flex-start; flex-direction: column; } .session-grouping-row { align-items: stretch; flex-direction: column; } .session-grouping-row select { max-width: none; } }

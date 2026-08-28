@@ -52,6 +52,8 @@ pub enum AppError {
     StudentAssetsUnavailable,
     #[error("group preset was not found")]
     GroupPresetNotFound,
+    #[error("group preset belongs to another classroom")]
+    GroupPresetClassroomMismatch,
     #[error("group preset name conflicts with an existing preset")]
     GroupPresetNameConflict,
     #[error("group was not found")]
@@ -74,6 +76,14 @@ pub enum AppError {
     DraftNotOpen,
     #[error("an active grouping draft already exists")]
     ActiveDraftExists,
+    #[error("there are no participants to group")]
+    NoParticipants,
+    #[error("the requested group count is invalid")]
+    InvalidGroupCount,
+    #[error("a participant changed while the draft was being edited")]
+    StaleParticipant,
+    #[error("random grouping could not be generated")]
+    RandomizationFailed,
     #[error("the session has ended")]
     SessionEnded,
     #[error("grouping revision could not be created")]
@@ -179,6 +189,11 @@ impl Serialize for AppError {
                 true,
             ),
             Self::GroupPresetNotFound => ("group_preset_not_found", "The group preset was not found.", false),
+            Self::GroupPresetClassroomMismatch => (
+                "preset_classroom_mismatch",
+                "This group preset does not belong to the current classroom.",
+                false,
+            ),
             Self::GroupPresetNameConflict => (
                 "group_preset_name_conflict",
                 "A group preset with this name already exists in the classroom.",
@@ -209,6 +224,26 @@ impl Serialize for AppError {
                 "active_draft_exists",
                 "An active grouping draft already exists for this session.",
                 false,
+            ),
+            Self::NoParticipants => (
+                "no_participants",
+                "There are no participants available for grouping.",
+                false,
+            ),
+            Self::InvalidGroupCount => (
+                "invalid_group_count",
+                "The number of groups is invalid for the current participants.",
+                false,
+            ),
+            Self::StaleParticipant => (
+                "stale_participant",
+                "The participant list changed. Reload the grouping draft and try again.",
+                true,
+            ),
+            Self::RandomizationFailed => (
+                "randomization_failed",
+                "The classroom grouping could not be randomized.",
+                true,
             ),
             Self::SessionEnded => ("session_ended", "The classroom session has ended.", false),
             Self::RevisionConflict => (

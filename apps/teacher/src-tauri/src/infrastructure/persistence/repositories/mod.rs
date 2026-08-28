@@ -14,7 +14,8 @@ pub use classroom::{Classroom, ClassroomRepository, NewClassroom};
 pub use course::{Course, CourseRepository, NewCourse};
 pub use grouping::{
     DraftGroup, GroupPreset, GroupPresetSummary, GroupingRepository, NewDraftGroup, PresetGroup,
-    PresetMember, SessionGroupSet, SessionGroupingDraft, UnassignedParticipant, UpdatePresetGroup,
+    PresetMember, SessionGroupSet, SessionGroupingDraft, SessionGroupingParticipant,
+    UnassignedParticipant, UpdateDraftGroup, UpdatePresetGroup,
 };
 pub use lesson::{Lesson, LessonRepository, NewLesson};
 pub use live_quiz::{

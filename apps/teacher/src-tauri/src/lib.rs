@@ -4,7 +4,11 @@ mod grading;
 mod infrastructure;
 mod question_domain;
 
-use application::grouping::{CreateGroupPresetRequest, GroupingService, UpdateGroupPresetRequest};
+use application::grouping::{
+    CreateGroupPresetRequest, CreateManualGroupingDraftRequest, CreateRandomGroupingDraftRequest,
+    CreateSessionGroupingDraftFromPresetRequest, GroupingService, UpdateGroupPresetRequest,
+    UpdateSessionGroupingDraftRequest,
+};
 use application::{
     CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateQuestionRequest,
     CreateQuestionSetRequest, CreateQuestionWithDraftAssetsRequest, CreateStudentRequest,
@@ -80,6 +84,70 @@ fn delete_group_preset(
     grouping: tauri::State<'_, GroupingService>,
 ) -> Result<(), AppError> {
     grouping.delete_preset(&classroom_id, &preset_id)
+}
+
+#[tauri::command]
+fn get_session_grouping(
+    session_id: String,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::SessionGroupingOverviewDto, AppError> {
+    grouping.session_grouping_overview(&session_id)
+}
+
+#[tauri::command]
+fn create_grouping_draft_from_preset(
+    request: CreateSessionGroupingDraftFromPresetRequest,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::SessionGroupingOverviewDto, AppError> {
+    grouping.create_draft_from_preset(request)
+}
+
+#[tauri::command]
+fn create_random_grouping_draft(
+    request: CreateRandomGroupingDraftRequest,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::SessionGroupingOverviewDto, AppError> {
+    grouping.create_random_draft(request)
+}
+
+#[tauri::command]
+fn create_manual_grouping_draft(
+    request: CreateManualGroupingDraftRequest,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::SessionGroupingOverviewDto, AppError> {
+    grouping.create_manual_draft(request)
+}
+
+#[tauri::command]
+fn clone_current_grouping_draft(
+    session_id: String,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::SessionGroupingOverviewDto, AppError> {
+    grouping.clone_current_grouping_draft(&session_id)
+}
+
+#[tauri::command]
+fn update_session_grouping_draft(
+    request: UpdateSessionGroupingDraftRequest,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::SessionGroupingOverviewDto, AppError> {
+    grouping.update_session_grouping_draft(request)
+}
+
+#[tauri::command]
+fn cancel_session_grouping_draft(
+    draft_id: String,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::SessionGroupingOverviewDto, AppError> {
+    grouping.cancel_session_grouping_draft(&draft_id)
+}
+
+#[tauri::command]
+fn finalize_session_grouping_draft(
+    draft_id: String,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::SessionGroupingOverviewDto, AppError> {
+    grouping.finalize_session_grouping_draft(&draft_id)
 }
 
 #[tauri::command]
@@ -590,6 +658,14 @@ pub fn run() -> Result<(), String> {
             create_group_preset,
             update_group_preset,
             delete_group_preset,
+            get_session_grouping,
+            create_grouping_draft_from_preset,
+            create_random_grouping_draft,
+            create_manual_grouping_draft,
+            clone_current_grouping_draft,
+            update_session_grouping_draft,
+            cancel_session_grouping_draft,
+            finalize_session_grouping_draft,
             start_local_server,
             stop_local_server,
             get_local_server_status,

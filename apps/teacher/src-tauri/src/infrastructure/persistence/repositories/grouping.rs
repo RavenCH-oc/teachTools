@@ -1,6 +1,7 @@
 use rusqlite::{params, OptionalExtension, Transaction, TransactionBehavior};
 use std::collections::{HashMap, HashSet};
 
+use getrandom::fill as random_fill;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::error::AppError;
@@ -130,6 +131,24 @@ pub struct NewDraftGroup {
     pub name: String,
     pub position: i64,
     pub capacity: Option<i64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct UpdateDraftGroup {
+    pub key: String,
+    pub id: Option<String>,
+    pub name: String,
+    pub position: i64,
+    pub capacity: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionGroupingParticipant {
+    pub id: String,
+    pub student_id: Option<String>,
+    pub seat_number: i64,
+    pub display_name: String,
+    pub joined_at: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -557,6 +576,377 @@ impl GroupingRepository {
         insert_draft_groups(&transaction, draft_id, groups, &now)?;
         transaction.commit()?;
         Self::get_draft(database, draft_id)?.ok_or(AppError::Storage)
+    }
+
+    pub fn create_draft_from_preset(
+        database: &Database,
+        session_id: &str,
+        preset_id: &str,
+        draft_id: &str,
+    ) -> Result<SessionGroupingDraft, AppError> {
+        let mut connection = database.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        ensure_session_can_group(&transaction, session_id)?;
+        ensure_no_active_draft(&transaction, session_id)?;
+
+        let classroom_id: String = transaction
+            .query_row(
+                "SELECT classroom_id FROM local_sessions WHERE id=?1",
+                [session_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| AppError::SessionNotFound)?;
+        let preset_classroom: Option<String> = transaction
+            .query_row(
+                "SELECT class_id FROM group_presets WHERE id=?1",
+                [preset_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(preset_classroom) = preset_classroom else {
+            return Err(AppError::GroupPresetNotFound);
+        };
+        if preset_classroom != classroom_id {
+            return Err(AppError::GroupPresetClassroomMismatch);
+        }
+
+        let now = now_utc();
+        transaction
+            .execute(
+                "INSERT INTO session_grouping_drafts(id,session_id,state,created_at,updated_at) VALUES (?1,?2,'DRAFT',?3,?3)",
+                params![draft_id, session_id, now],
+            )
+            .map_err(map_write_error)?;
+
+        let mut preset_groups = transaction.prepare(
+            "SELECT id,name,position FROM group_preset_groups WHERE preset_id=?1 ORDER BY position,id",
+        )?;
+        let group_rows = preset_groups
+            .query_map([preset_id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(preset_groups);
+        let mut draft_group_ids = HashMap::new();
+        for (preset_group_id, name, position) in group_rows {
+            let draft_group_id = new_id();
+            draft_group_ids.insert(preset_group_id, draft_group_id.clone());
+            transaction
+                .execute(
+                    "INSERT INTO session_grouping_draft_groups(id,draft_id,name,position,capacity,created_at,updated_at) VALUES (?1,?2,?3,?4,NULL,?5,?5)",
+                    params![draft_group_id, draft_id, name, position, now],
+                )
+                .map_err(map_write_error)?;
+        }
+
+        let mut members = transaction.prepare(
+            "SELECT group_id,student_id FROM group_preset_members WHERE preset_id=?1 ORDER BY group_id,student_id",
+        )?;
+        let member_rows = members
+            .query_map([preset_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(members);
+        for (preset_group_id, student_id) in member_rows {
+            let Some(draft_group_id) = draft_group_ids.get(&preset_group_id) else {
+                return Err(AppError::Storage);
+            };
+            let participant_id: Option<String> = transaction
+                .query_row(
+                    "SELECT id FROM session_participants WHERE session_id=?1 AND student_id=?2",
+                    params![session_id, student_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            let Some(participant_id) = participant_id else {
+                continue;
+            };
+            transaction
+                .execute(
+                    "INSERT INTO session_grouping_draft_members(id,draft_id,group_id,participant_id,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?5)",
+                    params![new_id(), draft_id, draft_group_id, participant_id, now],
+                )
+                .map_err(map_write_error)?;
+        }
+        transaction.commit()?;
+        Self::get_draft(database, draft_id)?.ok_or(AppError::Storage)
+    }
+
+    pub fn create_random_draft(
+        database: &Database,
+        session_id: &str,
+        draft_id: &str,
+        group_count: i64,
+    ) -> Result<SessionGroupingDraft, AppError> {
+        let mut connection = database.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        ensure_session_can_group(&transaction, session_id)?;
+        ensure_no_active_draft(&transaction, session_id)?;
+        let mut participant_statement = transaction.prepare(
+            "SELECT id FROM session_participants WHERE session_id=?1 ORDER BY seat_number,id",
+        )?;
+        let mut participants = participant_statement
+            .query_map([session_id], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(participant_statement);
+        if participants.is_empty() {
+            return Err(AppError::NoParticipants);
+        }
+        if group_count < 1 || group_count > participants.len() as i64 {
+            return Err(AppError::InvalidGroupCount);
+        }
+        let mut keyed = Vec::with_capacity(participants.len());
+        for participant_id in participants.drain(..) {
+            let mut bytes = [0_u8; 8];
+            random_fill(&mut bytes).map_err(|_| AppError::RandomizationFailed)?;
+            keyed.push((u64::from_le_bytes(bytes), participant_id));
+        }
+        keyed.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
+
+        let now = now_utc();
+        transaction
+            .execute(
+                "INSERT INTO session_grouping_drafts(id,session_id,state,created_at,updated_at) VALUES (?1,?2,'DRAFT',?3,?3)",
+                params![draft_id, session_id, now],
+            )
+            .map_err(map_write_error)?;
+        let mut group_ids = Vec::new();
+        for position in 0..group_count {
+            let group_id = new_id();
+            group_ids.push(group_id.clone());
+            transaction
+                .execute(
+                    "INSERT INTO session_grouping_draft_groups(id,draft_id,name,position,capacity,created_at,updated_at) VALUES (?1,?2,?3,?4,NULL,?5,?5)",
+                    params![group_id, draft_id, format!("第 {} 組", position + 1), position, now],
+                )
+                .map_err(map_write_error)?;
+        }
+        for (index, (_, participant_id)) in keyed.into_iter().enumerate() {
+            let group_id = &group_ids[index % group_ids.len()];
+            transaction
+                .execute(
+                    "INSERT INTO session_grouping_draft_members(id,draft_id,group_id,participant_id,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?5)",
+                    params![new_id(), draft_id, group_id, participant_id, now],
+                )
+                .map_err(map_write_error)?;
+        }
+        transaction.commit()?;
+        Self::get_draft(database, draft_id)?.ok_or(AppError::Storage)
+    }
+
+    pub fn update_draft(
+        database: &Database,
+        draft_id: &str,
+        groups: &[UpdateDraftGroup],
+        assignments: &[(String, String)],
+    ) -> Result<SessionGroupingDraft, AppError> {
+        validate_update_draft_groups(groups)?;
+        validate_assignment_inputs(assignments)?;
+        let mut connection = database.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let Some((session_id, state)) = transaction
+            .query_row(
+                "SELECT session_id,state FROM session_grouping_drafts WHERE id=?1",
+                [draft_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?
+        else {
+            return Err(AppError::NotFound("grouping draft".to_owned()));
+        };
+        ensure_session_can_group(&transaction, &session_id)?;
+        if !matches!(state.as_str(), "DRAFT" | "OPEN") {
+            return Err(AppError::DraftNotOpen);
+        }
+
+        let existing_group_ids = transaction
+            .prepare("SELECT id FROM session_grouping_draft_groups WHERE draft_id=?1")?
+            .query_map([draft_id], |row| row.get::<_, String>(0))?
+            .collect::<Result<HashSet<_>, _>>()?;
+        let mut group_ids_by_key = HashMap::new();
+        let mut retained_group_ids = HashSet::new();
+        for group in groups {
+            let group_id = group.id.clone().unwrap_or_else(new_id);
+            if group_ids_by_key
+                .insert(group.key.clone(), group_id.clone())
+                .is_some()
+            {
+                return Err(AppError::Validation("group keys must be unique".to_owned()));
+            }
+            if existing_group_ids.contains(&group_id) {
+                retained_group_ids.insert(group_id);
+            } else if group.id.is_some()
+                && transaction
+                    .query_row(
+                        "SELECT 1 FROM session_grouping_draft_groups WHERE id=?1",
+                        [&group_id],
+                        |_| Ok(()),
+                    )
+                    .optional()?
+                    .is_some()
+            {
+                return Err(AppError::GroupNotFound);
+            }
+        }
+
+        let mut assignment_counts = HashMap::new();
+        for (group_key, participant_id) in assignments {
+            let Some(group_id) = group_ids_by_key.get(group_key) else {
+                return Err(AppError::GroupNotFound);
+            };
+            let participant_session: Option<String> = transaction
+                .query_row(
+                    "SELECT session_id FROM session_participants WHERE id=?1",
+                    [participant_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            let Some(participant_session) = participant_session else {
+                return Err(AppError::StaleParticipant);
+            };
+            if participant_session != session_id {
+                return Err(AppError::ParticipantSessionMismatch);
+            }
+            *assignment_counts.entry(group_id.clone()).or_insert(0_i64) += 1;
+        }
+        for group in groups {
+            let group_id = group_ids_by_key.get(&group.key).ok_or(AppError::Storage)?;
+            if group.capacity.is_some_and(|capacity| {
+                assignment_counts.get(group_id).copied().unwrap_or(0) > capacity
+            }) {
+                return Err(AppError::GroupFull);
+            }
+        }
+
+        let now = now_utc();
+        transaction.execute(
+            "UPDATE session_grouping_drafts SET updated_at=?1 WHERE id=?2",
+            params![now, draft_id],
+        )?;
+        transaction.execute(
+            "DELETE FROM session_grouping_draft_members WHERE draft_id=?1",
+            [draft_id],
+        )?;
+        for group_id in &existing_group_ids {
+            if !retained_group_ids.contains(group_id) {
+                transaction.execute(
+                    "DELETE FROM session_grouping_draft_groups WHERE draft_id=?1 AND id=?2",
+                    params![draft_id, group_id],
+                )?;
+            }
+        }
+        for (index, group_id) in retained_group_ids.iter().enumerate() {
+            transaction.execute(
+                "UPDATE session_grouping_draft_groups SET name=?1,position=?2,updated_at=?3 WHERE draft_id=?4 AND id=?5",
+                params![format!("__pending_draft_group_{}_{}", draft_id, index), i64::MAX - index as i64, now, draft_id, group_id],
+            )?;
+        }
+        for group in groups {
+            let group_id = group_ids_by_key.get(&group.key).ok_or(AppError::Storage)?;
+            if !existing_group_ids.contains(group_id) {
+                transaction.execute(
+                    "INSERT INTO session_grouping_draft_groups(id,draft_id,name,position,capacity,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?6)",
+                    params![group_id, draft_id, group.name.trim(), group.position, group.capacity, now],
+                ).map_err(map_write_error)?;
+            } else {
+                transaction.execute(
+                    "UPDATE session_grouping_draft_groups SET name=?1,position=?2,capacity=?3,updated_at=?4 WHERE draft_id=?5 AND id=?6",
+                    params![group.name.trim(), group.position, group.capacity, now, draft_id, group_id],
+                ).map_err(map_write_error)?;
+            }
+        }
+        for (group_key, participant_id) in assignments {
+            let group_id = group_ids_by_key.get(group_key).ok_or(AppError::Storage)?;
+            transaction.execute(
+                "INSERT INTO session_grouping_draft_members(id,draft_id,group_id,participant_id,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?5)",
+                params![new_id(), draft_id, group_id, participant_id, now],
+            ).map_err(map_write_error)?;
+        }
+        transaction.commit()?;
+        Self::get_draft(database, draft_id)?.ok_or(AppError::Storage)
+    }
+
+    pub fn cancel_draft(
+        database: &Database,
+        draft_id: &str,
+    ) -> Result<SessionGroupingDraft, AppError> {
+        let mut connection = database.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let Some((session_id, state)) = transaction
+            .query_row(
+                "SELECT session_id,state FROM session_grouping_drafts WHERE id=?1",
+                [draft_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?
+        else {
+            return Err(AppError::NotFound("grouping draft".to_owned()));
+        };
+        ensure_session_can_group(&transaction, &session_id)?;
+        if !matches!(state.as_str(), "DRAFT" | "OPEN") {
+            return Err(AppError::DraftNotOpen);
+        }
+        transaction.execute(
+            "UPDATE session_grouping_drafts SET state='CANCELLED',updated_at=?1 WHERE id=?2",
+            params![now_utc(), draft_id],
+        )?;
+        transaction.commit()?;
+        Self::get_draft(database, draft_id)?.ok_or(AppError::Storage)
+    }
+
+    pub fn get_session_state(database: &Database, session_id: &str) -> Result<String, AppError> {
+        database
+            .connection()?
+            .query_row(
+                "SELECT state FROM local_sessions WHERE id=?1",
+                [session_id],
+                |row| row.get(0),
+            )
+            .optional()?
+            .ok_or(AppError::SessionNotFound)
+    }
+
+    pub fn get_session_classroom_id(
+        database: &Database,
+        session_id: &str,
+    ) -> Result<String, AppError> {
+        database
+            .connection()?
+            .query_row(
+                "SELECT classroom_id FROM local_sessions WHERE id=?1",
+                [session_id],
+                |row| row.get(0),
+            )
+            .optional()?
+            .ok_or(AppError::SessionNotFound)
+    }
+
+    pub fn list_grouping_participants(
+        database: &Database,
+        session_id: &str,
+    ) -> Result<Vec<SessionGroupingParticipant>, AppError> {
+        let connection = database.connection()?;
+        let mut statement = connection.prepare(
+            "SELECT id,student_id,seat_number,display_name,joined_at FROM session_participants WHERE session_id=?1 ORDER BY seat_number,display_name,id",
+        )?;
+        let participants = statement
+            .query_map([session_id], |row| {
+                Ok(SessionGroupingParticipant {
+                    id: row.get(0)?,
+                    student_id: row.get(1)?,
+                    seat_number: row.get(2)?,
+                    display_name: row.get(3)?,
+                    joined_at: row.get(4)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(AppError::from)?;
+        Ok(participants)
     }
 
     pub fn clone_current_to_draft(
@@ -1053,6 +1443,56 @@ fn validate_draft_group_inputs(groups: &[NewDraftGroup]) -> Result<(), AppError>
                 "group capacity must be positive".to_owned(),
             ));
         }
+    }
+    Ok(())
+}
+
+fn validate_update_draft_groups(groups: &[UpdateDraftGroup]) -> Result<(), AppError> {
+    let mut keys = HashSet::new();
+    let mut names = HashSet::new();
+    let mut positions = HashSet::new();
+    for group in groups {
+        if group.key.trim().is_empty() || !keys.insert(group.key.clone()) {
+            return Err(AppError::Validation("group keys must be unique".to_owned()));
+        }
+        validate_name(&group.name)?;
+        if !names.insert(normalized_name(&group.name)) {
+            return Err(AppError::GroupNameConflict);
+        }
+        if group.position < 0 || !positions.insert(group.position) {
+            return Err(AppError::Validation(
+                "group positions must be unique and non-negative".to_owned(),
+            ));
+        }
+        if group.capacity.is_some_and(|capacity| capacity < 1) {
+            return Err(AppError::Validation(
+                "group capacity must be positive".to_owned(),
+            ));
+        }
+    }
+    if positions
+        .iter()
+        .any(|position| *position >= groups.len() as i64)
+        || positions.len() != groups.len()
+    {
+        return Err(AppError::Validation(
+            "group positions must be continuous".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_no_active_draft(transaction: &Transaction<'_>, session_id: &str) -> Result<(), AppError> {
+    let active = transaction
+        .query_row(
+            "SELECT 1 FROM session_grouping_drafts WHERE session_id=?1 AND state IN ('DRAFT','OPEN') LIMIT 1",
+            [session_id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    if active {
+        return Err(AppError::ActiveDraftExists);
     }
     Ok(())
 }
@@ -2125,5 +2565,234 @@ mod tests {
             )
             .expect("existing draft state");
         assert_eq!(existing_state, "OPEN");
+    }
+
+    #[test]
+    fn session_preset_mapping_uses_student_identity_and_random_is_balanced() {
+        let fixture = fixture();
+        let connection = fixture.database.connection().expect("connection");
+        for participant_id in &fixture.participants[..2] {
+            connection
+                .execute(
+                    "UPDATE session_participants SET display_name='王小明' WHERE id=?1",
+                    [participant_id],
+                )
+                .expect("duplicate display name");
+        }
+        let participant_rows =
+            LocalSessionRepository::list_participants(&fixture.database, &fixture.session_id)
+                .expect("participants");
+        let student_ids = participant_rows
+            .iter()
+            .map(|participant| participant.student_id.clone().expect("student identity"))
+            .collect::<Vec<_>>();
+        let preset = GroupingRepository::create_preset(
+            &fixture.database,
+            &fixture.classroom_id,
+            "課堂分組預設",
+            &[
+                NewPresetGroup {
+                    id: "preset-a".to_owned(),
+                    name: "A".to_owned(),
+                    position: 0,
+                },
+                NewPresetGroup {
+                    id: "preset-b".to_owned(),
+                    name: "B".to_owned(),
+                    position: 1,
+                },
+            ],
+        )
+        .expect("preset");
+        GroupingRepository::update_preset(
+            &fixture.database,
+            &fixture.classroom_id,
+            &preset.id,
+            &preset.name,
+            &[
+                UpdatePresetGroup {
+                    key: "a".to_owned(),
+                    id: Some("preset-a".to_owned()),
+                    name: "A".to_owned(),
+                    position: 0,
+                },
+                UpdatePresetGroup {
+                    key: "b".to_owned(),
+                    id: Some("preset-b".to_owned()),
+                    name: "B".to_owned(),
+                    position: 1,
+                },
+            ],
+            &[
+                ("a".to_owned(), student_ids[0].clone()),
+                ("b".to_owned(), student_ids[1].clone()),
+            ],
+        )
+        .expect("preset assignments");
+        let draft = GroupingRepository::create_draft_from_preset(
+            &fixture.database,
+            &fixture.session_id,
+            &preset.id,
+            "identity-draft",
+        )
+        .expect("identity draft");
+        assert_eq!(
+            draft
+                .groups
+                .iter()
+                .map(|group| group.members.len())
+                .sum::<usize>(),
+            2
+        );
+        let mapped = draft
+            .groups
+            .iter()
+            .flat_map(|group| {
+                group
+                    .members
+                    .iter()
+                    .map(|member| member.participant_id.clone())
+            })
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            mapped,
+            [
+                fixture.participants[0].clone(),
+                fixture.participants[1].clone()
+            ]
+            .into_iter()
+            .collect()
+        );
+        let group_a = draft
+            .groups
+            .iter()
+            .find(|group| group.name == "A")
+            .expect("group A");
+        let group_b = draft
+            .groups
+            .iter()
+            .find(|group| group.name == "B")
+            .expect("group B");
+        assert_eq!(group_a.members[0].participant_id, fixture.participants[0]);
+        assert_eq!(group_b.members[0].participant_id, fixture.participants[1]);
+        GroupingRepository::cancel_draft(&fixture.database, &draft.id).expect("cancel");
+        let random = GroupingRepository::create_random_draft(
+            &fixture.database,
+            &fixture.session_id,
+            "random-draft",
+            3,
+        )
+        .expect("random draft");
+        let sizes = random
+            .groups
+            .iter()
+            .map(|group| group.members.len())
+            .collect::<Vec<_>>();
+        assert_eq!(sizes.iter().sum::<usize>(), fixture.participants.len());
+        assert!(sizes.iter().max().expect("max") - sizes.iter().min().expect("min") <= 1);
+    }
+
+    #[test]
+    fn session_grouping_draft_is_atomic_and_finalization_is_immutable() {
+        let fixture = fixture();
+        let draft = GroupingRepository::create_draft(
+            &fixture.database,
+            &fixture.session_id,
+            "manual-draft",
+            &[],
+        )
+        .expect("manual draft");
+        let update_groups = [
+            UpdateDraftGroup {
+                key: "a".to_owned(),
+                id: None,
+                name: "甲組".to_owned(),
+                position: 0,
+                capacity: None,
+            },
+            UpdateDraftGroup {
+                key: "b".to_owned(),
+                id: None,
+                name: "乙組".to_owned(),
+                position: 1,
+                capacity: None,
+            },
+        ];
+        assert!(matches!(
+            GroupingRepository::update_draft(
+                &fixture.database,
+                &draft.id,
+                &update_groups,
+                &[("missing".to_owned(), fixture.participants[0].clone())],
+            ),
+            Err(AppError::GroupNotFound)
+        ));
+        let unchanged = GroupingRepository::get_draft(&fixture.database, &draft.id)
+            .expect("draft")
+            .expect("draft exists");
+        assert!(unchanged.groups.is_empty());
+        let saved = GroupingRepository::update_draft(
+            &fixture.database,
+            &draft.id,
+            &update_groups,
+            &[
+                ("a".to_owned(), fixture.participants[0].clone()),
+                ("b".to_owned(), fixture.participants[1].clone()),
+            ],
+        )
+        .expect("save");
+        let finalized =
+            GroupingRepository::finalize_draft(&fixture.database, &saved.id).expect("finalize");
+        assert_eq!(finalized.revision, 1);
+        assert!(matches!(
+            GroupingRepository::update_draft(&fixture.database, &saved.id, &update_groups, &[]),
+            Err(AppError::DraftNotOpen)
+        ));
+        let current =
+            GroupingRepository::get_current_group_set(&fixture.database, &fixture.session_id)
+                .expect("current")
+                .expect("current set");
+        assert_eq!(current.revision, 1);
+        assert_eq!(
+            current
+                .groups
+                .iter()
+                .map(|group| group.members.len())
+                .sum::<usize>(),
+            2
+        );
+    }
+
+    #[test]
+    fn grouping_preset_must_belong_to_session_classroom() {
+        let fixture = fixture();
+        let parent = fixture.database.path().parent().expect("database parent");
+        let service = PersistenceService::initialize(parent).expect("service");
+        let other_classroom = service
+            .create_classroom(CreateClassroomRequest {
+                name: "Other".to_owned(),
+                academic_year: None,
+            })
+            .expect("classroom");
+        let preset = GroupingRepository::create_preset(
+            &fixture.database,
+            &other_classroom.id,
+            "其他班預設",
+            &[NewPresetGroup {
+                id: "other-group".to_owned(),
+                name: "A".to_owned(),
+                position: 0,
+            }],
+        )
+        .expect("preset");
+        assert!(matches!(
+            GroupingRepository::create_draft_from_preset(
+                &fixture.database,
+                &fixture.session_id,
+                &preset.id,
+                "mismatch-draft"
+            ),
+            Err(AppError::GroupPresetClassroomMismatch)
+        ));
     }
 }

@@ -31,3 +31,13 @@ Session End 與 stale-session recovery 在同一 database transaction 將 `DRAFT
 ## Future boundaries
 
 Phase 11D 才會新增 Student self-selection transport。Student projection 只可顯示 group name、current count、capacity、Session display names 與自己的 group，不得暴露 Student metadata、credential、IP 或 connection ID。本階段不加入 grouping scoring、leaderboard、statistics 或 peer-review schema。
+
+## Phase 11C Teacher session grouping
+
+Phase 11C 將 Teacher 分組編輯器接到既有 local session。Teacher 從 Lobby 或 Live Quiz 開啟「課堂分組」後，頁面永遠重新查詢 backend authoritative session、participants、current GroupSet 與 active draft；不依賴 Lobby component 的 local React state，也不會建立第二個 Session 或重新啟動 Local Server。
+
+Session participant 與名冊 Student 的橋接只使用 `session_participants.student_id` 的 exact durable identity。Preset membership 以 `student_id` 查詢同一 Session 的 participant；缺席 Student 會被忽略，`student_id IS NULL` 或沒有對應 membership 的 participant 保持未分組。display name、seat number、模糊比對與 frontend assignment 均不是 identity fallback。跨 Classroom preset 會 fail closed。
+
+Teacher command surface 為 `get_session_grouping`、`create_grouping_draft_from_preset`、`create_random_grouping_draft`、`create_manual_grouping_draft`、`clone_current_grouping_draft`、`update_session_grouping_draft`、`cancel_session_grouping_draft` 與 `finalize_session_grouping_draft`。Draft 編輯在一次 transaction 中保存 groups、順序、名稱、capacity 與 participant assignment；頁面可新增、改名、刪除、排序、分配、取消或套用。套用前的 current GroupSet 永不被草稿修改，finalize 產生下一個 immutable revision。Ended session 只讀；Lobby/Active session 才可變更。
+
+Random source 使用作業系統 random bytes 產生 deterministic-independent shuffle key，僅用於平衡分組，不作 authentication 或 security token。新增或重新連線的 late participant 不會修改已 finalized revision，會在下一個 draft 中顯示為未分組。SQLite migration 0001–0005 維持不變；沒有新增 schema 或 application dependency。Student grouping UI、protocol delivery、self-selection、statistics、peer review、export 與 Supabase 仍屬後續階段。

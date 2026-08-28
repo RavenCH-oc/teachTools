@@ -163,6 +163,49 @@ export interface UpdateGroupPresetRequest {
   groups: Array<{ key: string; id?: string; name: string; position: number }>;
   assignments: Array<{ groupId: string; studentId: string }>;
 }
+export type SessionGroupingDraftState = "DRAFT" | "OPEN" | "FINALIZED" | "CANCELLED";
+export interface SessionGroupingParticipant {
+  participantId: string;
+  studentId: string | null;
+  seatNumber: number;
+  displayName: string;
+  joinedAt: string;
+}
+export interface SessionGroupingGroup {
+  id: string;
+  name: string;
+  position: number;
+  capacity: number | null;
+  participantIds: string[];
+}
+export interface SessionGroupingDraft {
+  id: string;
+  sessionId: string;
+  state: SessionGroupingDraftState;
+  createdAt: string;
+  updatedAt: string;
+  groups: SessionGroupingGroup[];
+}
+export interface SessionGroupingGroupSet {
+  revision: number;
+  createdAt: string;
+  groups: SessionGroupingGroup[];
+}
+export interface SessionGroupingOverview {
+  sessionId: string;
+  classroomId: string;
+  sessionState: LocalSessionState;
+  participants: SessionGroupingParticipant[];
+  currentGroupSet: SessionGroupingGroupSet | null;
+  activeDraft: SessionGroupingDraft | null;
+}
+export interface CreateSessionGroupingDraftFromPresetRequest { sessionId: string; presetId: string }
+export interface CreateRandomGroupingDraftRequest { sessionId: string; groupCount: number }
+export interface UpdateSessionGroupingDraftRequest {
+  draftId: string;
+  groups: Array<{ key: string; id?: string; name: string; position: number; capacity: number | null }>;
+  assignments: Array<{ groupKey: string; participantId: string }>;
+}
 import type { CreateQuestionInput, CreateQuestionSetInput, Question, QuestionAsset, QuestionAssetPreview, QuestionSet, UpdateQuestionInput, UpdateQuestionSetInput } from "@classtools/domain";
 export type { Question, QuestionAsset, QuestionAssetPreview, QuestionSet } from "@classtools/domain";
 
@@ -214,6 +257,14 @@ export interface TeacherApi {
   createGroupPreset?(request: CreateGroupPresetRequest): Promise<GroupPresetDetail>
   updateGroupPreset?(request: UpdateGroupPresetRequest): Promise<GroupPresetDetail>
   deleteGroupPreset?(classroomId: string, presetId: string): Promise<void>
+  getSessionGrouping?(sessionId: string): Promise<SessionGroupingOverview>
+  createGroupingDraftFromPreset?(request: CreateSessionGroupingDraftFromPresetRequest): Promise<SessionGroupingOverview>
+  createRandomGroupingDraft?(request: CreateRandomGroupingDraftRequest): Promise<SessionGroupingOverview>
+  createManualGroupingDraft?(sessionId: string): Promise<SessionGroupingOverview>
+  cloneCurrentGroupingDraft?(sessionId: string): Promise<SessionGroupingOverview>
+  updateSessionGroupingDraft?(request: UpdateSessionGroupingDraftRequest): Promise<SessionGroupingOverview>
+  cancelSessionGroupingDraft?(draftId: string): Promise<SessionGroupingOverview>
+  finalizeSessionGroupingDraft?(draftId: string): Promise<SessionGroupingOverview>
   listCourses(): Promise<Course[]>
   createCourse(request: CreateCourseRequest): Promise<Course>
   updateCourse(id: string, request: CreateCourseRequest): Promise<Course>
