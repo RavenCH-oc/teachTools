@@ -457,6 +457,49 @@ describe("Student application shell", () => {
     fireEvent.click(await screen.findByRole("button", { name: "開啟 PDF：chapter.pdf" }));
     await waitFor(() => expect(openWindow).toHaveBeenCalledWith("blob:session-pdf", "_blank", "noopener,noreferrer"));
   });
+
+  it("renders an OPEN grouping projection and selects through the authenticated WebSocket", async () => {
+    const sessionId = "019fe91e-7606-7d00-aede-59c50a724f4d";
+    const serverInstanceId = "019fe91f-5d66-7e40-a01b-0a69f36caeff";
+    const participantId = "019fe920-0e14-7e30-8a9d-367f86c03bcc";
+    const info = { sessionId, classroomName: "三年甲班", state: "LOBBY" as const, joinMode: "roster_match" as const, serverInstanceId, protocolVersion: 1 as const };
+    const joined = { sessionId, participantId, credential: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", participant: { participantId, sessionId, seatNumber: 1, displayName: "Test" }, serverInstanceId };
+    const draftId = "019fe926-914b-7ea1-8f27-a6494761aac9";
+    const groupId = "019fe927-58b7-7bf0-bc08-b381969e4d2f";
+    window.history.pushState({}, "", "/student/join/AB7K9M2Q");
+    saveParticipant(info, joined, "AB7K9M2Q");
+    vi.stubGlobal("WebSocket", StudentWebSocket);
+    render(<App />);
+    const socket = await waitForSocket();
+    socket.message({ protocolVersion: 1, type: "server_hello", serverInstanceId });
+    socket.message({ protocolVersion: 1, type: "participant_authenticated", participant: joined.participant, classroomName: info.classroomName, sessionState: "ACTIVE" });
+    socket.message({
+      protocolVersion: 1,
+      type: "session_sync",
+      sync: {
+        sessionState: "ACTIVE",
+        currentQuestion: null,
+        ownLatestSubmission: null,
+        reveal: null,
+        grouping: {
+          groupingMode: "self_selection",
+          draftId,
+          draftState: "OPEN",
+          selectionOpen: true,
+          currentGroup: null,
+          availableGroups: [{ groupId, name: "甲組", position: 0, memberCount: 1, capacity: 2, isFull: false, members: [{ displayName: "李小華", seatNumber: 2, isSelf: false }] }],
+        },
+      },
+    });
+
+    expect(await screen.findByText("目前開放自行選組")).toBeInTheDocument();
+    expect(screen.getByText("李小華")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "加入甲組" }));
+    expect(StudentWebSocket.instances).toHaveLength(1);
+    expect(clientMessageSchema.parse(JSON.parse(socket.sent.at(-1) ?? "{}"))).toMatchObject({ type: "select_group", draftId, groupId });
+    socket.message({ protocolVersion: 1, type: "error", code: "GROUP_FULL", message: "The selected group is full." });
+    expect(await screen.findByRole("alert")).toHaveTextContent("這個組別已額滿");
+  });
 });
 
 function latestSocket(): StudentWebSocket {

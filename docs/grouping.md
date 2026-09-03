@@ -1,6 +1,6 @@
 # Grouping foundation
 
-Phase 11A建立分組的本機 persistence/application foundation；本階段沒有 Teacher UI、Student UI、Student HTTP/WebSocket grouping protocol、random grouping、preset apply、peer review 或 grouping statistics。
+Phase 11A建立分組的本機 persistence/application foundation；Phase 11B、11C、11D 已依序補上 Teacher preset、Session grouping，以及 Student self-selection / delivery。Peer review、group statistics、group scoring、competition、export 與 cloud 同步仍未實作。
 
 ## Student 與 Participant
 
@@ -40,4 +40,14 @@ Session participant 與名冊 Student 的橋接只使用 `session_participants.s
 
 Teacher command surface 為 `get_session_grouping`、`create_grouping_draft_from_preset`、`create_random_grouping_draft`、`create_manual_grouping_draft`、`clone_current_grouping_draft`、`update_session_grouping_draft`、`cancel_session_grouping_draft` 與 `finalize_session_grouping_draft`。Draft 編輯在一次 transaction 中保存 groups、順序、名稱、capacity 與 participant assignment；頁面可新增、改名、刪除、排序、分配、取消或套用。套用前的 current GroupSet 永不被草稿修改，finalize 產生下一個 immutable revision。Ended session 只讀；Lobby/Active session 才可變更。
 
-Random source 使用作業系統 random bytes 產生 deterministic-independent shuffle key，僅用於平衡分組，不作 authentication 或 security token。新增或重新連線的 late participant 不會修改已 finalized revision，會在下一個 draft 中顯示為未分組。SQLite migration 0001–0005 維持不變；沒有新增 schema 或 application dependency。Student grouping UI、protocol delivery、self-selection、statistics、peer review、export 與 Supabase 仍屬後續階段。
+Random source 使用作業系統 random bytes 產生 deterministic-independent shuffle key，僅用於平衡分組，不作 authentication 或 security token。新增或重新連線的 late participant 不會修改已 finalized revision，會在下一個 draft 中顯示為未分組。SQLite migration 0001–0005 維持不變；沒有新增 schema 或 application dependency。
+
+## Phase 11D Student self-selection and delivery
+
+Teacher 可將已完成結構與 capacity 的 `DRAFT` 開放為 `OPEN`。`OPEN` 沒有回到 `DRAFT` 的 transition：為避免 Teacher 的 stale bulk editor 覆蓋學生剛完成的選組，OPEN 時組別結構與 capacity 固定，Teacher 與 Student 都只透過 single-participant、`BEGIN IMMEDIATE` 的即時 move 操作變更 membership。Teacher 可 finalize 產生 immutable GroupSet revision，或 cancel 草稿；UI 將這兩種操作清楚表達為停止/結束自行選組的既有 state-model 行為。
+
+Student 只可經既有 authenticated Participant WebSocket 發送 `select_group`。request 不帶 participant、student 或 session authority；server 從 authenticated connection 取得 Participant，驗證 draft/session ownership、OPEN state 與 target group，再使用既有 atomic capacity transaction。滿組會回 `GROUP_FULL`，move 到滿組失敗時原 membership 保持不變；重複選擇同一組為 idempotent，退出分組使用 `groupId: null`。
+
+`session_sync` 會提供每位 authenticated Student 的安全 grouping projection。OPEN draft 可看到同一 Session 內所有可選 groups、member count、capacity 與 display names；finalized GroupSet 只會提供自己的 group 與同組 members。projection 不包含 credential、credential hash、IP、connection ID、Student permanent metadata 或其他 Session 資料。每次 OPEN membership 變更、finalize 或 cancel 都透過既有單一 ParticipantTransport 觸發每條連線重建自身 `session_sync` projection；Wi-Fi reconnect 也走既有 `participant_auth → session_sync`，不另建 grouping transport。
+
+Late participant 不會修改既有 finalized GroupSet，初始為未分組；當 Teacher 開啟新的 OPEN draft 後，可與同 Session participant 一樣選擇 group。Session end 會取消 mutable draft，Student 不再收到或操作 self-selection UI。

@@ -103,6 +103,7 @@ function storedResumeInfo(joinCode: string): SessionPublicView | null {
 
 export type ParticipantDisconnectReason = "transient" | "AUTH_FAILED" | "SESSION_ENDED" | "SERVER_INSTANCE_MISMATCH";
 export type SubmitAnswerResult = "sent" | "transport_unavailable" | "serialization_failed" | "send_failed";
+export type SelectGroupResult = "sent" | "transport_unavailable" | "serialization_failed" | "send_failed";
 export type ParticipantConnectionState = {
   generation: number;
   authenticated: boolean;
@@ -114,6 +115,7 @@ export type ParticipantTransport = {
   retryReconnectNow: () => boolean;
   close: () => void;
   submitAnswer: (submissionId: string, sessionQuestionId: string, answer: StudentAnswer) => SubmitAnswerResult;
+  selectGroup: (draftId: string, groupId: string | null) => SelectGroupResult;
   markReconnectScheduled: () => void;
   currentConnection: () => ParticipantConnectionState | null;
 };
@@ -329,6 +331,25 @@ export function createParticipantTransport(participant: StoredParticipant, callb
         return "sent";
       } catch {
         debug("SUBMIT_SEND_FAILED", connection, " reason=send_exception");
+        closeSocket(connection);
+        return "send_failed";
+      }
+    },
+    selectGroup: (draftId, groupId) => {
+      const connection = current;
+      if (!connection || !connection.authenticated || connection.socket.readyState !== WebSocket.OPEN) {
+        return "transport_unavailable";
+      }
+      let serialized: string;
+      try {
+        serialized = JSON.stringify(clientMessageSchema.parse({ protocolVersion: LOCAL_PROTOCOL_VERSION, type: "select_group", requestId: secureUuid(), draftId, groupId }));
+      } catch {
+        return "serialization_failed";
+      }
+      try {
+        connection.socket.send(serialized);
+        return "sent";
+      } catch {
         closeSocket(connection);
         return "send_failed";
       }

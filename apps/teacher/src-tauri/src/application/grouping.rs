@@ -1,10 +1,12 @@
 #![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
+use tokio::sync::broadcast;
 use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::infrastructure::persistence::database::Database;
+use crate::infrastructure::persistence::repositories::grouping::DraftState;
 use crate::infrastructure::persistence::repositories::{
     DraftGroup, GroupPreset, GroupPresetSummary, GroupingRepository, NewDraftGroup, PresetGroup,
     PresetMember, SessionGroupSet, SessionGroupingDraft, SessionGroupingParticipant,
@@ -102,6 +104,14 @@ pub struct UpdateSessionGroupingDraftRequest {
     pub assignments: Vec<SessionGroupingAssignmentRequest>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveSessionGroupingParticipantRequest {
+    pub draft_id: String,
+    pub participant_id: String,
+    pub target_group_id: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupPresetDto {
@@ -194,9 +204,51 @@ pub struct SessionGroupingOverviewDto {
     pub active_draft: Option<SessionGroupingDraftDto>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StudentGroupingMemberDto {
+    pub display_name: String,
+    pub seat_number: i64,
+    pub is_self: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StudentGroupingGroupDto {
+    pub group_id: String,
+    pub name: String,
+    pub position: i64,
+    pub member_count: i64,
+    pub capacity: Option<i64>,
+    pub is_full: bool,
+    pub members: Vec<StudentGroupingMemberDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StudentGroupingViewDto {
+    pub grouping_mode: String,
+    pub draft_id: Option<String>,
+    pub draft_state: Option<String>,
+    pub selection_open: bool,
+    pub current_group: Option<StudentGroupingGroupDto>,
+    pub available_groups: Vec<StudentGroupingGroupDto>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupSelectionResult {
+    pub selected_group_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupingEvent {
+    pub session_id: String,
+}
+
 #[derive(Clone)]
 pub struct GroupingService {
     database: Database,
+    events: broadcast::Sender<GroupingEvent>,
 }
 
 impl GroupPresetDto {
@@ -314,7 +366,12 @@ fn group_set_dto(group_set: SessionGroupSet) -> SessionGroupingGroupSetDto {
 
 impl GroupingService {
     pub fn initialize(database: Database) -> Self {
-        Self { database }
+        let (events, _) = broadcast::channel(64);
+        Self { database, events }
+    }
+
+    pub fn subscribe(&self) -> broadcast::Receiver<GroupingEvent> {
+        self.events.subscribe()
     }
 
     pub fn create_preset(
@@ -490,6 +547,9 @@ impl GroupingService {
             .collect::<Vec<_>>();
         let draft = GroupingRepository::get_draft(&self.database, &request.draft_id)?
             .ok_or(AppError::NotFound("grouping draft".to_owned()))?;
+        if !matches!(draft.state, DraftState::Draft) {
+            return Err(AppError::DraftNotOpen);
+        }
         GroupingRepository::update_draft(&self.database, &request.draft_id, &groups, &assignments)?;
         self.session_grouping_overview(&draft.session_id)
     }
@@ -501,6 +561,7 @@ impl GroupingService {
         let draft = GroupingRepository::get_draft(&self.database, draft_id)?
             .ok_or(AppError::NotFound("grouping draft".to_owned()))?;
         GroupingRepository::cancel_draft(&self.database, draft_id)?;
+        self.notify(&draft.session_id);
         self.session_grouping_overview(&draft.session_id)
     }
 
@@ -511,6 +572,7 @@ impl GroupingService {
         let draft = GroupingRepository::get_draft(&self.database, draft_id)?
             .ok_or(AppError::NotFound("grouping draft".to_owned()))?;
         GroupingRepository::finalize_draft(&self.database, draft_id)?;
+        self.notify(&draft.session_id);
         self.session_grouping_overview(&draft.session_id)
     }
 
@@ -555,7 +617,36 @@ impl GroupingService {
     }
 
     pub fn open_draft(&self, draft_id: &str) -> Result<SessionGroupingDraft, AppError> {
-        GroupingRepository::open_draft(&self.database, draft_id)
+        let existing = GroupingRepository::get_draft(&self.database, draft_id)?
+            .ok_or(AppError::NotFound("grouping draft".to_owned()))?;
+        if existing.groups.is_empty() {
+            return Err(AppError::Validation(
+                "a self-selection draft must contain at least one group".to_owned(),
+            ));
+        }
+        let draft = GroupingRepository::open_draft(&self.database, draft_id)?;
+        self.notify(&draft.session_id);
+        Ok(draft)
+    }
+
+    pub fn open_session_grouping_draft(
+        &self,
+        draft_id: &str,
+    ) -> Result<SessionGroupingOverviewDto, AppError> {
+        let draft = self.open_draft(draft_id)?;
+        self.session_grouping_overview(&draft.session_id)
+    }
+
+    pub fn move_session_grouping_participant(
+        &self,
+        request: MoveSessionGroupingParticipantRequest,
+    ) -> Result<SessionGroupingOverviewDto, AppError> {
+        let draft = self.move_participant(
+            &request.draft_id,
+            &request.participant_id,
+            request.target_group_id.as_deref(),
+        )?;
+        self.session_grouping_overview(&draft.session_id)
     }
 
     pub fn move_participant(
@@ -564,16 +655,20 @@ impl GroupingService {
         participant_id: &str,
         target_group_id: Option<&str>,
     ) -> Result<SessionGroupingDraft, AppError> {
-        GroupingRepository::move_draft_member(
+        let draft = GroupingRepository::move_draft_member(
             &self.database,
             draft_id,
             participant_id,
             target_group_id,
-        )
+        )?;
+        self.notify(&draft.session_id);
+        Ok(draft)
     }
 
     pub fn finalize_draft(&self, draft_id: &str) -> Result<SessionGroupSet, AppError> {
-        GroupingRepository::finalize_draft(&self.database, draft_id)
+        let group_set = GroupingRepository::finalize_draft(&self.database, draft_id)?;
+        self.notify(&group_set.session_id);
+        Ok(group_set)
     }
 
     pub fn current_group_set(&self, session_id: &str) -> Result<Option<SessionGroupSet>, AppError> {
@@ -605,4 +700,175 @@ impl GroupingService {
             .ok_or(AppError::NotFound("grouping draft".to_owned()))?
             .groups)
     }
+
+    pub fn select_group(
+        &self,
+        draft_id: &str,
+        participant_id: &str,
+        session_id: &str,
+        target_group_id: Option<&str>,
+    ) -> Result<GroupSelectionResult, AppError> {
+        let draft = GroupingRepository::get_draft(&self.database, draft_id)?
+            .ok_or(AppError::StaleGroupingDraft)?;
+        if draft.session_id != session_id {
+            return Err(AppError::StaleGroupingDraft);
+        }
+        if !matches!(draft.state, DraftState::Open) {
+            return Err(AppError::DraftNotOpen);
+        }
+        let updated = GroupingRepository::move_draft_member(
+            &self.database,
+            draft_id,
+            participant_id,
+            target_group_id,
+        )?;
+        let selected_group_id = updated
+            .groups
+            .iter()
+            .find(|group| {
+                group
+                    .members
+                    .iter()
+                    .any(|member| member.participant_id == participant_id)
+            })
+            .map(|group| group.id.clone());
+        self.notify(&updated.session_id);
+        Ok(GroupSelectionResult { selected_group_id })
+    }
+
+    pub fn student_grouping_view(
+        &self,
+        participant_id: &str,
+        session_id: &str,
+    ) -> Result<StudentGroupingViewDto, AppError> {
+        let participants =
+            GroupingRepository::list_grouping_participants(&self.database, session_id)?;
+        let labels = participants
+            .into_iter()
+            .map(|participant| (participant.id.clone(), participant))
+            .collect::<std::collections::HashMap<_, _>>();
+        if !labels.contains_key(participant_id) {
+            return Err(AppError::ParticipantSessionMismatch);
+        }
+        if let Some(draft) = GroupingRepository::get_active_draft(&self.database, session_id)? {
+            if matches!(draft.state, DraftState::Open) {
+                let available_groups = draft
+                    .groups
+                    .iter()
+                    .map(|group| {
+                        student_group_from_members(
+                            &group.id,
+                            &group.name,
+                            group.position,
+                            group.capacity,
+                            group
+                                .members
+                                .iter()
+                                .map(|member| member.participant_id.as_str()),
+                            &labels,
+                            participant_id,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let current_group = available_groups
+                    .iter()
+                    .find(|group| group.members.iter().any(|member| member.is_self))
+                    .cloned();
+                return Ok(StudentGroupingViewDto {
+                    grouping_mode: "self_selection".to_owned(),
+                    draft_id: Some(draft.id),
+                    draft_state: Some("OPEN".to_owned()),
+                    selection_open: true,
+                    current_group,
+                    available_groups,
+                });
+            }
+        }
+        if let Some(group_set) =
+            GroupingRepository::get_current_group_set(&self.database, session_id)?
+        {
+            let current_group = group_set
+                .groups
+                .iter()
+                .find(|group| {
+                    group
+                        .members
+                        .iter()
+                        .any(|member| member.participant_id == participant_id)
+                })
+                .map(|group| {
+                    student_group_from_members(
+                        &group.id,
+                        &group.name,
+                        group.position,
+                        None,
+                        group
+                            .members
+                            .iter()
+                            .map(|member| member.participant_id.as_str()),
+                        &labels,
+                        participant_id,
+                    )
+                })
+                .transpose()?;
+            return Ok(StudentGroupingViewDto {
+                grouping_mode: "finalized".to_owned(),
+                draft_id: None,
+                draft_state: None,
+                selection_open: false,
+                current_group,
+                available_groups: Vec::new(),
+            });
+        }
+        Ok(StudentGroupingViewDto {
+            grouping_mode: "none".to_owned(),
+            draft_id: None,
+            draft_state: None,
+            selection_open: false,
+            current_group: None,
+            available_groups: Vec::new(),
+        })
+    }
+
+    fn notify(&self, session_id: &str) {
+        let _ = self.events.send(GroupingEvent {
+            session_id: session_id.to_owned(),
+        });
+    }
+}
+
+fn student_group_from_members<'a>(
+    group_id: &str,
+    name: &str,
+    position: i64,
+    capacity: Option<i64>,
+    participant_ids: impl Iterator<Item = &'a str>,
+    labels: &std::collections::HashMap<String, SessionGroupingParticipant>,
+    self_participant_id: &str,
+) -> Result<StudentGroupingGroupDto, AppError> {
+    let mut members = participant_ids
+        .map(|participant_id| {
+            let participant = labels.get(participant_id).ok_or(AppError::Storage)?;
+            Ok(StudentGroupingMemberDto {
+                display_name: participant.display_name.clone(),
+                seat_number: participant.seat_number,
+                is_self: participant.id == self_participant_id,
+            })
+        })
+        .collect::<Result<Vec<_>, AppError>>()?;
+    members.sort_by(|left, right| {
+        left.seat_number
+            .cmp(&right.seat_number)
+            .then_with(|| left.display_name.cmp(&right.display_name))
+    });
+    let member_count = i64::try_from(members.len()).map_err(|_| AppError::Storage)?;
+    Ok(StudentGroupingGroupDto {
+        group_id: group_id.to_owned(),
+        name: name.to_owned(),
+        position,
+        member_count,
+        capacity,
+        is_full: capacity.is_some_and(|limit| member_count >= limit),
+        members,
+    })
 }

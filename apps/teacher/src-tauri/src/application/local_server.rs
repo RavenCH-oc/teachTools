@@ -18,6 +18,7 @@ use tokio::sync::oneshot;
 use tower_http::limit::RequestBodyLimitLayer;
 use uuid::Uuid;
 
+use crate::application::grouping::GroupingService;
 use crate::application::{
     LiveQuizService, LocalSessionService, QuestionPublicView, QuestionRevealView, SessionSyncDto,
     StudentAssetLocation, StudentAssetProvider, SubmissionAckDto,
@@ -151,6 +152,7 @@ pub struct LocalServerService {
     lifecycle: Arc<Mutex<ServerLifecycle>>,
     session: Arc<LocalSessionService>,
     quiz: Arc<LiveQuizService>,
+    grouping: GroupingService,
     student_assets: StudentAssetLocation,
     presence: PresenceRegistry,
 }
@@ -159,12 +161,14 @@ impl LocalServerService {
     pub fn new(
         session: Arc<LocalSessionService>,
         quiz: Arc<LiveQuizService>,
+        grouping: GroupingService,
         student_assets: StudentAssetLocation,
     ) -> Self {
         Self {
             lifecycle: Arc::new(Mutex::new(ServerLifecycle::Stopped)),
             session,
             quiz,
+            grouping,
             student_assets,
             presence: PresenceRegistry::default(),
         }
@@ -274,6 +278,7 @@ impl LocalServerService {
             server_instance_id,
             session: Arc::clone(&self.session),
             quiz: Arc::clone(&self.quiz),
+            grouping: Arc::new(self.grouping.clone()),
             assets,
             presence: self.presence.clone(),
             limiter: JoinRateLimiter::default(),
@@ -327,6 +332,7 @@ struct TransportState {
     server_instance_id: String,
     session: Arc<LocalSessionService>,
     quiz: Arc<LiveQuizService>,
+    grouping: Arc<GroupingService>,
     assets: StudentAssetProvider,
     presence: PresenceRegistry,
     limiter: JoinRateLimiter,
@@ -832,12 +838,7 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
     let connection_id = authenticated.connection_id;
     transport_connection_debug(connection_id, "participant_authenticated");
     if authenticated.session_state == "ACTIVE" {
-        let initial_sync = {
-            let quiz = Arc::clone(&state.quiz);
-            let participant_id = authenticated.participant_id.clone();
-            let session_id = authenticated.session_id.clone();
-            blocking(move || quiz.sync(&participant_id, &session_id, "ACTIVE")).await
-        };
+        let initial_sync = student_sync(&state, &authenticated).await;
         match initial_sync {
             Ok(sync) => {
                 if !send_server_message(
@@ -866,6 +867,7 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
     transport_debug("presence lease created");
     let mut events = state.session.subscribe();
     let mut quiz_events = state.quiz.subscribe();
+    let mut grouping_events = state.grouping.subscribe();
     let exit_reason = loop {
         tokio::select! {
             next = socket.recv() => {
@@ -881,16 +883,26 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
             },
             event = quiz_events.recv() => match event {
                 Ok(event) if event.session_id == authenticated.session_id => {
-                    let quiz = Arc::clone(&state.quiz);
-                    let participant_id = authenticated.participant_id.clone();
-                    let session_id = authenticated.session_id.clone();
-                    match blocking(move || quiz.sync(&participant_id, &session_id, "ACTIVE")).await {
+                    match student_sync(&state, &authenticated).await {
                         Ok(sync) => if !send_quiz_sync(&mut socket, sync).await { break "quiz_sync_send_failed"; },
                         Err(_) => break "quiz_sync_failed",
                     }
                 }
                 Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
                 Err(tokio::sync::broadcast::error::RecvError::Closed) => break "quiz_event_channel_closed",
+            },
+            event = grouping_events.recv() => {
+                let requires_sync = match event {
+                    Ok(event) => event.session_id == authenticated.session_id,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => true,
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break "grouping_event_channel_closed",
+                };
+                if requires_sync {
+                    match student_sync(&state, &authenticated).await {
+                        Ok(sync) => if !send_session_sync(&mut socket, sync).await { break "grouping_sync_send_failed"; },
+                        Err(_) => break "grouping_sync_failed",
+                    }
+                }
             },
         }
     };
@@ -993,7 +1005,7 @@ async fn authenticate_socket(
                             }
                         }
                     }
-                    Ok(ClientMessage::SubmitAnswer { .. }) => {
+                    Ok(ClientMessage::SubmitAnswer { .. } | ClientMessage::SelectGroup { .. }) => {
                         return SocketAuthentication::Rejected("PROTOCOL_ERROR")
                     }
                     Err(()) => {
@@ -1077,6 +1089,38 @@ async fn handle_authenticated_socket_message(
                         }
                     }
                 }
+                Ok(ClientMessage::SelectGroup {
+                    request_id,
+                    draft_id,
+                    group_id,
+                    ..
+                }) => {
+                    let grouping = Arc::clone(&state.grouping);
+                    let participant_id = participant.participant_id.clone();
+                    let session_id = participant.session_id.clone();
+                    match blocking(move || {
+                        grouping.select_group(
+                            &draft_id,
+                            &participant_id,
+                            &session_id,
+                            group_id.as_deref(),
+                        )
+                    })
+                    .await
+                    {
+                        Ok(selection) => {
+                            send_group_selection_acknowledgement(
+                                socket,
+                                request_id,
+                                selection.selected_group_id,
+                            )
+                            .await
+                        }
+                        Err(error) => {
+                            send_transport_error(socket, grouping_error_code(&error)).await
+                        }
+                    }
+                }
                 _ => {
                     let _ = send_protocol_error(socket).await;
                     false
@@ -1094,15 +1138,7 @@ async fn handle_authenticated_socket_message(
 
 async fn send_quiz_sync(socket: &mut WebSocket, sync: SessionSyncDto) -> bool {
     let revealed = sync.reveal.is_some();
-    if !send_server_message(
-        socket,
-        &ServerMessage::SessionSync {
-            protocol_version: LOCAL_PROTOCOL_VERSION,
-            sync: Box::new(sync.clone()),
-        },
-    )
-    .await
-    {
+    if !send_session_sync(socket, sync.clone()).await {
         return false;
     }
     if let Some(question) = sync.current_question {
@@ -1148,6 +1184,33 @@ async fn send_quiz_sync(socket: &mut WebSocket, sync: SessionSyncDto) -> bool {
     true
 }
 
+async fn send_session_sync(socket: &mut WebSocket, sync: SessionSyncDto) -> bool {
+    send_server_message(
+        socket,
+        &ServerMessage::SessionSync {
+            protocol_version: LOCAL_PROTOCOL_VERSION,
+            sync: Box::new(sync),
+        },
+    )
+    .await
+}
+
+async fn student_sync(
+    state: &TransportState,
+    participant: &SocketParticipant,
+) -> Result<SessionSyncDto, AppError> {
+    let quiz = Arc::clone(&state.quiz);
+    let grouping = Arc::clone(&state.grouping);
+    let participant_id = participant.participant_id.clone();
+    let session_id = participant.session_id.clone();
+    blocking(move || {
+        let mut sync = quiz.sync(&participant_id, &session_id, "ACTIVE")?;
+        sync.grouping = Some(grouping.student_grouping_view(&participant_id, &session_id)?);
+        Ok(sync)
+    })
+    .await
+}
+
 async fn send_protocol_error(socket: &mut WebSocket) -> bool {
     send_server_message(
         socket,
@@ -1177,13 +1240,62 @@ fn submission_error_code(error: &AppError) -> &'static str {
     }
 }
 
+fn grouping_error_code(error: &AppError) -> &'static str {
+    match error {
+        AppError::GroupFull => "GROUP_FULL",
+        AppError::GroupNotFound => "GROUP_NOT_FOUND",
+        AppError::DraftNotOpen => "SELF_SELECTION_NOT_OPEN",
+        AppError::StaleGroupingDraft
+        | AppError::ParticipantSessionMismatch
+        | AppError::ParticipantNotFound => "STALE_GROUPING_DRAFT",
+        AppError::SessionEnded | AppError::SessionNotOpen => "SESSION_ENDED",
+        _ => "STALE_GROUPING_DRAFT",
+    }
+}
+
 async fn send_transport_error(socket: &mut WebSocket, code: &'static str) -> bool {
     send_server_message(
         socket,
         &ServerMessage::Error {
             protocol_version: LOCAL_PROTOCOL_VERSION,
             code,
-            message: "Participant authentication failed.",
+            message: transport_error_message(code),
+        },
+    )
+    .await
+}
+
+fn transport_error_message(code: &str) -> &'static str {
+    match code {
+        "GROUP_FULL" => "The selected group is full.",
+        "SELF_SELECTION_NOT_OPEN" => "Student group selection is not open.",
+        "GROUP_NOT_FOUND" => "The selected group was not found.",
+        "STALE_GROUPING_DRAFT" => "The grouping draft has changed. Refresh and try again.",
+        "SESSION_ENDED" => "The classroom session has ended.",
+        "QUESTION_LOCKED" => "The question is no longer accepting answers.",
+        "INVALID_ANSWER" => "The answer is invalid.",
+        "SUBMISSION_CONFLICT" => "The submission conflicts with an existing answer.",
+        "PROTOCOL_ERROR" => "The transport message is invalid.",
+        "AUTH_TIMEOUT" => "Participant authentication timed out.",
+        "SERVER_INSTANCE_MISMATCH" => "The classroom server has changed.",
+        _ => "Participant authentication failed.",
+    }
+}
+
+async fn send_group_selection_acknowledgement(
+    socket: &mut WebSocket,
+    request_id: String,
+    selected_group_id: Option<String>,
+) -> bool {
+    send_server_message(
+        socket,
+        &ServerMessage::GroupSelectionAcknowledged {
+            protocol_version: LOCAL_PROTOCOL_VERSION,
+            acknowledgement: GroupSelectionAcknowledgement {
+                request_id,
+                selected_group_id,
+                accepted: true,
+            },
         },
     )
     .await
@@ -1275,6 +1387,21 @@ fn parse_client_message(text: &str) -> Result<ClientMessage, ()> {
         {
             Ok(message)
         }
+        ClientMessage::SelectGroup {
+            protocol_version,
+            request_id,
+            draft_id,
+            group_id,
+        } if *protocol_version == LOCAL_PROTOCOL_VERSION
+            && !request_id.trim().is_empty()
+            && request_id.len() <= 120
+            && Uuid::parse_str(draft_id).is_ok()
+            && group_id
+                .as_deref()
+                .map_or(true, |group_id| Uuid::parse_str(group_id).is_ok()) =>
+        {
+            Ok(message)
+        }
         _ => Err(()),
     }
 }
@@ -1349,6 +1476,12 @@ enum ClientMessage {
         session_question_id: String,
         answer: StudentAnswer,
     },
+    SelectGroup {
+        protocol_version: u8,
+        request_id: String,
+        draft_id: String,
+        group_id: Option<String>,
+    },
 }
 
 #[derive(Serialize)]
@@ -1397,11 +1530,23 @@ enum ServerMessage {
         protocol_version: u8,
         result: crate::application::OwnSubmissionResultDto,
     },
+    GroupSelectionAcknowledged {
+        protocol_version: u8,
+        acknowledgement: GroupSelectionAcknowledgement,
+    },
     Error {
         protocol_version: u8,
         code: &'static str,
         message: &'static str,
     },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GroupSelectionAcknowledgement {
+    request_id: String,
+    selected_group_id: Option<String>,
+    accepted: bool,
 }
 
 async fn run_server(
@@ -1561,11 +1706,13 @@ mod tests {
         )
         .expect("student");
         let quiz = LiveQuizService::initialize(database.clone(), &directory).expect("quiz service");
+        let grouping = GroupingService::initialize(database.clone());
         let session = LocalSessionService::initialize(database).expect("session service");
         (
             LocalServerService::new(
                 session,
                 quiz,
+                grouping,
                 StudentAssetLocation::from_root(directory.join("student")),
             ),
             classroom.id,
@@ -1625,11 +1772,13 @@ mod tests {
             )
             .expect("question");
         let quiz = LiveQuizService::initialize(database.clone(), &directory).expect("quiz service");
+        let grouping = GroupingService::initialize(database.clone());
         let session = LocalSessionService::initialize(database).expect("session service");
         (
             LocalServerService::new(
                 session,
                 quiz,
+                grouping,
                 StudentAssetLocation::from_root(directory.join("student")),
             ),
             classroom.id,
@@ -1710,6 +1859,110 @@ mod tests {
             .expect("malformed payload sends");
         assert_protocol_error(&receive_text(&mut socket).await);
 
+        service.stop().await.expect("server stops");
+    }
+
+    #[tokio::test]
+    async fn authenticated_group_selection_syncs_a_safe_projection_and_survives_reconnect() {
+        let (service, classroom_id) = test_service_with_roster();
+        let status = service
+            .start_on(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), false)
+            .await
+            .expect("server starts");
+        let port = status.port.expect("port");
+        let server_id = status.server_instance_id.clone().expect("server id");
+        let session = service
+            .session
+            .create(classroom_id, server_id.clone())
+            .expect("session");
+        let lobby = service
+            .session
+            .open_lobby(session.id, server_id.clone())
+            .expect("lobby");
+        let joined = http_join(port, &lobby.join_code, 12, "王小明").await;
+        service
+            .session
+            .start(lobby.id.clone(), server_id)
+            .expect("session starts");
+        let draft = service
+            .grouping
+            .create_draft(crate::application::grouping::CreateGroupingDraftRequest {
+                session_id: lobby.id.clone(),
+                groups: vec![crate::application::grouping::CreateDraftGroupRequest {
+                    name: "甲組".to_owned(),
+                    position: 0,
+                    capacity: Some(1),
+                }],
+            })
+            .expect("draft");
+        let group_id = draft.groups[0].id.clone();
+        service.grouping.open_draft(&draft.id).expect("open draft");
+
+        let (mut socket, _) = connect_same_origin(port).await;
+        let _ = receive_text(&mut socket).await;
+        socket
+            .send(ClientWebSocketMessage::Text(
+                format!("{{\"protocolVersion\":1,\"type\":\"participant_auth\",\"requestId\":\"auth-group-1\",\"sessionId\":\"{}\",\"participantId\":\"{}\",\"credential\":\"{}\"}}", joined.session_id, joined.participant_id, joined.credential).into(),
+            ))
+            .await
+            .expect("auth sends");
+        assert!(receive_text(&mut socket)
+            .await
+            .contains("participant_authenticated"));
+        let initial_sync = receive_text(&mut socket).await;
+        assert!(initial_sync.contains("\"groupingMode\":\"self_selection\""));
+        assert!(initial_sync.contains("\"selectionOpen\":true"));
+        assert!(!initial_sync.contains(&joined.participant_id));
+        assert!(!initial_sync.contains(&joined.credential));
+
+        let selection = serde_json::json!({
+            "protocolVersion": 1,
+            "type": "select_group",
+            "requestId": "group-select-1",
+            "draftId": draft.id,
+            "groupId": group_id,
+        });
+        socket
+            .send(ClientWebSocketMessage::Text(selection.to_string().into()))
+            .await
+            .expect("selection sends");
+        let acknowledgement =
+            receive_until(&mut socket, "\"type\":\"group_selection_acknowledged\"").await;
+        assert!(acknowledgement.contains("\"accepted\":true"));
+        let selected_sync = receive_until(&mut socket, "\"currentGroup\":{").await;
+        assert!(selected_sync.contains("\"name\":\"甲組\""));
+        assert!(!selected_sync.contains(&joined.participant_id));
+        assert!(!selected_sync.contains(&joined.credential));
+
+        socket.close(None).await.expect("socket closes");
+        let (mut reconnected, _) = connect_same_origin(port).await;
+        let _ = receive_text(&mut reconnected).await;
+        reconnected
+            .send(ClientWebSocketMessage::Text(
+                format!("{{\"protocolVersion\":1,\"type\":\"participant_auth\",\"requestId\":\"auth-group-2\",\"sessionId\":\"{}\",\"participantId\":\"{}\",\"credential\":\"{}\"}}", joined.session_id, joined.participant_id, joined.credential).into(),
+            ))
+            .await
+            .expect("reconnect auth sends");
+        let _ = receive_text(&mut reconnected).await;
+        let reconnect_sync = receive_text(&mut reconnected).await;
+        assert!(reconnect_sync.contains("\"currentGroup\":{"));
+        assert!(reconnect_sync.contains("\"memberCount\":1"));
+
+        reconnected
+            .send(ClientWebSocketMessage::Text(selection.to_string().into()))
+            .await
+            .expect("idempotent selection sends");
+        let _ = receive_until(
+            &mut reconnected,
+            "\"type\":\"group_selection_acknowledged\"",
+        )
+        .await;
+        let idempotent_sync = receive_until(&mut reconnected, "\"currentGroup\":{").await;
+        assert!(idempotent_sync.contains("\"memberCount\":1"));
+        service
+            .session
+            .end(lobby.id, "teacher_ended")
+            .expect("session ends");
         service.stop().await.expect("server stops");
     }
 

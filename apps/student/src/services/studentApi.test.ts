@@ -293,6 +293,23 @@ describe("student local transport", () => {
     expect(resume).toContain(session.sessionId);
     expect(resume).not.toContain(participant.credential);
   });
+
+  it("sends an authenticated group selection through the existing WebSocket only", () => {
+    vi.stubGlobal("WebSocket", TestWebSocket);
+    const transport = createParticipantTransport(participant, { onAuthenticated: vi.fn(), onEnded: vi.fn(), onDisconnected: vi.fn() });
+    transport.start();
+    const socket = latestSocket();
+    authenticate(socket, "ACTIVE");
+
+    expect(transport.selectGroup("019fe926-914b-7ea1-8f27-a6494761aac9", "019fe927-58b7-7bf0-bc08-b381969e4d2f")).toBe("sent");
+    expect(TestWebSocket.instances).toHaveLength(1);
+    expect(clientMessageSchema.parse(JSON.parse(socket.sent.at(-1) ?? "{}"))).toMatchObject({
+      type: "select_group",
+      draftId: "019fe926-914b-7ea1-8f27-a6494761aac9",
+      groupId: "019fe927-58b7-7bf0-bc08-b381969e4d2f",
+    });
+    transport.close();
+  });
 });
 
 function latestSocket(): TestWebSocket {

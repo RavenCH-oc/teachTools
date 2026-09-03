@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { APP_NAME } from "@classtools/shared";
-import type { QuestionPublicView, ServerMessage, SessionPublicView, StudentAnswer } from "@classtools/backend-contract";
+import type { QuestionPublicView, ServerMessage, SessionPublicView, StudentAnswer, StudentGroupingView } from "@classtools/backend-contract";
 import { clearParticipant, createParticipantTransport, fetchSessionAsset, getJoinInfo, joinClassroom, saveParticipant, secureUuid, storedParticipant, storedParticipantForJoinCode, StudentApiError, type ParticipantTransport, type StoredParticipant, type SubmitAnswerResult } from "./services/studentApi";
 
 type Screen = "loading" | "join" | "joining" | "connecting" | "resuming" | "lobby" | "live" | "ended" | "error";
@@ -22,6 +22,7 @@ export function App() {
   const [participant, setParticipant] = useState<StoredParticipant | null>(null); const [error, setError] = useState(""); const [reconnecting, setReconnecting] = useState(false);
   const [question, setQuestion] = useState<QuestionPublicView | null>(null); const [reveal, setReveal] = useState<RevealedQuestion | null>(null);
   const [latest, setLatest] = useState<Latest | null>(null); const [submission, setSubmission] = useState<SubmissionState>({ status: "idle" }); const submissionRef = useRef<SubmissionState>({ status: "idle" }); const transportRef = useRef<ParticipantTransport | null>(null);
+  const [grouping, setGrouping] = useState<StudentGroupingView | null>(null); const [groupingPending, setGroupingPending] = useState(false); const groupingPendingRef = useRef(false);
 
   useEffect(() => {
     if (!joinCode) return;
@@ -84,7 +85,17 @@ export function App() {
     const apply = (event: ServerMessage) => {
       if (cancelled) return;
       if (event.type === "participant_authenticated" && event.sessionState === "LOBBY") setScreen("lobby");
-      if (event.type === "session_sync") { setQuestion(event.sync.currentQuestion); setLatest(event.sync.ownLatestSubmission as Latest | null); setReveal(event.sync.reveal); setScreen(event.sync.sessionState === "ACTIVE" ? "live" : event.sync.sessionState === "ENDED" ? "ended" : "lobby"); }
+      if (event.type === "session_sync") {
+        setQuestion(event.sync.currentQuestion);
+        setLatest(event.sync.ownLatestSubmission as Latest | null);
+        setReveal(event.sync.reveal);
+        if (event.sync.grouping) {
+          setGrouping(event.sync.grouping);
+          groupingPendingRef.current = false;
+          setGroupingPending(false);
+        }
+        setScreen(event.sync.sessionState === "ACTIVE" ? "live" : event.sync.sessionState === "ENDED" ? "ended" : "lobby");
+      }
       if (event.type === "session_state_changed") { if (event.state === "ACTIVE") setScreen("live"); if (event.state === "ENDED") setScreen("ended"); }
       if (event.type === "question_state_changed") { setQuestion(event.question); if (event.question.state !== "REVEALED") setReveal(null); }
       if (event.type === "question_revealed") { setQuestion(event.reveal); setReveal(event.reveal); }
@@ -96,9 +107,20 @@ export function App() {
           setError("");
         }
       }
-      if (event.type === "error" && currentPending()) {
-        setSubmissionState({ status: "idle" });
-        setError(submissionErrorMessage(event.code));
+      if (event.type === "group_selection_acknowledged") {
+        groupingPendingRef.current = false;
+        setGroupingPending(false);
+        setError("");
+      }
+      if (event.type === "error") {
+        if (groupingPendingRef.current) {
+          groupingPendingRef.current = false;
+          setGroupingPending(false);
+          setError(groupingErrorMessage(event.code));
+        } else if (currentPending()) {
+          setSubmissionState({ status: "idle" });
+          setError(submissionErrorMessage(event.code));
+        }
       }
       if (event.type === "submission_result") setLatest(event.result as Latest);
     };
@@ -161,14 +183,43 @@ export function App() {
     setSubmission(next.state);
     setError(next.error);
   };
+  const selectGroup = (draftId: string, groupId: string | null) => {
+    const result = transportRef.current?.selectGroup(draftId, groupId) ?? "transport_unavailable";
+    if (result === "sent") {
+      groupingPendingRef.current = true;
+      setGroupingPending(true);
+      setError("");
+      return;
+    }
+    setError(result === "serialization_failed" ? "無法建立分組請求，請重新選擇。" : "連線暫時中斷，請重新連線後再選組。");
+  };
 
   if (!joinCode) return <main className="student-shell"><section className="student-card"><p className="eyebrow">學生端</p><h1>{APP_NAME}</h1><p>請輸入老師提供的課堂代碼。</p><form onSubmit={submitManual}><Field id="manual-code" label="課堂代碼" value={manualCode} onChange={setManualCode} /><button className="join-button" type="submit">前往課堂</button></form>{error && <p role="alert">{error}</p>}</section></main>;
   if (screen === "loading") return <State title="正在讀取課堂…" />; if (screen === "error") return <State title="無法加入課堂" detail={error} />; if (screen === "ended") return <State title="課堂已結束" detail="老師已結束這堂課，無法再送出答案。" />; if (!info) return <State title="正在讀取課堂…" />;
   if (screen === "resuming") return <State title="正在恢復課堂…" detail={reconnecting ? "網路中斷，正在重新連線…" : undefined} />;
   if (screen === "connecting") return <State title="正在驗證登入狀態…" detail={reconnecting ? "網路中斷，正在重新連線…" : undefined} />;
   if (screen === "lobby") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>已加入課堂</h1><p>座號：{participant?.participant.seatNumber}</p><p>姓名：{participant?.participant.displayName}</p><p>{reconnecting ? "連線中斷，正在重新連線…" : "等待老師開始課堂…"}</p></section></main>;
-  if (screen === "live") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>{question ? "目前題目" : "課堂已開始"}</h1>{error && <p className="student-error" role="alert">{error}</p>}{question ? <LiveQuestion participant={participant} question={question} latest={latest} pending={submission.status !== "idle"} reveal={reveal} onSubmit={submitAnswer} /> : <p>等待老師發布題目…</p>}{reconnecting && <p role="status">連線中斷，正在重新連線…</p>}</section></main>;
+  if (screen === "live") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>{question ? "目前題目" : "課堂已開始"}</h1>{error && <p className="student-error" role="alert">{error}</p>}<StudentGrouping grouping={grouping} pending={groupingPending} onSelect={selectGroup} />{question ? <LiveQuestion participant={participant} question={question} latest={latest} pending={submission.status !== "idle"} reveal={reveal} onSubmit={submitAnswer} /> : <p>等待老師發布題目…</p>}{reconnecting && <p role="status">連線中斷，正在重新連線…</p>}</section></main>;
   return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>加入課堂</h1><form onSubmit={submitJoin}><Field id="seat-number" label="座號" value={seatNumber} onChange={setSeatNumber} numeric /><Field id="student-name" label="姓名" value={name} onChange={setName} /><button className="join-button" disabled={screen === "joining"} type="submit">{screen === "joining" ? "加入中…" : "加入課堂"}</button></form>{error && <p role="alert">{error}</p>}</section></main>;
+}
+
+function StudentGrouping({ grouping, pending, onSelect }: { grouping: StudentGroupingView | null; pending: boolean; onSelect: (draftId: string, groupId: string | null) => void }) {
+  if (!grouping) return null;
+  if (grouping.groupingMode === "none") return <section aria-label="分組" className="student-grouping"><h2>分組</h2><p role="status">目前尚未分組</p></section>;
+  if (grouping.groupingMode === "finalized") {
+    return <section aria-label="分組" className="student-grouping"><h2>分組</h2>{grouping.currentGroup ? <><p className="student-grouping-current">你的組別：{grouping.currentGroup.name}</p><MemberList members={grouping.currentGroup.members} /></> : <p role="status">目前尚未分組</p>}</section>;
+  }
+  return <section aria-label="分組" className="student-grouping"><h2>分組</h2><p role="status">目前開放自行選組</p>{grouping.currentGroup ? <><p className="student-grouping-current">目前選擇：{grouping.currentGroup.name}</p><button className="student-grouping-action secondary" disabled={pending} onClick={() => onSelectDraft(grouping, onSelect, null)} type="button">{pending ? "更新分組中…" : "退出分組"}</button></> : <p>目前尚未分組</p>}<div className="student-grouping-list">{grouping.availableGroups.map((group) => { const isCurrent = group.members.some((member) => member.isSelf); const disabled = pending || (group.isFull && !isCurrent); return <article className="student-grouping-group" key={group.groupId}><div><strong>{group.name}</strong><span>{group.memberCount} / {group.capacity ?? "不限"}</span></div><MemberList members={group.members} />{isCurrent ? <p className="student-grouping-status">目前所在組</p> : group.isFull ? <p className="student-grouping-status">已額滿</p> : <button className="student-grouping-action" disabled={disabled} onClick={() => onSelectDraft(grouping, onSelect, group.groupId)} type="button">{pending ? "更新分組中…" : `加入${group.name}`}</button>}</article>; })}</div></section>;
+}
+
+function onSelectDraft(grouping: StudentGroupingView, onSelect: (draftId: string, groupId: string | null) => void, groupId: string | null): void {
+  const draftId = grouping.draftId;
+  if (!draftId || grouping.draftState !== "OPEN") return;
+  onSelect(draftId, groupId);
+}
+
+function MemberList({ members }: { members: StudentGroupingView["availableGroups"][number]["members"] }) {
+  return <ul className="student-grouping-members">{members.map((member, index) => <li key={`${member.seatNumber}-${member.displayName}-${index}`}>{member.isSelf ? "你" : member.displayName}{member.isSelf ? `（${member.displayName}）` : ""}</li>)}</ul>;
 }
 
 function LiveQuestion({ participant, question, latest, pending, reveal, onSubmit }: { participant: StoredParticipant | null; question: QuestionPublicView; latest: Latest | null; pending: boolean; reveal: RevealedQuestion | null; onSubmit: (answer: StudentAnswer) => void }) {
@@ -284,5 +335,16 @@ function submissionErrorMessage(code: string): string {
     case "INVALID_ANSWER": return "答案格式無效，請重新選擇。";
     case "SUBMISSION_CONFLICT": return "答案提交衝突，請重新選擇後再試。";
     default: return "課堂伺服器無法接受答案，請重新連線後再試。";
+  }
+}
+
+function groupingErrorMessage(code: string): string {
+  switch (code) {
+    case "GROUP_FULL": return "這個組別已額滿，請選擇其他組別。";
+    case "SELF_SELECTION_NOT_OPEN": return "老師目前未開放自行選組。";
+    case "GROUP_NOT_FOUND":
+    case "STALE_GROUPING_DRAFT": return "分組狀態已更新，請等待最新分組資料後再試。";
+    case "SESSION_ENDED": return "課堂已結束，無法變更分組。";
+    default: return "課堂伺服器無法接受分組變更，請重新連線後再試。";
   }
 }

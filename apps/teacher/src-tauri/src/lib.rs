@@ -6,7 +6,8 @@ mod question_domain;
 
 use application::grouping::{
     CreateGroupPresetRequest, CreateManualGroupingDraftRequest, CreateRandomGroupingDraftRequest,
-    CreateSessionGroupingDraftFromPresetRequest, GroupingService, UpdateGroupPresetRequest,
+    CreateSessionGroupingDraftFromPresetRequest, GroupingService,
+    MoveSessionGroupingParticipantRequest, UpdateGroupPresetRequest,
     UpdateSessionGroupingDraftRequest,
 };
 use application::{
@@ -132,6 +133,22 @@ fn update_session_grouping_draft(
     grouping: tauri::State<'_, GroupingService>,
 ) -> Result<application::grouping::SessionGroupingOverviewDto, AppError> {
     grouping.update_session_grouping_draft(request)
+}
+
+#[tauri::command]
+fn open_session_grouping_draft(
+    draft_id: String,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::SessionGroupingOverviewDto, AppError> {
+    grouping.open_session_grouping_draft(&draft_id)
+}
+
+#[tauri::command]
+fn move_session_grouping_participant(
+    request: MoveSessionGroupingParticipantRequest,
+    grouping: tauri::State<'_, GroupingService>,
+) -> Result<application::grouping::SessionGroupingOverviewDto, AppError> {
+    grouping.move_session_grouping_participant(request)
 }
 
 #[tauri::command]
@@ -641,6 +658,7 @@ pub fn run() -> Result<(), String> {
             app.manage(LocalServerService::new(
                 std::sync::Arc::clone(&sessions),
                 std::sync::Arc::clone(&quiz),
+                grouping.clone(),
                 student_assets,
             ));
             app.manage(quiz);
@@ -664,6 +682,8 @@ pub fn run() -> Result<(), String> {
             create_manual_grouping_draft,
             clone_current_grouping_draft,
             update_session_grouping_draft,
+            open_session_grouping_draft,
+            move_session_grouping_participant,
             cancel_session_grouping_draft,
             finalize_session_grouping_draft,
             start_local_server,

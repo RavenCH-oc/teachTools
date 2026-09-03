@@ -4,6 +4,13 @@
       "protocolVersion": 1,
       "type": "ping",
       "requestId": "ping-0001"
+    },
+    {
+      "protocolVersion": 1,
+      "type": "select_group",
+      "requestId": "group-select-0001",
+      "draftId": "019b2af9-4fe6-7f2d-a5d5-711897ed2a31",
+      "groupId": null
     }
   ],
   "validServerMessages": [
@@ -16,6 +23,15 @@
       "protocolVersion": 1,
       "type": "pong",
       "requestId": "ping-0001"
+    },
+    {
+      "protocolVersion": 1,
+      "type": "group_selection_acknowledged",
+      "acknowledgement": {
+        "requestId": "group-select-0001",
+        "selectedGroupId": null,
+        "accepted": true
+      }
     },
     {
       "protocolVersion": 1,
@@ -54,6 +70,15 @@
         "protocolVersion": 1,
         "type": "ping",
         "requestId": "   "
+      }
+    },
+    {
+      "name": "group selection without a draft identifier",
+      "message": {
+        "protocolVersion": 1,
+        "type": "select_group",
+        "requestId": "group-select-0002",
+        "groupId": null
       }
     }
   ]

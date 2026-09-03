@@ -74,6 +74,8 @@ pub enum AppError {
     GroupFull,
     #[error("grouping draft is not open")]
     DraftNotOpen,
+    #[error("grouping draft is stale")]
+    StaleGroupingDraft,
     #[error("an active grouping draft already exists")]
     ActiveDraftExists,
     #[error("there are no participants to group")]
@@ -220,6 +222,11 @@ impl Serialize for AppError {
             Self::AlreadyGrouped => ("already_grouped", "The participant is already assigned to a group.", false),
             Self::GroupFull => ("group_full", "The selected group is full.", false),
             Self::DraftNotOpen => ("draft_not_open", "The grouping draft is not open.", false),
+            Self::StaleGroupingDraft => (
+                "stale_grouping_draft",
+                "The grouping draft has changed. Refresh and try again.",
+                true,
+            ),
             Self::ActiveDraftExists => (
                 "active_draft_exists",
                 "An active grouping draft already exists for this session.",

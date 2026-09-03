@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SessionGroupingOverview } from "../../types/teacher";
 import { SessionGroupingPage, type SessionGroupingApi } from "./SessionGroupingPage";
 
@@ -20,6 +20,8 @@ function api(initial: SessionGroupingOverview, overrides: Partial<SessionGroupin
     createManualGroupingDraft: vi.fn().mockResolvedValue(initial),
     cloneCurrentGroupingDraft: vi.fn().mockResolvedValue(initial),
     updateSessionGroupingDraft: vi.fn().mockResolvedValue(initial),
+    openSessionGroupingDraft: vi.fn().mockResolvedValue(initial),
+    moveSessionGroupingParticipant: vi.fn().mockResolvedValue(initial),
     cancelSessionGroupingDraft: vi.fn().mockResolvedValue(initial),
     finalizeSessionGroupingDraft: vi.fn().mockResolvedValue(initial),
     ...overrides,
@@ -27,6 +29,7 @@ function api(initial: SessionGroupingOverview, overrides: Partial<SessionGroupin
 }
 
 describe("SessionGroupingPage", () => {
+  afterEach(() => { vi.useRealTimers(); });
   it("hydrates directly from an ACTIVE session and edits a persisted draft", async () => {
     const draft = { id: "draft-1", sessionId: "session-1", state: "DRAFT" as const, createdAt: "now", updatedAt: "now", groups: [{ id: "group-1", name: "甲組", position: 0, capacity: null, participantIds: ["participant-1"] }] };
     const saved = overview({ ...draft, updatedAt: "later" });
@@ -51,5 +54,51 @@ describe("SessionGroupingPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "手動建立" }));
     await waitFor(() => expect(createManual).toHaveBeenCalledWith("session-1"));
     expect(await screen.findByText("分組草稿")).toBeInTheDocument();
+  });
+
+  it("opens a DRAFT for student selection and then uses only immediate participant moves", async () => {
+    const draft = { id: "draft-3", sessionId: "session-1", state: "DRAFT" as const, createdAt: "now", updatedAt: "now", groups: [{ id: "group-1", name: "甲組", position: 0, capacity: 2, participantIds: [] }] };
+    const openOverview = overview({ ...draft, state: "OPEN" });
+    const open = vi.fn().mockResolvedValue(openOverview);
+    const move = vi.fn().mockResolvedValue(openOverview);
+    const groupingApi = api(overview(draft), { openSessionGroupingDraft: open, moveSessionGroupingParticipant: move });
+    render(<SessionGroupingPage api={groupingApi} sessionId="session-1" onBack={vi.fn()} onDirtyChange={vi.fn()} />);
+
+    await screen.findByText("分組草稿");
+    fireEvent.click(screen.getByRole("button", { name: "開放學生選組" }));
+    await waitFor(() => expect(open).toHaveBeenCalledWith("draft-3"));
+    expect(await screen.findByText("學生自行選組已開放")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "儲存草稿" })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "1 號 王小明 即時分組" }), { target: { value: "group-1" } });
+    await waitFor(() => expect(move).toHaveBeenCalledWith({ draftId: "draft-3", participantId: "participant-1", targetGroupId: "group-1" }));
+  });
+
+  it("polls OPEN state after each completed request and stops when unmounted", async () => {
+    vi.useFakeTimers();
+    const draft = { id: "draft-4", sessionId: "session-1", state: "OPEN" as const, createdAt: "now", updatedAt: "now", groups: [{ id: "group-1", name: "甲組", position: 0, capacity: 2, participantIds: [] }] };
+    let resolvePoll: ((value: SessionGroupingOverview) => void) | undefined;
+    const getSessionGrouping = vi.fn()
+      .mockResolvedValueOnce(overview(draft))
+      .mockImplementationOnce(() => new Promise<SessionGroupingOverview>((resolve) => { resolvePoll = resolve; }))
+      .mockResolvedValue(overview(draft));
+    const groupingApi = api(overview(draft), { getSessionGrouping });
+    const rendered = render(<SessionGroupingPage api={groupingApi} sessionId="session-1" onBack={vi.fn()} onDirtyChange={vi.fn()} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByText("學生自行選組已開放")).toBeInTheDocument();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    expect(getSessionGrouping).toHaveBeenCalledTimes(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    expect(getSessionGrouping).toHaveBeenCalledTimes(2);
+
+    resolvePoll?.(overview(draft));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    expect(getSessionGrouping).toHaveBeenCalledTimes(3);
+
+    rendered.unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+    expect(getSessionGrouping).toHaveBeenCalledTimes(3);
   });
 });

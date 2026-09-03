@@ -8,6 +8,7 @@ use sha2::{Digest, Sha256};
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
+use crate::application::grouping::StudentGroupingViewDto;
 use crate::error::AppError;
 use crate::grading::{grade_question, GradeResult, GradingError};
 use crate::infrastructure::persistence::database::Database;
@@ -112,6 +113,8 @@ pub struct SessionSyncDto {
     pub current_question: Option<QuestionPublicView>,
     pub own_latest_submission: Option<OwnSubmissionResultDto>,
     pub reveal: Option<QuestionRevealView>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grouping: Option<StudentGroupingViewDto>,
 }
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -276,6 +279,7 @@ impl LiveQuizService {
                 current_question: None,
                 own_latest_submission: None,
                 reveal: None,
+                grouping: None,
             });
         };
         let public = self.public_view(&question)?;
@@ -292,6 +296,7 @@ impl LiveQuizService {
             current_question: Some(public),
             own_latest_submission: own,
             reveal,
+            grouping: None,
         })
     }
 

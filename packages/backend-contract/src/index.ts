@@ -61,6 +61,13 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
       z.object({ type: z.literal("essay"), text: z.string().max(100_000) }).strict(),
     ]),
   }).strict(),
+  z.object({
+    protocolVersion: protocolVersionSchema,
+    type: z.literal("select_group"),
+    requestId: requestIdSchema,
+    draftId: uuidSchema,
+    groupId: uuidSchema.nullable(),
+  }).strict(),
 ]);
 
 export const sessionQuestionAssetSchema = z.object({
@@ -73,7 +80,10 @@ export const questionPublicViewSchema = z.object({
 }).strict();
 export const ownSubmissionResultSchema = z.object({ submissionId: uuidSchema, revision: z.number().int().positive(), gradingStatus: z.enum(["graded", "pending"]), isCorrect: z.boolean().nullable(), score: z.number().int().nonnegative().nullable(), maxScore: z.number().int().positive(), answer: z.unknown() }).strict();
 export const questionRevealViewSchema = z.object({ ...questionPublicViewSchema.shape, correctAnswer: z.unknown().nullable() }).strict();
-export const sessionSyncSchema = z.object({ sessionState: z.enum(["LOBBY", "ACTIVE", "ENDED"]), currentQuestion: questionPublicViewSchema.nullable(), ownLatestSubmission: ownSubmissionResultSchema.nullable(), reveal: questionRevealViewSchema.nullable() }).strict();
+export const studentGroupingMemberSchema = z.object({ displayName: z.string().trim().min(1).max(200), seatNumber: z.number().int().positive(), isSelf: z.boolean() }).strict();
+export const studentGroupingGroupSchema = z.object({ groupId: uuidSchema, name: z.string().trim().min(1).max(200), position: z.number().int().nonnegative(), memberCount: z.number().int().nonnegative(), capacity: z.number().int().positive().nullable(), isFull: z.boolean(), members: z.array(studentGroupingMemberSchema) }).strict();
+export const studentGroupingViewSchema = z.object({ groupingMode: z.enum(["none", "self_selection", "finalized"]), draftId: uuidSchema.nullable(), draftState: z.literal("OPEN").nullable(), selectionOpen: z.boolean(), currentGroup: studentGroupingGroupSchema.nullable(), availableGroups: z.array(studentGroupingGroupSchema) }).strict();
+export const sessionSyncSchema = z.object({ sessionState: z.enum(["LOBBY", "ACTIVE", "ENDED"]), currentQuestion: questionPublicViewSchema.nullable(), ownLatestSubmission: ownSubmissionResultSchema.nullable(), reveal: questionRevealViewSchema.nullable(), grouping: studentGroupingViewSchema.nullable().optional() }).strict();
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
   z.object({
@@ -99,6 +109,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
   z.object({ protocolVersion: protocolVersionSchema, type: z.literal("question_revealed"), reveal: questionRevealViewSchema }).strict(),
   z.object({ protocolVersion: protocolVersionSchema, type: z.literal("submission_acknowledged"), acknowledgement: z.object({ submissionId: uuidSchema, sessionQuestionId: uuidSchema, revision: z.number().int().positive(), accepted: z.literal(true), submittedAt: z.string().datetime(), gradingStatus: z.enum(["graded", "pending"]) }).strict() }).strict(),
   z.object({ protocolVersion: protocolVersionSchema, type: z.literal("submission_result"), result: ownSubmissionResultSchema }).strict(),
+  z.object({ protocolVersion: protocolVersionSchema, type: z.literal("group_selection_acknowledged"), acknowledgement: z.object({ requestId: requestIdSchema, selectedGroupId: uuidSchema.nullable(), accepted: z.literal(true) }).strict() }).strict(),
   z.object({
     protocolVersion: protocolVersionSchema,
     type: z.literal("pong"),
@@ -107,7 +118,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
   z.object({
     protocolVersion: protocolVersionSchema,
     type: z.literal("error"),
-    code: z.enum(["PROTOCOL_ERROR", "AUTH_FAILED", "AUTH_TIMEOUT", "SESSION_ENDED", "SERVER_INSTANCE_MISMATCH", "QUESTION_LOCKED", "INVALID_ANSWER", "SUBMISSION_CONFLICT"]),
+    code: z.enum(["PROTOCOL_ERROR", "AUTH_FAILED", "AUTH_TIMEOUT", "SESSION_ENDED", "SERVER_INSTANCE_MISMATCH", "QUESTION_LOCKED", "INVALID_ANSWER", "SUBMISSION_CONFLICT", "GROUP_FULL", "SELF_SELECTION_NOT_OPEN", "GROUP_NOT_FOUND", "STALE_GROUPING_DRAFT"]),
     message: z.string().trim().min(1).max(200),
   }).strict(),
 ]);
@@ -120,6 +131,7 @@ export type JoinSuccess = z.infer<typeof joinSuccessSchema>;
 export type StudentAnswer = z.infer<typeof clientMessageSchema> extends infer Message ? Extract<Message, { type: "submit_answer" }> extends { answer: infer Answer } ? Answer : never : never;
 export type QuestionPublicView = z.infer<typeof questionPublicViewSchema>;
 export type SessionSync = z.infer<typeof sessionSyncSchema>;
+export type StudentGroupingView = z.infer<typeof studentGroupingViewSchema>;
 
 /**
  * The production SessionBackend contract is still deferred. Phase 7 defines

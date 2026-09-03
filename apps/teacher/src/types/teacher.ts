@@ -206,6 +206,11 @@ export interface UpdateSessionGroupingDraftRequest {
   groups: Array<{ key: string; id?: string; name: string; position: number; capacity: number | null }>;
   assignments: Array<{ groupKey: string; participantId: string }>;
 }
+export interface MoveSessionGroupingParticipantRequest {
+  draftId: string;
+  participantId: string;
+  targetGroupId: string | null;
+}
 import type { CreateQuestionInput, CreateQuestionSetInput, Question, QuestionAsset, QuestionAssetPreview, QuestionSet, UpdateQuestionInput, UpdateQuestionSetInput } from "@classtools/domain";
 export type { Question, QuestionAsset, QuestionAssetPreview, QuestionSet } from "@classtools/domain";
 
@@ -263,6 +268,8 @@ export interface TeacherApi {
   createManualGroupingDraft?(sessionId: string): Promise<SessionGroupingOverview>
   cloneCurrentGroupingDraft?(sessionId: string): Promise<SessionGroupingOverview>
   updateSessionGroupingDraft?(request: UpdateSessionGroupingDraftRequest): Promise<SessionGroupingOverview>
+  openSessionGroupingDraft?(draftId: string): Promise<SessionGroupingOverview>
+  moveSessionGroupingParticipant?(request: MoveSessionGroupingParticipantRequest): Promise<SessionGroupingOverview>
   cancelSessionGroupingDraft?(draftId: string): Promise<SessionGroupingOverview>
   finalizeSessionGroupingDraft?(draftId: string): Promise<SessionGroupingOverview>
   listCourses(): Promise<Course[]>
