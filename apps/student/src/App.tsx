@@ -89,11 +89,9 @@ export function App() {
         setQuestion(event.sync.currentQuestion);
         setLatest(event.sync.ownLatestSubmission as Latest | null);
         setReveal(event.sync.reveal);
-        if (event.sync.grouping) {
-          setGrouping(event.sync.grouping);
-          groupingPendingRef.current = false;
-          setGroupingPending(false);
-        }
+        setGrouping(event.sync.grouping ?? null);
+        groupingPendingRef.current = false;
+        setGroupingPending(false);
         setScreen(event.sync.sessionState === "ACTIVE" ? "live" : event.sync.sessionState === "ENDED" ? "ended" : "lobby");
       }
       if (event.type === "session_state_changed") { if (event.state === "ACTIVE") setScreen("live"); if (event.state === "ENDED") setScreen("ended"); }
@@ -198,7 +196,7 @@ export function App() {
   if (screen === "loading") return <State title="正在讀取課堂…" />; if (screen === "error") return <State title="無法加入課堂" detail={error} />; if (screen === "ended") return <State title="課堂已結束" detail="老師已結束這堂課，無法再送出答案。" />; if (!info) return <State title="正在讀取課堂…" />;
   if (screen === "resuming") return <State title="正在恢復課堂…" detail={reconnecting ? "網路中斷，正在重新連線…" : undefined} />;
   if (screen === "connecting") return <State title="正在驗證登入狀態…" detail={reconnecting ? "網路中斷，正在重新連線…" : undefined} />;
-  if (screen === "lobby") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>已加入課堂</h1><p>座號：{participant?.participant.seatNumber}</p><p>姓名：{participant?.participant.displayName}</p><p>{reconnecting ? "連線中斷，正在重新連線…" : "等待老師開始課堂…"}</p></section></main>;
+  if (screen === "lobby") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>已加入課堂</h1><p>座號：{participant?.participant.seatNumber}</p><p>姓名：{participant?.participant.displayName}</p><p>{reconnecting ? "連線中斷，正在重新連線…" : "等待老師開始課堂…"}</p>{error && <p className="student-error" role="alert">{error}</p>}<StudentGrouping grouping={grouping} pending={groupingPending} onSelect={selectGroup} /></section></main>;
   if (screen === "live") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>{question ? "目前題目" : "課堂已開始"}</h1>{error && <p className="student-error" role="alert">{error}</p>}<StudentGrouping grouping={grouping} pending={groupingPending} onSelect={selectGroup} />{question ? <LiveQuestion participant={participant} question={question} latest={latest} pending={submission.status !== "idle"} reveal={reveal} onSubmit={submitAnswer} /> : <p>等待老師發布題目…</p>}{reconnecting && <p role="status">連線中斷，正在重新連線…</p>}</section></main>;
   return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>加入課堂</h1><form onSubmit={submitJoin}><Field id="seat-number" label="座號" value={seatNumber} onChange={setSeatNumber} numeric /><Field id="student-name" label="姓名" value={name} onChange={setName} /><button className="join-button" disabled={screen === "joining"} type="submit">{screen === "joining" ? "加入中…" : "加入課堂"}</button></form>{error && <p role="alert">{error}</p>}</section></main>;
 }

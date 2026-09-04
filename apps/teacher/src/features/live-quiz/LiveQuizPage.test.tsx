@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LiveQuizPage, type LiveQuizApi } from "./LiveQuizPage";
 import type { LocalServerStatus, LocalSession, Question, QuestionSet, QuestionStatistics, SessionQuestion } from "../../types/teacher";
@@ -52,7 +52,7 @@ function publishedQuestion(state: SessionQuestion["state"]): SessionQuestion {
 }
 
 describe("LiveQuizPage", () => {
-  afterEach(() => cleanup());
+  afterEach(() => { cleanup(); vi.useRealTimers(); });
 
   it("hydrates an ACTIVE session from the authoritative backend on direct mount", async () => {
     const api = apiFixture(baseSession);
@@ -155,5 +155,20 @@ describe("LiveQuizPage", () => {
 
     expect(await screen.findByText("正在更新統計…")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "鎖定題目" })).toBeEnabled();
+  });
+
+  it("stops current-question progress polling when navigation unmounts the page", async () => {
+    vi.useFakeTimers();
+    const api = apiFixture(baseSession);
+    vi.mocked(api.listSessionQuestions).mockResolvedValue([publishedQuestion("OPEN")]);
+    vi.mocked(api.getSessionQuestionProgress).mockResolvedValue({ sessionQuestionId: "session-question-1", answeredCount: 0, participantCount: 1, answeredParticipantIds: [] });
+    const view = render(<LiveQuizPage api={api} onError={vi.fn()} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+    expect(api.getSessionQuestionProgress).toHaveBeenCalledTimes(1);
+
+    view.unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(6_000); });
+    expect(api.getSessionQuestionProgress).toHaveBeenCalledTimes(1);
   });
 });

@@ -30,6 +30,17 @@ describe("useSessionAnalysis", () => {
     expect(api.getSessionStatistics).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("state")).toHaveTextContent("ENDED");
   });
+  it("stops polling when navigation unmounts the analysis page", async () => {
+    vi.useFakeTimers();
+    const first = deferred<SessionStatistics>();
+    const api = apiFor(statistics("ACTIVE"));
+    api.getSessionStatistics.mockReturnValueOnce(first.promise);
+    const view = render(<Harness api={api} />);
+    expect(api.getSessionStatistics).toHaveBeenCalledTimes(1);
+    view.unmount();
+    await act(async () => { first.resolve(statistics("ACTIVE")); await first.promise; await vi.advanceTimersByTimeAsync(SESSION_ANALYSIS_POLL_INTERVAL_MS * 2); });
+    expect(api.getSessionStatistics).toHaveBeenCalledTimes(1);
+  });
   it("retains the last snapshot and recovers after a transient error", async () => {
     vi.useFakeTimers();
     const api = apiFor(statistics("ACTIVE"));

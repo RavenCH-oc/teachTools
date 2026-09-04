@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clientMessageSchema, serverMessageSchema } from "@classtools/backend-contract";
+import { clientMessageSchema, serverMessageSchema, type StudentGroupingView } from "@classtools/backend-contract";
 import { App } from "./App";
 import { saveParticipant, storedParticipantForJoinCode } from "./services/studentApi";
 
@@ -499,6 +499,139 @@ describe("Student application shell", () => {
     expect(clientMessageSchema.parse(JSON.parse(socket.sent.at(-1) ?? "{}"))).toMatchObject({ type: "select_group", draftId, groupId });
     socket.message({ protocolVersion: 1, type: "error", code: "GROUP_FULL", message: "The selected group is full." });
     expect(await screen.findByRole("alert")).toHaveTextContent("這個組別已額滿");
+  });
+
+  it.each(["LOBBY", "ACTIVE"] as const)("restores finalized grouping after hard reload and Wi-Fi reconnect in %s without Teacher actions", async (sessionState) => {
+    const sessionId = "019fe91e-7606-7d00-aede-59c50a724f4d";
+    const serverInstanceId = "019fe91f-5d66-7e40-a01b-0a69f36caeff";
+    const participantId = "019fe920-0e14-7e30-8a9d-367f86c03bcc";
+    const draftId = "019fe926-914b-7ea1-8f27-a6494761aac9";
+    const groupId = "019fe927-58b7-7bf0-bc08-b381969e4d2f";
+    const info = { sessionId, classroomName: "三年甲班", state: "LOBBY" as const, joinMode: "roster_match" as const, serverInstanceId, protocolVersion: 1 as const };
+    const joined = { sessionId, participantId, credential: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", participant: { participantId, sessionId, seatNumber: 1, displayName: "Test" }, serverInstanceId };
+    const group = { groupId, name: "甲組", position: 0, memberCount: 1, capacity: null, isFull: false, members: [{ displayName: "Test", seatNumber: 1, isSelf: true }] };
+    const finalized: StudentGroupingView = { groupingMode: "finalized", draftId: null, draftState: null, selectionOpen: false, currentGroup: group, availableGroups: [] };
+    const sync = (grouping: StudentGroupingView | null | undefined) => ({ protocolVersion: 1, type: "session_sync", sync: { sessionState, currentQuestion: null, ownLatestSubmission: null, reveal: null, grouping } });
+    const authenticate = (socket: StudentWebSocket) => {
+      socket.message({ protocolVersion: 1, type: "server_hello", serverInstanceId });
+      expect(clientMessageSchema.parse(JSON.parse(socket.sent.at(-1) ?? "{}"))).toMatchObject({ type: "participant_auth", sessionId, participantId });
+      socket.message({ protocolVersion: 1, type: "participant_authenticated", participant: joined.participant, classroomName: info.classroomName, sessionState });
+    };
+    window.history.pushState({}, "", "/student/join/AB7K9M2Q");
+    saveParticipant(info, joined, "AB7K9M2Q");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("WebSocket", StudentWebSocket);
+    const firstMount = render(<App />);
+    const firstSocket = await waitForSocket();
+    await act(async () => {
+      authenticate(firstSocket);
+      firstSocket.message(sync({ groupingMode: "self_selection", draftId, draftState: "OPEN", selectionOpen: true, currentGroup: group, availableGroups: [group] }));
+    });
+    expect(screen.getByText("目前開放自行選組")).toBeInTheDocument();
+    await act(async () => { firstSocket.message(sync(finalized)); });
+    expect(screen.getByText("你的組別：甲組")).toBeInTheDocument();
+
+    // Exact QA5: discard React/transport memory, retain only the stored credential.
+    firstMount.unmount();
+    StudentWebSocket.instances = [];
+    render(<App />);
+    const resumedSocket = await waitForSocket();
+    await act(async () => { authenticate(resumedSocket); resumedSocket.message(sync(finalized)); });
+    expect(screen.getByText("你的組別：甲組")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    if (sessionState === "LOBBY") expect(screen.getByText("等待老師開始課堂…")).toBeInTheDocument();
+
+    vi.useFakeTimers();
+    await act(async () => { resumedSocket.networkFailure(); await vi.advanceTimersByTimeAsync(1_000); });
+    const reconnectedSocket = latestSocket();
+    expect(reconnectedSocket).not.toBe(resumedSocket);
+    await act(async () => { authenticate(reconnectedSocket); reconnectedSocket.message(sync(finalized)); });
+    expect(screen.getByText("你的組別：甲組")).toBeInTheDocument();
+    const latestRevision = { ...finalized, currentGroup: { ...group, name: "乙組" } };
+    await act(async () => {
+      reconnectedSocket.message(sync(latestRevision));
+      resumedSocket.message(sync(null));
+      firstSocket.message(sync(finalized));
+    });
+    expect(screen.getByText("你的組別：乙組")).toBeInTheDocument();
+    expect(screen.queryByText("你的組別：甲組")).not.toBeInTheDocument();
+    await act(async () => { reconnectedSocket.message(sync({ ...finalized, currentGroup: null })); });
+    expect(screen.getByText("目前尚未分組")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "分組" })).toBeInTheDocument();
+    await act(async () => { reconnectedSocket.message(sync(null)); });
+    expect(screen.queryByRole("region", { name: "分組" })).not.toBeInTheDocument();
+    await act(async () => { reconnectedSocket.message(sync(finalized)); reconnectedSocket.message(sync(undefined)); });
+    expect(screen.queryByRole("region", { name: "分組" })).not.toBeInTheDocument();
+  });
+
+  it("preserves a selected answer and pending submission across grouping sync updates", async () => {
+    const sessionId = "019fe91e-7606-7d00-aede-59c50a724f4d";
+    const serverInstanceId = "019fe91f-5d66-7e40-a01b-0a69f36caeff";
+    const participantId = "019fe920-0e14-7e30-8a9d-367f86c03bcc";
+    const sessionQuestionId = "019fe923-090a-7aa0-85dc-c216080117fa";
+    const draftId = "019fe926-914b-7ea1-8f27-a6494761aac9";
+    const groupId = "019fe927-58b7-7bf0-bc08-b381969e4d2f";
+    const info = { sessionId, classroomName: "三年甲班", state: "LOBBY" as const, joinMode: "roster_match" as const, serverInstanceId, protocolVersion: 1 as const };
+    const joined = { sessionId, participantId, credential: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", participant: { participantId, sessionId, seatNumber: 1, displayName: "Test" }, serverInstanceId };
+    const question = { sessionQuestionId, type: "true_false" as const, prompt: "分組期間仍可作答。", points: 1, state: "OPEN" as const, options: [], blanks: [], assets: [] };
+    window.history.pushState({}, "", "/student/join/AB7K9M2Q");
+    saveParticipant(info, joined, "AB7K9M2Q");
+    vi.stubGlobal("WebSocket", StudentWebSocket);
+    render(<App />);
+    const socket = await waitForSocket();
+    socket.message({ protocolVersion: 1, type: "server_hello", serverInstanceId });
+    socket.message({ protocolVersion: 1, type: "participant_authenticated", participant: joined.participant, classroomName: info.classroomName, sessionState: "ACTIVE" });
+    socket.message({
+      protocolVersion: 1,
+      type: "session_sync",
+      sync: {
+        sessionState: "ACTIVE",
+        currentQuestion: question,
+        ownLatestSubmission: null,
+        reveal: null,
+        grouping: {
+          groupingMode: "self_selection",
+          draftId,
+          draftState: "OPEN",
+          selectionOpen: true,
+          currentGroup: null,
+          availableGroups: [{ groupId, name: "甲組", position: 0, memberCount: 0, capacity: 2, isFull: false, members: [] }],
+        },
+      },
+    });
+
+    const correct = await screen.findByRole("button", { name: "正確" });
+    fireEvent.click(correct);
+    expect(correct).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "送出答案" }));
+    expect(screen.getByRole("button", { name: "送出中…" })).toBeDisabled();
+    const submission = clientMessageSchema.parse(JSON.parse(socket.sent.at(-1) ?? "{}"));
+    expect(submission).toMatchObject({ type: "submit_answer", sessionQuestionId, answer: { type: "true_false", value: true } });
+
+    socket.message({
+      protocolVersion: 1,
+      type: "session_sync",
+      sync: {
+        sessionState: "ACTIVE",
+        currentQuestion: question,
+        ownLatestSubmission: null,
+        reveal: null,
+        grouping: {
+          groupingMode: "self_selection",
+          draftId,
+          draftState: "OPEN",
+          selectionOpen: true,
+          currentGroup: { groupId, name: "甲組", position: 0, memberCount: 1, capacity: 2, isFull: false, members: [{ displayName: "Test", seatNumber: 1, isSelf: true }] },
+          availableGroups: [{ groupId, name: "甲組", position: 0, memberCount: 1, capacity: 2, isFull: false, members: [{ displayName: "Test", seatNumber: 1, isSelf: true }] }],
+        },
+      },
+    });
+
+    expect(await screen.findByText("目前選擇：甲組")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "正確" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "送出中…" })).toBeDisabled();
+    expect(StudentWebSocket.instances).toHaveLength(1);
   });
 });
 

@@ -837,37 +837,26 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
     };
     let connection_id = authenticated.connection_id;
     transport_connection_debug(connection_id, "participant_authenticated");
-    if authenticated.session_state == "ACTIVE" {
-        let initial_sync = student_sync(&state, &authenticated).await;
-        match initial_sync {
-            Ok(sync) => {
-                if !send_server_message(
-                    &mut socket,
-                    &ServerMessage::SessionSync {
-                        protocol_version: LOCAL_PROTOCOL_VERSION,
-                        sync: Box::new(sync),
-                    },
-                )
-                .await
-                {
-                    state
-                        .presence
-                        .disconnect(&authenticated.participant_id, connection_id);
-                    return;
-                }
-            }
-            Err(_) => {
+    let mut events = state.session.subscribe();
+    let mut quiz_events = state.quiz.subscribe();
+    let mut grouping_events = state.grouping.subscribe();
+    match student_sync(&state, &authenticated).await {
+        Ok(sync) => {
+            if !send_session_sync(&mut socket, sync).await {
                 state
                     .presence
                     .disconnect(&authenticated.participant_id, connection_id);
                 return;
             }
         }
+        Err(_) => {
+            state
+                .presence
+                .disconnect(&authenticated.participant_id, connection_id);
+            return;
+        }
     }
     transport_debug("presence lease created");
-    let mut events = state.session.subscribe();
-    let mut quiz_events = state.quiz.subscribe();
-    let mut grouping_events = state.grouping.subscribe();
     let exit_reason = loop {
         tokio::select! {
             next = socket.recv() => {
@@ -917,7 +906,6 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
 struct SocketParticipant {
     participant_id: String,
     session_id: String,
-    session_state: String,
     connection_id: Uuid,
 }
 enum SocketAuthentication {
@@ -969,7 +957,6 @@ async fn authenticate_socket(
                         {
                             Ok(authenticated) => {
                                 let session_id = authenticated.participant.session_id.clone();
-                                let session_state = authenticated.session_state.clone();
                                 let authenticated_participant_id =
                                     authenticated.participant.participant_id.clone();
                                 let connection_id =
@@ -994,7 +981,6 @@ async fn authenticate_socket(
                                 return SocketAuthentication::Authenticated(SocketParticipant {
                                     participant_id: authenticated_participant_id,
                                     session_id,
-                                    session_state,
                                     connection_id,
                                 });
                             }
@@ -1201,10 +1187,15 @@ async fn student_sync(
 ) -> Result<SessionSyncDto, AppError> {
     let quiz = Arc::clone(&state.quiz);
     let grouping = Arc::clone(&state.grouping);
+    let session = Arc::clone(&state.session);
     let participant_id = participant.participant_id.clone();
     let session_id = participant.session_id.clone();
     blocking(move || {
-        let mut sync = quiz.sync(&participant_id, &session_id, "ACTIVE")?;
+        let current_session = session
+            .active()?
+            .filter(|current| current.id == session_id)
+            .ok_or(AppError::SessionEnded)?;
+        let mut sync = quiz.sync(&participant_id, &session_id, &current_session.state)?;
         sync.grouping = Some(grouping.student_grouping_view(&participant_id, &session_id)?);
         Ok(sync)
     })
@@ -1863,6 +1854,201 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn lobby_grouping_sync_restores_finalized_groups_without_teacher_action() {
+        assert_grouping_reconnect_lifecycle(false).await;
+    }
+
+    #[tokio::test]
+    async fn active_grouping_sync_restores_finalized_groups_without_teacher_action() {
+        assert_grouping_reconnect_lifecycle(true).await;
+    }
+
+    async fn authenticate_grouping_socket(
+        port: u16,
+        joined: &JoinResponse,
+    ) -> (TestSocket, serde_json::Value) {
+        let (mut socket, _) = connect_same_origin(port).await;
+        let _ = receive_text(&mut socket).await;
+        socket.send(ClientWebSocketMessage::Text(serde_json::json!({
+            "protocolVersion": 1, "type": "participant_auth", "requestId": "grouping-resume",
+            "sessionId": joined.session_id, "participantId": joined.participant_id,
+            "credential": joined.credential,
+        }).to_string().into())).await.expect("authenticate reconnect");
+        assert!(receive_text(&mut socket)
+            .await
+            .contains("participant_authenticated"));
+        let sync = receive_grouping_sync(&mut socket).await;
+        (socket, sync)
+    }
+
+    async fn receive_grouping_sync(socket: &mut TestSocket) -> serde_json::Value {
+        let text = tokio::time::timeout(
+            Duration::from_secs(2),
+            receive_until(socket, "\"type\":\"session_sync\""),
+        )
+        .await
+        .expect("authenticated connection must receive authoritative session_sync");
+        serde_json::from_str::<serde_json::Value>(&text).expect("sync JSON")["sync"].clone()
+    }
+
+    async fn assert_grouping_reconnect_lifecycle(active: bool) {
+        use crate::application::grouping::{CreateDraftGroupRequest, CreateGroupingDraftRequest};
+
+        let (service, classroom_id) = test_service_with_roster();
+        let status = service
+            .start_on(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), false)
+            .await
+            .expect("server");
+        let port = status.port.expect("port");
+        let server_id = status.server_instance_id.expect("server id");
+        let session = service
+            .session
+            .create(classroom_id, server_id.clone())
+            .expect("session");
+        let lobby = service
+            .session
+            .open_lobby(session.id, server_id.clone())
+            .expect("lobby");
+        let joined = http_join(port, &lobby.join_code, 12, "王小明").await;
+        if active {
+            service
+                .session
+                .start(lobby.id.clone(), server_id)
+                .expect("start");
+        }
+        let expected_state = if active { "ACTIVE" } else { "LOBBY" };
+        let draft = service
+            .grouping
+            .create_draft(CreateGroupingDraftRequest {
+                session_id: lobby.id.clone(),
+                groups: vec![
+                    CreateDraftGroupRequest {
+                        name: "A".to_owned(),
+                        position: 0,
+                        capacity: Some(2),
+                    },
+                    CreateDraftGroupRequest {
+                        name: "B".to_owned(),
+                        position: 1,
+                        capacity: Some(2),
+                    },
+                ],
+            })
+            .expect("draft");
+        let (mut socket, initial) = authenticate_grouping_socket(port, &joined).await;
+        assert_eq!(initial["sessionState"], expected_state);
+        assert_eq!(initial["grouping"]["groupingMode"], "none");
+        service.grouping.open_draft(&draft.id).expect("open");
+        let opened = receive_grouping_sync(&mut socket).await;
+        assert_eq!(opened["sessionState"], expected_state);
+        assert_eq!(opened["grouping"]["groupingMode"], "self_selection");
+        service
+            .grouping
+            .select_group(
+                &draft.id,
+                &joined.participant_id,
+                &lobby.id,
+                Some(&draft.groups[0].id),
+            )
+            .expect("select A");
+        let _ = receive_grouping_sync(&mut socket).await;
+        service.grouping.finalize_draft(&draft.id).expect("rev1");
+        let live_finalized = receive_grouping_sync(&mut socket).await;
+        assert_eq!(live_finalized["sessionState"], expected_state);
+        assert_eq!(live_finalized["grouping"]["currentGroup"]["name"], "A");
+        assert_eq!(live_finalized["grouping"]["groupingMode"], "finalized");
+        socket.close(None).await.expect("hard reload closes socket");
+        // Fresh authenticated connection, with no Teacher action or cached Student state.
+        let (mut socket, restored) = authenticate_grouping_socket(port, &joined).await;
+        assert_eq!(restored, live_finalized);
+
+        let next = service
+            .grouping
+            .clone_current_to_draft(&lobby.id)
+            .expect("next DRAFT");
+        socket.close(None).await.expect("refresh during DRAFT");
+        let (mut socket, during_draft) = authenticate_grouping_socket(port, &joined).await;
+        assert_eq!(during_draft["grouping"], live_finalized["grouping"]);
+        service.grouping.open_draft(&next.id).expect("open next");
+        let opened = receive_grouping_sync(&mut socket).await;
+        socket.close(None).await.expect("refresh during OPEN");
+        let (mut socket, restored_open) = authenticate_grouping_socket(port, &joined).await;
+        assert_eq!(restored_open, opened);
+        assert_eq!(restored_open["grouping"]["currentGroup"]["name"], "A");
+        assert_eq!(
+            restored_open["grouping"]["availableGroups"][0]["capacity"],
+            serde_json::Value::Null
+        );
+        service
+            .grouping
+            .cancel_session_grouping_draft(&next.id)
+            .expect("cancel");
+        let cancelled = receive_grouping_sync(&mut socket).await;
+        assert_eq!(cancelled["grouping"], live_finalized["grouping"]);
+        socket.close(None).await.expect("refresh after cancel");
+        let (mut socket, restored_cancel) = authenticate_grouping_socket(port, &joined).await;
+        assert_eq!(restored_cancel, cancelled);
+
+        let next = service
+            .grouping
+            .clone_current_to_draft(&lobby.id)
+            .expect("rev2 draft");
+        service.grouping.open_draft(&next.id).expect("open rev2");
+        let _ = receive_grouping_sync(&mut socket).await;
+        service
+            .grouping
+            .move_participant(&next.id, &joined.participant_id, Some(&next.groups[1].id))
+            .expect("move to B");
+        let _ = receive_grouping_sync(&mut socket).await;
+        service.grouping.finalize_draft(&next.id).expect("rev2");
+        let live_rev2 = receive_grouping_sync(&mut socket).await;
+        socket.close(None).await.expect("Wi-Fi disconnect");
+        let (mut socket, restored_rev2) = authenticate_grouping_socket(port, &joined).await;
+        assert_eq!(restored_rev2, live_rev2);
+        assert_eq!(restored_rev2["grouping"]["currentGroup"]["name"], "B");
+        assert_eq!(
+            service
+                .grouping
+                .current_group_set(&lobby.id)
+                .expect("current")
+                .expect("set")
+                .revision,
+            2
+        );
+
+        let next = service
+            .grouping
+            .clone_current_to_draft(&lobby.id)
+            .expect("unassigned draft");
+        service
+            .grouping
+            .open_draft(&next.id)
+            .expect("open unassigned");
+        let _ = receive_grouping_sync(&mut socket).await;
+        service
+            .grouping
+            .move_participant(&next.id, &joined.participant_id, None)
+            .expect("unassign");
+        let _ = receive_grouping_sync(&mut socket).await;
+        service
+            .grouping
+            .finalize_draft(&next.id)
+            .expect("finalize unassigned");
+        let _ = receive_grouping_sync(&mut socket).await;
+        socket.close(None).await.expect("refresh unassigned");
+        let (mut socket, unassigned) = authenticate_grouping_socket(port, &joined).await;
+        assert_eq!(unassigned["grouping"]["groupingMode"], "finalized");
+        assert!(unassigned["grouping"]["currentGroup"].is_null());
+        assert_eq!(
+            unassigned["grouping"]["availableGroups"],
+            serde_json::json!([])
+        );
+        socket.close(None).await.expect("close");
+        service.session.end(lobby.id, "teacher_ended").expect("end");
+        service.stop().await.expect("stop");
+    }
+
+    #[tokio::test]
     async fn authenticated_group_selection_syncs_a_safe_projection_and_survives_reconnect() {
         let (service, classroom_id) = test_service_with_roster();
         let status = service
@@ -2383,6 +2569,10 @@ mod tests {
         assert!(receive_text(&mut socket)
             .await
             .contains("participant_authenticated"));
+        assert_eq!(
+            receive_grouping_sync(&mut socket).await["sessionState"],
+            "LOBBY"
+        );
         assert!(teacher_participants(&service, &session.id)[0].online);
 
         milliseconds.store(6_000, Ordering::Relaxed);
@@ -2413,6 +2603,10 @@ mod tests {
         assert!(receive_text(&mut reconnected)
             .await
             .contains("participant_authenticated"));
+        assert_eq!(
+            receive_grouping_sync(&mut reconnected).await["sessionState"],
+            "LOBBY"
+        );
         assert!(teacher_participants(&service, &session.id)[0].online);
 
         reconnected
@@ -2453,6 +2647,10 @@ mod tests {
         socket.send(ClientWebSocketMessage::Text(format!("{{\"protocolVersion\":1,\"type\":\"participant_auth\",\"requestId\":\"auth-1\",\"sessionId\":\"{}\",\"participantId\":\"{}\",\"credential\":\"{}\"}}", joined.session_id, joined.participant_id, joined.credential).into())).await.expect("auth sends");
         let authenticated = receive_text(&mut socket).await;
         assert!(authenticated.contains("participant_authenticated"));
+        assert_eq!(
+            receive_grouping_sync(&mut socket).await["sessionState"],
+            "LOBBY"
+        );
         assert!(service.is_participant_online(&joined.participant_id));
         assert!(teacher_participants(&service, &session.id)[0].online);
 
@@ -2467,6 +2665,10 @@ mod tests {
         assert!(receive_text(&mut reconnected)
             .await
             .contains("participant_authenticated"));
+        assert_eq!(
+            receive_grouping_sync(&mut reconnected).await["sessionState"],
+            "LOBBY"
+        );
         assert!(service.is_participant_online(&joined.participant_id));
 
         service

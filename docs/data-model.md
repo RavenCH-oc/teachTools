@@ -46,6 +46,14 @@ Question 在 TypeScript domain 中使用 discriminated union，而非以一串 t
 ## Submission 與 Grade
 
 Submission 有穩定 submission_id，作為 retry 與 idempotency 的鍵。學生端只送出答案，不可送出 authoritative score 或 correct 值；權威 backend 產生 Grade、score、correct 與統計。重送、取代答案、題目鎖定後的行為及衝突回應，由 SessionBackend contract 定義並由兩種 backend 一致實作。
+
+## Grouping lifecycle
+
+`GroupPreset` 是 Classroom-scoped、以長期 `Student.id` 為 membership 的可重用 creation source。套用至 Session 時，只以 `session_participants.student_id` 作 exact durable mapping，轉成 Session-scoped `participant_id`；不使用姓名、座號或模糊比對，`student_id = NULL` 的 Participant 保持未分組。Preset 後續變更或刪除不會回寫已建立的 Session draft 或 formal snapshot。
+
+`SessionGroupingDraft` 是 Participant-based mutable preparation，狀態固定為 `DRAFT`、`OPEN`、`FINALIZED`、`CANCELLED`。DRAFT 可由 Teacher 編輯 structure/membership；OPEN 鎖定 structure，由 Teacher 與 authenticated Student 共用 atomic move/capacity 規則。`SessionGroupSet` 是 finalize 時建立的 immutable revision snapshot，保存當時 group name、position 與 participant membership；最高 revision 是 current grouping，舊 revision 不會因 roster、preset、presence 或新 revision 而重算。
+
+Late Participant 在既有 GroupSet 中保持未分組，clone current 後進入 editable pool。Session End 或 stale restart recovery 會取消 mutable draft，不會建立空 revision，並保留所有 formal GroupSet。Student delivery 的 OPEN projection 僅包含可選組別、count/capacity 與 presentation-safe Session member labels；FINALIZED projection 僅包含自己的 group 與 members。未來 Peer Review 若需要固定分組，應以 durable `sessionGroupSetId` 引用特定 revision。
 # Phase 9 live quiz tables
 
 `session_questions` stores a validated immutable source snapshot with a nullable traceability link to `questions`. `session_question_assets` owns copied managed media under the application data directory. `submissions` stores immutable answer revisions; its UUID primary key provides idempotency, and `(session_question_id, participant_id, revision)` provides ordered per-student history.

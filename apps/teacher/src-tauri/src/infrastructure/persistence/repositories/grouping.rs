@@ -760,7 +760,9 @@ impl GroupingRepository {
             return Err(AppError::NotFound("grouping draft".to_owned()));
         };
         ensure_session_can_group(&transaction, &session_id)?;
-        if !matches!(state.as_str(), "DRAFT" | "OPEN") {
+        // Recheck under the write lock: OPEN may have committed after the
+        // application's precheck, and bulk replacement would lose live selections.
+        if state != DraftState::Draft.as_str() {
             return Err(AppError::DraftNotOpen);
         }
 
@@ -1778,10 +1780,15 @@ mod tests {
         database: Database,
         classroom_id: String,
         session_id: String,
+        student_ids: Vec<String>,
         participants: Vec<String>,
     }
 
     fn fixture() -> Fixture {
+        fixture_with_roster(4, &[1, 2, 3, 4])
+    }
+
+    fn fixture_with_roster(student_count: i64, participant_seats: &[i64]) -> Fixture {
         let directory = tempdir().expect("temp directory");
         let directory = Arc::new(directory);
         let database = Database::open(directory.path().join("classroom.sqlite3"));
@@ -1793,7 +1800,7 @@ mod tests {
                 academic_year: None,
             })
             .expect("classroom");
-        let student_ids = (1..=4)
+        let student_ids = (1..=student_count)
             .map(|seat| {
                 service
                     .create_student(CreateStudentRequest {
@@ -1817,19 +1824,19 @@ mod tests {
         )
         .expect("session");
         LocalSessionRepository::open_lobby(&database, &session_id, "server").expect("lobby");
-        let participants = student_ids
-            .into_iter()
-            .enumerate()
-            .map(|(index, student_id)| {
+        let participants = participant_seats
+            .iter()
+            .map(|seat| {
+                let student_index = usize::try_from(*seat - 1).expect("student seat index");
                 let participant_id = Uuid::now_v7().to_string();
                 LocalSessionRepository::create_participant(
                     &database,
                     NewParticipant {
                         id: participant_id.clone(),
                         session_id: session_id.clone(),
-                        student_id,
-                        seat_number: index as i64 + 1,
-                        display_name: format!("Student {}", index + 1),
+                        student_id: student_ids[student_index].clone(),
+                        seat_number: *seat,
+                        display_name: format!("Student {seat}"),
                         credential_hash: "hash".to_owned(),
                         server_instance_id: "server".to_owned(),
                     },
@@ -1843,8 +1850,25 @@ mod tests {
             database,
             classroom_id: classroom.id,
             session_id,
+            student_ids,
             participants,
         }
+    }
+
+    fn group_set_signature(group_set: &SessionGroupSet) -> Vec<(String, i64, Vec<String>)> {
+        group_set
+            .groups
+            .iter()
+            .map(|group| {
+                let mut participant_ids = group
+                    .members
+                    .iter()
+                    .map(|member| member.participant_id.clone())
+                    .collect::<Vec<_>>();
+                participant_ids.sort();
+                (group.name.clone(), group.position, participant_ids)
+            })
+            .collect()
     }
 
     fn group(id: &str, name: &str, position: i64, capacity: Option<i64>) -> NewDraftGroup {
@@ -2761,6 +2785,666 @@ mod tests {
                 .sum::<usize>(),
             2
         );
+    }
+
+    #[test]
+    fn preset_open_selection_finalize_survives_preset_and_roster_changes() {
+        let fixture = fixture_with_roster(5, &[1, 3, 5]);
+        let preset = GroupingRepository::create_preset(
+            &fixture.database,
+            &fixture.classroom_id,
+            "Integration preset",
+            &[
+                NewPresetGroup {
+                    id: "preset-integration-a".to_owned(),
+                    name: "A".to_owned(),
+                    position: 0,
+                },
+                NewPresetGroup {
+                    id: "preset-integration-b".to_owned(),
+                    name: "B".to_owned(),
+                    position: 1,
+                },
+            ],
+        )
+        .expect("preset");
+        GroupingRepository::replace_preset_members(
+            &fixture.database,
+            &preset.id,
+            &[
+                (
+                    "preset-integration-a".to_owned(),
+                    fixture.student_ids[0].clone(),
+                ),
+                (
+                    "preset-integration-a".to_owned(),
+                    fixture.student_ids[1].clone(),
+                ),
+                (
+                    "preset-integration-b".to_owned(),
+                    fixture.student_ids[2].clone(),
+                ),
+                (
+                    "preset-integration-b".to_owned(),
+                    fixture.student_ids[3].clone(),
+                ),
+            ],
+        )
+        .expect("preset members");
+
+        let draft = GroupingRepository::create_draft_from_preset(
+            &fixture.database,
+            &fixture.session_id,
+            &preset.id,
+            "preset-integration-draft",
+        )
+        .expect("draft from preset");
+        let group_a = draft
+            .groups
+            .iter()
+            .find(|group| group.name == "A")
+            .expect("group A");
+        let group_b = draft
+            .groups
+            .iter()
+            .find(|group| group.name == "B")
+            .expect("group B");
+        assert_eq!(group_a.members.len(), 1);
+        assert_eq!(group_a.members[0].participant_id, fixture.participants[0]);
+        assert_eq!(group_b.members.len(), 1);
+        assert_eq!(group_b.members[0].participant_id, fixture.participants[1]);
+        assert!(draft.groups.iter().all(|group| group
+            .members
+            .iter()
+            .all(|member| member.participant_id != fixture.participants[2])));
+
+        GroupingRepository::update_preset(
+            &fixture.database,
+            &fixture.classroom_id,
+            &preset.id,
+            "Mutated preset",
+            &[
+                UpdatePresetGroup {
+                    key: "preset-integration-b".to_owned(),
+                    id: Some("preset-integration-b".to_owned()),
+                    name: "Changed".to_owned(),
+                    position: 0,
+                },
+                UpdatePresetGroup {
+                    key: "preset-integration-a".to_owned(),
+                    id: Some("preset-integration-a".to_owned()),
+                    name: "Also changed".to_owned(),
+                    position: 1,
+                },
+            ],
+            &[(
+                "preset-integration-b".to_owned(),
+                fixture.student_ids[4].clone(),
+            )],
+        )
+        .expect("mutate preset");
+        let independent_draft = GroupingRepository::get_draft(&fixture.database, &draft.id)
+            .expect("read independent draft")
+            .expect("draft remains");
+        assert_eq!(
+            independent_draft
+                .groups
+                .iter()
+                .map(|group| group.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["A", "B"]
+        );
+
+        GroupingRepository::open_draft(&fixture.database, &draft.id).expect("open draft");
+        GroupingRepository::move_draft_member(
+            &fixture.database,
+            &draft.id,
+            &fixture.participants[2],
+            Some(&group_b.id),
+        )
+        .expect("self selection");
+        let revision = GroupingRepository::finalize_draft(&fixture.database, &draft.id)
+            .expect("finalize revision");
+        assert_eq!(revision.revision, 1);
+        assert_eq!(
+            revision
+                .groups
+                .iter()
+                .find(|group| group.name == "A")
+                .expect("revision A")
+                .members
+                .iter()
+                .map(|member| member.participant_id.as_str())
+                .collect::<Vec<_>>(),
+            vec![fixture.participants[0].as_str()]
+        );
+        let mut revision_b = revision
+            .groups
+            .iter()
+            .find(|group| group.name == "B")
+            .expect("revision B")
+            .members
+            .iter()
+            .map(|member| member.participant_id.clone())
+            .collect::<Vec<_>>();
+        revision_b.sort();
+        let mut expected_b = vec![
+            fixture.participants[1].clone(),
+            fixture.participants[2].clone(),
+        ];
+        expected_b.sort();
+        assert_eq!(revision_b, expected_b);
+
+        GroupingRepository::delete_preset_for_classroom(
+            &fixture.database,
+            &fixture.classroom_id,
+            &preset.id,
+        )
+        .expect("delete source preset");
+        let grouping_service =
+            crate::application::grouping::GroupingService::initialize(fixture.database.clone());
+        let delivered = grouping_service
+            .student_grouping_view(&fixture.participants[2], &fixture.session_id)
+            .expect("student delivery");
+        assert_eq!(delivered.grouping_mode, "finalized");
+        assert_eq!(delivered.current_group.expect("own group").name, "B");
+        assert!(delivered.available_groups.is_empty());
+
+        crate::infrastructure::persistence::repositories::StudentRepository::delete(
+            &fixture.database,
+            &fixture.student_ids[0],
+        )
+        .expect("delete roster student");
+        let participant =
+            LocalSessionRepository::get_participant(&fixture.database, &fixture.participants[0])
+                .expect("participant read")
+                .expect("historical participant remains");
+        assert!(participant.student_id.is_none());
+        assert_eq!(
+            group_set_signature(
+                &GroupingRepository::get_current_group_set(&fixture.database, &fixture.session_id,)
+                    .expect("current read")
+                    .expect("current remains"),
+            ),
+            group_set_signature(&revision)
+        );
+    }
+
+    #[test]
+    fn random_late_join_and_three_revisions_remain_independent() {
+        let fixture = fixture_with_roster(6, &[1, 2, 3, 4, 5, 6]);
+        let random = GroupingRepository::create_random_draft(
+            &fixture.database,
+            &fixture.session_id,
+            "random-integration-draft",
+            2,
+        )
+        .expect("random draft");
+        let mut sizes = random
+            .groups
+            .iter()
+            .map(|group| group.members.len())
+            .collect::<Vec<_>>();
+        sizes.sort();
+        assert_eq!(sizes, vec![3, 3]);
+        let moving_participant = random.groups[0].members[0].participant_id.clone();
+        let target_group = random.groups[1].id.clone();
+        GroupingRepository::open_draft(&fixture.database, &random.id).expect("open random");
+        let final_open = GroupingRepository::move_draft_member(
+            &fixture.database,
+            &random.id,
+            &moving_participant,
+            Some(&target_group),
+        )
+        .expect("student move");
+        let revision_one = GroupingRepository::finalize_draft(&fixture.database, &random.id)
+            .expect("revision one");
+        assert_eq!(
+            group_set_signature(&revision_one),
+            final_open
+                .groups
+                .iter()
+                .map(|group| {
+                    let mut members = group
+                        .members
+                        .iter()
+                        .map(|member| member.participant_id.clone())
+                        .collect::<Vec<_>>();
+                    members.sort();
+                    (group.name.clone(), group.position, members)
+                })
+                .collect::<Vec<_>>()
+        );
+        let revision_one_signature = group_set_signature(&revision_one);
+
+        let service = PersistenceService::initialize(
+            fixture.database.path().parent().expect("database parent"),
+        )
+        .expect("persistence service");
+        let late_student = service
+            .create_student(CreateStudentRequest {
+                class_id: fixture.classroom_id.clone(),
+                seat_number: 7,
+                name: "Late student".to_owned(),
+            })
+            .expect("late student");
+        let late_participant = Uuid::now_v7().to_string();
+        LocalSessionRepository::create_participant(
+            &fixture.database,
+            NewParticipant {
+                id: late_participant.clone(),
+                session_id: fixture.session_id.clone(),
+                student_id: late_student.id,
+                seat_number: 7,
+                display_name: "Late student".to_owned(),
+                credential_hash: "late-hash".to_owned(),
+                server_instance_id: "server".to_owned(),
+            },
+        )
+        .expect("late participant");
+        let late_view =
+            crate::application::grouping::GroupingService::initialize(fixture.database.clone())
+                .student_grouping_view(&late_participant, &fixture.session_id)
+                .expect("late participant finalized projection");
+        assert_eq!(late_view.grouping_mode, "finalized");
+        assert!(late_view.current_group.is_none());
+        assert!(late_view.available_groups.is_empty());
+        assert!(!late_view.selection_open);
+        assert_eq!(
+            group_set_signature(
+                &GroupingRepository::get_group_set_revision(
+                    &fixture.database,
+                    &fixture.session_id,
+                    1,
+                )
+                .expect("revision one read")
+                .expect("revision one remains"),
+            ),
+            revision_one_signature
+        );
+        assert!(GroupingRepository::list_unassigned_participants(
+            &fixture.database,
+            &fixture.session_id,
+            Some(&revision_one.id),
+        )
+        .expect("revision one unassigned")
+        .iter()
+        .any(|participant| participant.id == late_participant));
+
+        let revision_two_draft = GroupingRepository::clone_current_to_draft(
+            &fixture.database,
+            &fixture.session_id,
+            "revision-two-draft",
+        )
+        .expect("clone revision one");
+        assert!(revision_two_draft.groups.iter().all(|group| group
+            .members
+            .iter()
+            .all(|member| member.participant_id != late_participant)));
+        let late_target = revision_two_draft.groups[0].id.clone();
+        GroupingRepository::open_draft(&fixture.database, &revision_two_draft.id)
+            .expect("open revision two draft");
+        GroupingRepository::move_draft_member(
+            &fixture.database,
+            &revision_two_draft.id,
+            &late_participant,
+            Some(&late_target),
+        )
+        .expect("late participant selects");
+        let revision_two =
+            GroupingRepository::finalize_draft(&fixture.database, &revision_two_draft.id)
+                .expect("revision two");
+        assert_eq!(revision_two.revision, 2);
+        assert!(revision_two.groups.iter().any(|group| group
+            .members
+            .iter()
+            .any(|member| member.participant_id == late_participant)));
+        let revision_two_signature = group_set_signature(&revision_two);
+
+        let revision_three_draft = GroupingRepository::clone_current_to_draft(
+            &fixture.database,
+            &fixture.session_id,
+            "revision-three-draft",
+        )
+        .expect("clone revision two");
+        let updated_groups = revision_three_draft
+            .groups
+            .iter()
+            .enumerate()
+            .map(|(index, group)| UpdateDraftGroup {
+                key: group.id.clone(),
+                id: Some(group.id.clone()),
+                name: format!("Revision 3 group {}", index + 1),
+                position: group.position,
+                capacity: None,
+            })
+            .collect::<Vec<_>>();
+        let assignments = revision_three_draft
+            .groups
+            .iter()
+            .flat_map(|group| {
+                group
+                    .members
+                    .iter()
+                    .map(|member| (group.id.clone(), member.participant_id.clone()))
+            })
+            .collect::<Vec<_>>();
+        GroupingRepository::update_draft(
+            &fixture.database,
+            &revision_three_draft.id,
+            &updated_groups,
+            &assignments,
+        )
+        .expect("update revision three draft");
+        let revision_three =
+            GroupingRepository::finalize_draft(&fixture.database, &revision_three_draft.id)
+                .expect("revision three");
+        assert_eq!(revision_three.revision, 3);
+        assert!(revision_three
+            .groups
+            .iter()
+            .all(|group| group.name.starts_with("Revision 3 group")));
+        let revisions =
+            GroupingRepository::list_group_set_revisions(&fixture.database, &fixture.session_id)
+                .expect("revision history");
+        assert_eq!(
+            revisions
+                .iter()
+                .map(|revision| revision.revision)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(group_set_signature(&revisions[0]), revision_one_signature);
+        assert_eq!(group_set_signature(&revisions[1]), revision_two_signature);
+
+        let recovery_draft = GroupingRepository::clone_current_to_draft(
+            &fixture.database,
+            &fixture.session_id,
+            "recovery-draft",
+        )
+        .expect("recovery draft");
+        GroupingRepository::open_draft(&fixture.database, &recovery_draft.id)
+            .expect("open recovery draft");
+        LocalSessionRepository::end_stale_sessions(&fixture.database).expect("stale recovery");
+        assert!(matches!(
+            GroupingRepository::get_draft(&fixture.database, &recovery_draft.id)
+                .expect("recovery draft read")
+                .expect("recovery draft remains")
+                .state,
+            DraftState::Cancelled
+        ));
+        assert_eq!(
+            GroupingRepository::get_current_group_set(&fixture.database, &fixture.session_id)
+                .expect("current after recovery")
+                .expect("formal group set retained")
+                .revision,
+            3
+        );
+    }
+
+    #[test]
+    fn manual_selection_override_race_and_session_end_preserve_invariants() {
+        let fixture = fixture_with_roster(6, &[1, 2, 3, 4, 5, 6]);
+        let draft = GroupingRepository::create_draft(
+            &fixture.database,
+            &fixture.session_id,
+            "manual-integration-draft",
+            &[],
+        )
+        .expect("manual draft");
+        let grouping_service =
+            crate::application::grouping::GroupingService::initialize(fixture.database.clone());
+        assert_eq!(
+            grouping_service
+                .student_grouping_view(&fixture.participants[0], &fixture.session_id)
+                .expect("draft student projection")
+                .grouping_mode,
+            "none"
+        );
+        let groups = [
+            UpdateDraftGroup {
+                key: "manual-a".to_owned(),
+                id: None,
+                name: "A".to_owned(),
+                position: 0,
+                capacity: Some(4),
+            },
+            UpdateDraftGroup {
+                key: "manual-b".to_owned(),
+                id: None,
+                name: "B".to_owned(),
+                position: 1,
+                capacity: Some(4),
+            },
+        ];
+        let saved = GroupingRepository::update_draft(
+            &fixture.database,
+            &draft.id,
+            &groups,
+            &[
+                ("manual-a".to_owned(), fixture.participants[0].clone()),
+                ("manual-b".to_owned(), fixture.participants[1].clone()),
+            ],
+        )
+        .expect("teacher assignments");
+        let group_a = saved.groups[0].id.clone();
+        let group_b = saved.groups[1].id.clone();
+        GroupingRepository::open_draft(&fixture.database, &draft.id).expect("open manual");
+        let open_view = grouping_service
+            .student_grouping_view(&fixture.participants[2], &fixture.session_id)
+            .expect("open student projection");
+        assert_eq!(open_view.grouping_mode, "self_selection");
+        assert!(open_view.selection_open);
+        assert_eq!(open_view.available_groups.len(), 2);
+        let serialized_open_view =
+            serde_json::to_string(&open_view).expect("serialize safe open projection");
+        assert!(serialized_open_view.len() < 8 * 1024);
+        assert!(fixture
+            .participants
+            .iter()
+            .all(|participant_id| !serialized_open_view.contains(participant_id)));
+        assert!(!serialized_open_view.contains("credential"));
+        assert!(!serialized_open_view.contains("studentId"));
+        assert!(!serialized_open_view.contains("connectionId"));
+        grouping_service
+            .select_group(
+                &draft.id,
+                &fixture.participants[2],
+                &fixture.session_id,
+                Some(&group_a),
+            )
+            .expect("participant three selects");
+        grouping_service
+            .select_group(
+                &draft.id,
+                &fixture.participants[3],
+                &fixture.session_id,
+                Some(&group_b),
+            )
+            .expect("participant four selects");
+        grouping_service
+            .select_group(
+                &draft.id,
+                &fixture.participants[4],
+                &fixture.session_id,
+                Some(&group_b),
+            )
+            .expect("participant five selects");
+
+        let database = fixture.database.clone();
+        let draft_id = draft.id.clone();
+        let participant_id = fixture.participants[0].clone();
+        let student_move = thread::spawn({
+            let database = database.clone();
+            let draft_id = draft_id.clone();
+            let participant_id = participant_id.clone();
+            let group_b = group_b.clone();
+            move || {
+                GroupingRepository::move_draft_member(
+                    &database,
+                    &draft_id,
+                    &participant_id,
+                    Some(&group_b),
+                )
+            }
+        });
+        let teacher_move = thread::spawn(move || {
+            GroupingRepository::move_draft_member(
+                &database,
+                &draft_id,
+                &participant_id,
+                Some(&group_a),
+            )
+        });
+        student_move
+            .join()
+            .expect("student move thread")
+            .expect("student move");
+        teacher_move
+            .join()
+            .expect("teacher move thread")
+            .expect("teacher move");
+        let raced = GroupingRepository::get_draft(&fixture.database, &draft.id)
+            .expect("race draft read")
+            .expect("race draft");
+        assert_eq!(
+            raced
+                .groups
+                .iter()
+                .flat_map(|group| &group.members)
+                .filter(|member| member.participant_id == fixture.participants[0])
+                .count(),
+            1
+        );
+
+        let finalized = GroupingRepository::finalize_draft(&fixture.database, &draft.id)
+            .expect("manual finalization");
+        assert_eq!(finalized.revision, 1);
+        assert_eq!(
+            finalized
+                .groups
+                .iter()
+                .flat_map(|group| &group.members)
+                .count(),
+            5
+        );
+        assert!(GroupingRepository::list_unassigned_participants(
+            &fixture.database,
+            &fixture.session_id,
+            Some(&finalized.id),
+        )
+        .expect("formal unassigned")
+        .iter()
+        .any(|participant| participant.id == fixture.participants[5]));
+        let finalized_view = grouping_service
+            .student_grouping_view(&fixture.participants[0], &fixture.session_id)
+            .expect("finalized student projection");
+        assert_eq!(finalized_view.grouping_mode, "finalized");
+        assert!(!finalized_view.selection_open);
+        assert!(finalized_view.available_groups.is_empty());
+
+        let pending_revision = GroupingRepository::clone_current_to_draft(
+            &fixture.database,
+            &fixture.session_id,
+            "pending-revision-draft",
+        )
+        .expect("pending revision");
+        GroupingRepository::open_draft(&fixture.database, &pending_revision.id)
+            .expect("open pending revision");
+        LocalSessionRepository::end(&fixture.database, &fixture.session_id, "teacher_ended")
+            .expect("end session");
+        assert!(matches!(
+            GroupingRepository::get_draft(&fixture.database, &pending_revision.id)
+                .expect("pending draft read")
+                .expect("pending draft retained")
+                .state,
+            DraftState::Cancelled
+        ));
+        assert_eq!(
+            GroupingRepository::list_group_set_revisions(&fixture.database, &fixture.session_id)
+                .expect("formal revisions")
+                .len(),
+            1
+        );
+        let ended_overview = grouping_service
+            .session_grouping_overview(&fixture.session_id)
+            .expect("ended overview");
+        assert_eq!(ended_overview.session_state, "ENDED");
+        assert!(ended_overview.active_draft.is_none());
+        assert_eq!(
+            ended_overview
+                .current_group_set
+                .expect("formal set retained")
+                .revision,
+            1
+        );
+
+        let no_set = fixture_with_roster(2, &[1, 2]);
+        let open_only = GroupingRepository::create_draft(
+            &no_set.database,
+            &no_set.session_id,
+            "open-only-draft",
+            &[group("open-only-a", "A", 0, None)],
+        )
+        .expect("open-only draft");
+        GroupingRepository::open_draft(&no_set.database, &open_only.id).expect("open-only open");
+        LocalSessionRepository::end(&no_set.database, &no_set.session_id, "teacher_ended")
+            .expect("end without formal set");
+        assert!(
+            GroupingRepository::get_current_group_set(&no_set.database, &no_set.session_id)
+                .expect("no formal set read")
+                .is_none()
+        );
+        assert!(matches!(
+            GroupingRepository::get_draft(&no_set.database, &open_only.id)
+                .expect("open-only read")
+                .expect("open-only retained")
+                .state,
+            DraftState::Cancelled
+        ));
+    }
+
+    #[test]
+    fn stale_bulk_save_cannot_overwrite_selection_after_draft_opens() {
+        let fixture = fixture();
+        let draft = GroupingRepository::create_draft(
+            &fixture.database,
+            &fixture.session_id,
+            "stale-save-draft",
+            &[
+                group("stale-a", "A", 0, Some(2)),
+                group("stale-b", "B", 1, Some(2)),
+            ],
+        )
+        .expect("draft");
+        // The application precheck read DRAFT; OPEN and a Student move then commit
+        // before the stale bulk save reaches its own transaction.
+        assert!(matches!(draft.state, DraftState::Draft));
+        GroupingRepository::open_draft(&fixture.database, &draft.id).expect("open");
+        let selected = GroupingRepository::move_draft_member(
+            &fixture.database,
+            &draft.id,
+            &fixture.participants[0],
+            Some("stale-a"),
+        )
+        .expect("student selection");
+        let stale_save = GroupingRepository::update_draft(
+            &fixture.database,
+            &draft.id,
+            &[UpdateDraftGroup {
+                key: "stale-b".to_owned(),
+                id: Some("stale-b".to_owned()),
+                name: "Stale renamed B".to_owned(),
+                position: 0,
+                capacity: Some(1),
+            }],
+            &[],
+        );
+        assert!(matches!(stale_save, Err(AppError::DraftNotOpen)));
+        let after = GroupingRepository::get_draft(&fixture.database, &draft.id)
+            .expect("read after rejection")
+            .expect("draft remains");
+        assert_eq!(after, selected);
     }
 
     #[test]
