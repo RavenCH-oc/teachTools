@@ -3,6 +3,8 @@ use crate::infrastructure::persistence::database::Database;
 use crate::peer_review_domain::*;
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 type Result<T> = std::result::Result<T, PeerReviewError>;
+#[path = "peer_review_setup.rs"]
+pub(crate) mod setup;
 
 pub(crate) struct PeerReviewRepository;
 
@@ -67,9 +69,24 @@ impl PeerReviewRepository {
     }
 
     pub fn open(database: &Database, id: &str) -> Result<PeerReviewActivity> {
+        Self::open_with_policy(database, id, false)
+    }
+
+    pub(crate) fn open_for_teacher(database: &Database, id: &str) -> Result<PeerReviewActivity> {
+        Self::open_with_policy(database, id, true)
+    }
+
+    fn open_with_policy(
+        database: &Database,
+        id: &str,
+        teacher_policy: bool,
+    ) -> Result<PeerReviewActivity> {
         let mut c = database.connection()?;
         let tx = c.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let a = activity(&tx, id)?;
+        if teacher_policy && tx.prepare("SELECT 1 FROM peer_review_activities WHERE session_id=?1 AND session_question_id=?2 AND id<>?3 AND state IN ('DRAFT','OPEN')")?.exists(params![a.session_id,a.session_question_id,id])? {
+            return Err(PeerReviewError::PeerReviewAlreadyOpen);
+        }
         match a.state {
             PeerReviewActivityState::Draft => {}
             PeerReviewActivityState::Open => return Err(PeerReviewError::PeerReviewAlreadyOpen),

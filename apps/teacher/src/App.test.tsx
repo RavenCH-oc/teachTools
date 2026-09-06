@@ -2,6 +2,32 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { LocalSession, QuestionSet, TeacherApi } from "./types/teacher";
+import { draftFixture, reviewApiFixture, setupFixture } from "./features/peer-review/testFixtures";
+
+it("opens Teacher peer review from Live Quiz and protects dirty navigation then rehydrates saved drafts", async()=>{
+  const session:LocalSession={id:"session",classroomId:"class",classroomName:"測試班級",serverInstanceId:"server",state:"ACTIVE",joinMode:"roster_match",joinCode:"ABCDEFGH",createdAt:"now",lobbyOpenedAt:null,endedAt:null,endedReason:null};
+  const api=mockApi({getActiveLocalSession:vi.fn().mockResolvedValue(session),getLocalServerStatus:vi.fn().mockResolvedValue({running:true,serverInstanceId:"server",lifecycleState:"running",candidateUrls:[],webSocketUrls:[]}),listSessionQuestions:vi.fn().mockResolvedValue([])});
+  const context=setupFixture();context.activities=[draftFixture()];const reviewApi=reviewApiFixture(context);
+  const confirm=vi.spyOn(window,"confirm").mockReturnValue(false);
+  try {
+    render(<App api={api} reviewApi={reviewApi}/>);
+    await screen.findByText("本機儲存空間已就緒");
+    fireEvent.click(screen.getByRole("button",{name:"即時測驗"}));
+    fireEvent.click(await screen.findByRole("button",{name:"同儕互評"}));
+    await screen.findByLabelText("互評方式");
+    fireEvent.change(screen.getByLabelText("互評方式"),{target:{value:"STUDENT_SELECT"}});
+    fireEvent.click(screen.getByRole("button",{name:"返回即時測驗"}));
+    expect(screen.getByLabelText("互評方式")).toHaveValue("STUDENT_SELECT");
+    fireEvent.click(screen.getByRole("button",{name:"首頁"}));expect(confirm).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button",{name:"儲存設定"}));
+    await waitFor(()=>expect(screen.queryByText("尚有未儲存的變更")).not.toBeInTheDocument());
+    await waitFor(()=>expect(screen.getByRole("button",{name:"返回即時測驗"})).toBeEnabled());
+    fireEvent.click(screen.getByRole("button",{name:"返回即時測驗"}));
+    fireEvent.click(await screen.findByRole("button",{name:"同儕互評"}));
+    expect(await screen.findByLabelText("互評方式")).toHaveValue("STUDENT_SELECT");
+    expect(reviewApi.getPeerReviewSetupContext).toHaveBeenCalledTimes(3);expect(confirm).toHaveBeenCalledTimes(2);
+  } finally {confirm.mockRestore();}
+});
 
 const mockApi = (overrides: Partial<TeacherApi> = {}): TeacherApi => ({
   getLocalDatabaseStatus: vi.fn().mockResolvedValue({ database_open: true, schema_version: 1, path_classification: "app_data" }),

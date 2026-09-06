@@ -5,6 +5,8 @@ use crate::infrastructure::persistence::repositories::{
     local_session::LocalSessionRepository,
 };
 use std::sync::{Arc, Barrier};
+#[path = "peer_review_setup_tests.rs"]
+mod teacher_setup_tests;
 
 #[test]
 fn ownership_slots_and_response_constraints_reject_invalid_records() {

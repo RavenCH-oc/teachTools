@@ -14,6 +14,7 @@ mod live_quiz;
 mod local_server;
 mod local_session;
 pub mod peer_review;
+pub(crate) mod peer_review_setup;
 mod questions;
 mod statistics;
 mod student_assets;
