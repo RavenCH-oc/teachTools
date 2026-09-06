@@ -215,6 +215,7 @@ impl LocalSessionRepository {
             "UPDATE session_grouping_drafts SET state='CANCELLED',updated_at=?1 WHERE session_id=?2 AND state IN ('DRAFT','OPEN')",
             params![now, id],
         )?;
+        finish_peer_review_activities(&transaction, id, &now)?;
         transaction.commit()?;
         Self::get_by_id(database, id)?.ok_or(AppError::Storage)
     }
@@ -256,6 +257,7 @@ impl LocalSessionRepository {
                 "UPDATE session_grouping_drafts SET state='CANCELLED',updated_at=?1 WHERE session_id=?2 AND state IN ('DRAFT','OPEN')",
                 params![now, session_id],
             )?;
+            finish_peer_review_activities(&transaction, &session_id, &now)?;
         }
         transaction.commit()?;
         Ok(())
@@ -341,6 +343,18 @@ impl LocalSessionRepository {
         )?;
         Ok(())
     }
+}
+
+fn finish_peer_review_activities(
+    transaction: &rusqlite::Transaction<'_>,
+    session_id: &str,
+    now: &str,
+) -> Result<(), AppError> {
+    transaction.execute(
+        "UPDATE peer_review_activities SET state=CASE state WHEN 'DRAFT' THEN 'CANCELLED' ELSE 'CLOSED' END,closed_at=?1 WHERE session_id=?2 AND state IN ('DRAFT','OPEN')",
+        params![now,session_id],
+    )?;
+    Ok(())
 }
 
 fn session_select(clause: &str) -> String {

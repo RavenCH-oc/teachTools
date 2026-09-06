@@ -4,6 +4,7 @@ pub(crate) mod grouping;
 mod lesson;
 pub(crate) mod live_quiz;
 pub(crate) mod local_session;
+pub(crate) mod peer_review;
 pub(crate) mod question;
 pub(crate) mod question_asset;
 pub(crate) mod question_set;

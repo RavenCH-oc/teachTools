@@ -13,6 +13,7 @@ pub(crate) mod grouping;
 mod live_quiz;
 mod local_server;
 mod local_session;
+pub mod peer_review;
 mod questions;
 mod statistics;
 mod student_assets;

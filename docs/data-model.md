@@ -22,7 +22,8 @@
 | SessionGroupingDraft | Session 範圍、可變更的 Participant 分組準備資料 |
 | SessionGroupSet / SessionGroup / SessionGroupMember | immutable、可保留多 revision 的 Participant 分組 snapshot |
 | Group / GroupMember | session runtime 分組 projection |
-| PeerReviewAssignment / PeerReview | 同儕互評的指派及送出結果 |
+| PeerReviewActivity / PeerReviewTarget / PeerReviewGroupTarget | Session essay 互評活動、固定 Submission revision 與分組 essay bundle |
+| PeerReviewAssignment / PeerReviewResponse | 個人或分組 shared assignment，以及 immutable feedback revisions（不評分） |
 | Rubric / RubricCriterion | 可重用評分規準 |
 
 ## Student 與 Participant
@@ -59,3 +60,7 @@ Late Participant 在既有 GroupSet 中保持未分組，clone current 後進入
 `session_questions` stores a validated immutable source snapshot with a nullable traceability link to `questions`. `session_question_assets` owns copied managed media under the application data directory. `submissions` stores immutable answer revisions; its UUID primary key provides idempotency, and `(session_question_id, participant_id, revision)` provides ordered per-student history.
 
 The database enforces a single active local session and a single `OPEN`/`LOCKED` session question through partial unique indexes. Correct answer and grading snapshot columns are teacher/backend-only and are never projected into Student public views.
+
+## Phase 12A peer review tables
+
+Migration `0006_peer_review_foundation` adds six peer review tables without modifying migrations 0001–0005. Activities capture immutable essay submission IDs at OPEN and optionally pin a SessionGroupSet revision. Claims consume capacity atomically; feedback appends revisions using an expected base and UUIDv7 idempotency key. Closing/ending preserves history. Feedback does not change grades or Phase 10 statistics. See [Peer Review Foundation](peer-review.md) for lifecycle, ownership, concurrency, internal API and future transport boundaries.

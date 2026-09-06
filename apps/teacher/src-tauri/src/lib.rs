@@ -2,7 +2,9 @@ mod application;
 mod error;
 mod grading;
 mod infrastructure;
+pub mod peer_review_domain;
 mod question_domain;
+pub use application::peer_review;
 
 use application::grouping::{
     CreateGroupPresetRequest, CreateManualGroupingDraftRequest, CreateRandomGroupingDraftRequest,

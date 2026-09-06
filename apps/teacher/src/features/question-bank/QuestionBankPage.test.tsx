@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Question, QuestionSet } from "@classtools/domain";
 import type { TeacherApi } from "../../types/teacher";
@@ -20,11 +20,20 @@ function mockApi(overrides: Partial<TeacherApi> = {}): TeacherApi {
   };
 }
 
+async function renderHydratedBank(api: TeacherApi, onError = vi.fn()) {
+  // Flush both set hydration and its dependent question-loading effect. The
+  // new-question button can appear between them, so its first appearance alone
+  // does not establish that the selected set's questions have finished loading.
+  await act(async () => {
+    render(<QuestionBankPage api={api} onError={onError} />);
+  });
+}
+
 describe("Question Bank feature", () => {
   it("renders the selected set, question, public preview, and teacher answer summary", async () => {
-    render(<QuestionBankPage api={mockApi()} onError={vi.fn()} />);
+    await renderHydratedBank(mockApi());
     await waitFor(() => expect(screen.getByRole("heading", { name: "建立與管理題組" })).toBeInTheDocument());
-    expect(screen.getByText("Fractions")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "題組" })).getByText("Fractions")).toBeInTheDocument();
     const preview = await waitFor(() => screen.getByRole("region", { name: "教師預覽" }));
     expect(within(preview).getByRole("heading", { name: "2 + 2 = 4?" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "正確答案摘要" })).toHaveTextContent("正確");
@@ -33,20 +42,28 @@ describe("Question Bank feature", () => {
 
   it("rejects an empty new question through shared validation", async () => {
     const onError = vi.fn();
-    render(<QuestionBankPage api={mockApi({ listQuestions: vi.fn().mockResolvedValue([]) })} onError={onError} />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "＋ 新增題目" })).toBeInTheDocument());
-    screen.getByRole("button", { name: "＋ 新增題目" }).click();
-    await waitFor(() => expect(screen.getByRole("button", { name: "建立題目" })).toBeInTheDocument());
-    screen.getByRole("button", { name: "建立題目" }).click();
+    let resolveQuestions!: (questions: Question[]) => void;
+    const pendingQuestions = new Promise<Question[]>((resolve) => { resolveQuestions = resolve; });
+    const listQuestions = vi.fn().mockReturnValue(pendingQuestions);
+    await renderHydratedBank(mockApi({ listQuestions }), onError);
+    expect(listQuestions).toHaveBeenCalledWith("set-1");
+    expect(screen.getByText("正在載入題目…")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "＋ 新增題目" })).not.toBeInTheDocument();
+
+    await act(async () => { resolveQuestions([]); });
+    expect(screen.queryByText("正在載入題目…")).not.toBeInTheDocument();
+    expect(screen.getByText("尚無題目。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "＋ 新增題目" }));
+    fireEvent.click(await screen.findByRole("button", { name: "建立題目" }));
     await waitFor(() => expect(onError).toHaveBeenCalledWith("請輸入題目內容。"));
   });
 
   it("uses the typed reorder API for move controls", async () => {
     const second: Question = { ...trueFalse, id: "q-2", prompt: "Second", position: 1 };
     const reorderQuestions = vi.fn().mockResolvedValue([second, trueFalse]);
-    render(<QuestionBankPage api={mockApi({ listQuestions: vi.fn().mockResolvedValue([trueFalse, second]), reorderQuestions })} onError={vi.fn()} />);
+    await renderHydratedBank(mockApi({ listQuestions: vi.fn().mockResolvedValue([trueFalse, second]), reorderQuestions }));
     await waitFor(() => expect(screen.getByText("Second")).toBeInTheDocument());
-    screen.getByRole("button", { name: "將第 2 題上移" }).click();
+    fireEvent.click(screen.getByRole("button", { name: "將第 2 題上移" }));
     await waitFor(() => expect(reorderQuestions).toHaveBeenCalledWith("set-1", ["q-2", "q-1"]));
   });
 
@@ -54,9 +71,9 @@ describe("Question Bank feature", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const onError = vi.fn();
     const deleteQuestionSet = vi.fn().mockRejectedValue({ code: "conflict" });
-    render(<QuestionBankPage api={mockApi({ deleteQuestionSet })} onError={onError} />);
+    await renderHydratedBank(mockApi({ deleteQuestionSet }), onError);
     await waitFor(() => expect(screen.getByRole("button", { name: "刪除" })).toBeInTheDocument());
-    screen.getByRole("button", { name: "刪除" }).click();
+    fireEvent.click(screen.getByRole("button", { name: "刪除" }));
     await waitFor(() => expect(onError).toHaveBeenCalledWith("此題組仍包含題目，請先刪除題目。"));
   });
 
@@ -64,7 +81,7 @@ describe("Question Bank feature", () => {
     const created: Question = { ...trueFalse, id: "q-created", prompt: "新題目", position: 0 };
     const createQuestionWithDraftAssets = vi.fn().mockResolvedValue(created);
     const listQuestionAssets = vi.fn().mockResolvedValue([]);
-    render(<QuestionBankPage api={mockApi({ listQuestions: vi.fn().mockResolvedValue([]), createQuestionWithDraftAssets, listQuestionAssets })} onError={vi.fn()} />);
+    await renderHydratedBank(mockApi({ listQuestions: vi.fn().mockResolvedValue([]), createQuestionWithDraftAssets, listQuestionAssets }));
 
     await screen.findByRole("button", { name: "＋ 新增題目" });
     fireEvent.click(screen.getByRole("button", { name: "＋ 新增題目" }));
@@ -81,7 +98,7 @@ describe("Question Bank feature", () => {
 
   it("requires the teacher to create or cancel a draft before switching Questions", async () => {
     const onError = vi.fn();
-    render(<QuestionBankPage api={mockApi()} onError={onError} />);
+    await renderHydratedBank(mockApi(), onError);
     await screen.findByRole("button", { name: "＋ 新增題目" });
     fireEvent.click(screen.getByRole("button", { name: "＋ 新增題目" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "加入圖片" })).toBeEnabled());
