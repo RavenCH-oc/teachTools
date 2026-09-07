@@ -5,8 +5,90 @@ use crate::infrastructure::persistence::repositories::{
     local_session::LocalSessionRepository,
 };
 use std::sync::{Arc, Barrier};
+#[path = "peer_review_student_tests.rs"]
+mod student_tests;
 #[path = "peer_review_setup_tests.rs"]
 mod teacher_setup_tests;
+
+#[test]
+fn client_uuid_versions_and_lost_ack_replay_after_close() {
+    for id in ["c51a6f25-69d6-4e48-907a-12cce665913d".to_owned(), new_id()] {
+        let f = Fixture::new(2);
+        f.ready();
+        let a = f.draft(PeerReviewMode::StudentSelect, Some(3), None);
+        f.service.open_activity(&a.id).expect("open");
+        let assigned = f
+            .service
+            .claim_target(&a.id, &f.participants[0], &f.target(&a.id, 1).id)
+            .expect("claim");
+        for invalid in [
+            "not-a-uuid",
+            "00000000-0000-0000-0000-000000000000",
+            "c51a6f25-69d6-1e48-907a-12cce665913d",
+            "c51a6f25-69d6-4e48-007a-12cce665913d",
+        ] {
+            let mut request = f.request(&assigned.id, 0, 0, "Feedback");
+            request.review_submission_id = invalid.into();
+            assert_eq!(
+                f.service.submit_review_revision(request),
+                Err(PeerReviewError::InvalidInput)
+            );
+        }
+        let mut request = f.request(&assigned.id, 0, 0, "Feedback");
+        request.review_submission_id = id;
+        let accepted = f
+            .service
+            .submit_review_revision(request.clone())
+            .expect("accepted before lost ACK");
+        assert_eq!(
+            f.service
+                .submit_review_revision(request.clone())
+                .expect("retry"),
+            accepted
+        );
+        f.service
+            .close_activity(&a.id)
+            .expect("close before reconnect");
+        let reopened =
+            PeerReviewService::initialize(f.dir.path()).expect("new service after reconnect");
+        assert_eq!(
+            reopened
+                .submit_review_revision(request.clone())
+                .expect("accepted replay despite CLOSED"),
+            accepted
+        );
+        let mut conflict = request.clone();
+        conflict.body = "Different".into();
+        assert_eq!(
+            reopened.submit_review_revision(conflict),
+            Err(PeerReviewError::ReviewSubmissionConflict)
+        );
+        let mut unauthorized = request;
+        unauthorized.submitted_by_participant_id = f.participants[1].clone();
+        assert_eq!(
+            reopened.submit_review_revision(unauthorized),
+            Err(PeerReviewError::ReviewerNotAuthorized)
+        );
+        assert_eq!(
+            reopened.submit_review_revision(f.request(&assigned.id, 0, 1, "New after close")),
+            Err(PeerReviewError::PeerReviewClosed)
+        );
+        assert_eq!(
+            reopened
+                .list_review_revisions(&assigned.id)
+                .expect("no duplicates"),
+            vec![accepted]
+        );
+        for internal in [&a.id, &assigned.id, &f.target(&a.id, 1).id] {
+            assert_eq!(
+                uuid::Uuid::parse_str(internal)
+                    .expect("internal UUID")
+                    .get_version_num(),
+                7
+            );
+        }
+    }
+}
 
 #[test]
 fn ownership_slots_and_response_constraints_reject_invalid_records() {

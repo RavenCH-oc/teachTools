@@ -108,13 +108,20 @@ pub struct SessionStateChanged {
 pub struct LocalSessionService {
     database: Database,
     events: broadcast::Sender<SessionStateChanged>,
+    pub(crate) peer_review: super::peer_review_student::StudentPeerReviewService,
 }
 
 impl LocalSessionService {
     pub fn initialize(database: Database) -> Result<Arc<Self>, AppError> {
         LocalSessionRepository::end_stale_sessions(&database)?;
         let (events, _) = broadcast::channel(64);
-        Ok(Arc::new(Self { database, events }))
+        let peer_review =
+            super::peer_review_student::StudentPeerReviewService::new(database.clone());
+        Ok(Arc::new(Self {
+            database,
+            events,
+            peer_review,
+        }))
     }
 
     pub fn create(

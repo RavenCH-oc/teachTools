@@ -115,6 +115,8 @@ pub struct SessionSyncDto {
     pub reveal: Option<QuestionRevealView>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grouping: Option<StudentGroupingViewDto>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peer_review: Option<super::peer_review_student::Projection>,
 }
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -280,6 +282,7 @@ impl LiveQuizService {
                 own_latest_submission: None,
                 reveal: None,
                 grouping: None,
+                peer_review: None,
             });
         };
         let public = self.public_view(&question)?;
@@ -297,6 +300,7 @@ impl LiveQuizService {
             own_latest_submission: own,
             reveal,
             grouping: None,
+            peer_review: None,
         })
     }
 

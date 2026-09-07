@@ -1,7 +1,10 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { APP_NAME } from "@classtools/shared";
 import type { QuestionPublicView, ServerMessage, SessionPublicView, StudentAnswer, StudentGroupingView } from "@classtools/backend-contract";
 import { clearParticipant, createParticipantTransport, fetchSessionAsset, getJoinInfo, joinClassroom, saveParticipant, secureUuid, storedParticipant, storedParticipantForJoinCode, StudentApiError, type ParticipantTransport, type StoredParticipant, type SubmitAnswerResult } from "./services/studentApi";
+import type { PeerReviewMutation } from "@classtools/backend-contract";
+import { PeerReviewPanel } from "./features/peer-review/PeerReviewPanel";
+import { createPeerSessionChannel } from "./features/peer-review/sessionChannel";
 
 type Screen = "loading" | "join" | "joining" | "connecting" | "resuming" | "lobby" | "live" | "ended" | "error";
 type Latest = { submissionId: string; revision: number; gradingStatus: "graded" | "pending"; isCorrect: boolean | null; score: number | null; maxScore: number; answer: StudentAnswer };
@@ -23,6 +26,8 @@ export function App() {
   const [question, setQuestion] = useState<QuestionPublicView | null>(null); const [reveal, setReveal] = useState<RevealedQuestion | null>(null);
   const [latest, setLatest] = useState<Latest | null>(null); const [submission, setSubmission] = useState<SubmissionState>({ status: "idle" }); const submissionRef = useRef<SubmissionState>({ status: "idle" }); const transportRef = useRef<ParticipantTransport | null>(null);
   const [grouping, setGrouping] = useState<StudentGroupingView | null>(null); const [groupingPending, setGroupingPending] = useState(false); const groupingPendingRef = useRef(false);
+  const peerChannel = useMemo(() => createPeerSessionChannel(), [participant]);
+  const sendPeerReview = useCallback((message: PeerReviewMutation) => transportRef.current?.sendPeerReview(message) ?? "transport_unavailable", []);
 
   useEffect(() => {
     if (!joinCode) return;
@@ -82,8 +87,9 @@ export function App() {
         if (!cancelled) transport?.start();
       }, [1000, 2000, 5000][Math.min(attempt++, 2)]);
     };
-    const apply = (event: ServerMessage) => {
+    const apply = (event: ServerMessage, connection: { generation: number }) => {
       if (cancelled) return;
+      peerChannel.emit({ type: "message", message: event, generation: connection.generation });
       if (event.type === "participant_authenticated" && event.sessionState === "LOBBY") setScreen("lobby");
       if (event.type === "session_sync") {
         setQuestion(event.sync.currentQuestion);
@@ -123,16 +129,18 @@ export function App() {
       if (event.type === "submission_result") setLatest(event.result as Latest);
     };
     transport = createParticipantTransport(participant, {
-      onAuthenticated: () => {
+      onAuthenticated: connection => {
         if (cancelled) return;
+        peerChannel.emit({ type: "connection", online: true, generation: connection.generation });
         attempt = 0;
         reconnectingNow = false;
         setReconnecting(false);
         retryPending();
       },
       onEnded: () => { if (!cancelled) { reconnectingNow = false; clearParticipant(info, joinCode); setParticipant(null); setScreen("ended"); } },
-      onDisconnected: (reason) => {
+      onDisconnected: (reason, connection) => {
         if (cancelled) return;
+        peerChannel.emit({ type: "connection", online: false, generation: connection.generation });
         if (reason === "AUTH_FAILED" || reason === "SESSION_ENDED" || reason === "SERVER_INSTANCE_MISMATCH") {
           reconnectingNow = false;
           clearParticipant(info, joinCode);
@@ -164,7 +172,7 @@ export function App() {
       transport?.close();
       if (transportRef.current === transport) transportRef.current = null;
     };
-  }, [info, joinCode, participant]);
+  }, [info, joinCode, participant, peerChannel]);
 
   const submitManual = (event: FormEvent) => { event.preventDefault(); const code = manualCode.trim().toUpperCase(); if (/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/.test(code)) window.location.assign(`/student/join/${code}`); else setError("請輸入 8 碼課堂代碼。"); };
   const submitJoin = async (event: FormEvent) => { event.preventDefault(); const seat = Number(seatNumber); if (!info || !Number.isInteger(seat) || seat <= 0 || !name.trim()) { setError("請輸入正確的座號與姓名。"); return; } setScreen("joining"); setError(""); try { const joined = await joinClassroom(joinCode, seat, name); saveParticipant(info, joined, joinCode); setParticipant(joined); setScreen("connecting"); } catch (cause) { setError(message(cause)); setScreen("join"); } };
@@ -197,7 +205,7 @@ export function App() {
   if (screen === "resuming") return <State title="正在恢復課堂…" detail={reconnecting ? "網路中斷，正在重新連線…" : undefined} />;
   if (screen === "connecting") return <State title="正在驗證登入狀態…" detail={reconnecting ? "網路中斷，正在重新連線…" : undefined} />;
   if (screen === "lobby") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>已加入課堂</h1><p>座號：{participant?.participant.seatNumber}</p><p>姓名：{participant?.participant.displayName}</p><p>{reconnecting ? "連線中斷，正在重新連線…" : "等待老師開始課堂…"}</p>{error && <p className="student-error" role="alert">{error}</p>}<StudentGrouping grouping={grouping} pending={groupingPending} onSelect={selectGroup} /></section></main>;
-  if (screen === "live") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>{question ? "目前題目" : "課堂已開始"}</h1>{error && <p className="student-error" role="alert">{error}</p>}<StudentGrouping grouping={grouping} pending={groupingPending} onSelect={selectGroup} />{question ? <LiveQuestion participant={participant} question={question} latest={latest} pending={submission.status !== "idle"} reveal={reveal} onSubmit={submitAnswer} /> : <p>等待老師發布題目…</p>}{reconnecting && <p role="status">連線中斷，正在重新連線…</p>}</section></main>;
+  if (screen === "live") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>{question ? "目前題目" : "課堂已開始"}</h1>{error && <p className="student-error" role="alert">{error}</p>}<StudentGrouping grouping={grouping} pending={groupingPending} onSelect={selectGroup} />{participant && <PeerReviewPanel participant={participant} channel={peerChannel} send={sendPeerReview} />}{question ? <LiveQuestion participant={participant} question={question} latest={latest} pending={submission.status !== "idle"} reveal={reveal} onSubmit={submitAnswer} /> : <p>等待老師發布題目…</p>}{reconnecting && <p role="status">連線中斷，正在重新連線…</p>}</section></main>;
   return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>加入課堂</h1><form onSubmit={submitJoin}><Field id="seat-number" label="座號" value={seatNumber} onChange={setSeatNumber} numeric /><Field id="student-name" label="姓名" value={name} onChange={setName} /><button className="join-button" disabled={screen === "joining"} type="submit">{screen === "joining" ? "加入中…" : "加入課堂"}</button></form>{error && <p role="alert">{error}</p>}</section></main>;
 }
 

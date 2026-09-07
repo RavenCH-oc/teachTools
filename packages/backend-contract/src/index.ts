@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { claimPeerReviewSchema, submitPeerReviewSchema, peerReviewProjectionSchema, peerReviewChangedSchema, peerReviewAcknowledgedSchema, peerReviewRejectedSchema } from "./peer-review";
+export * from "./peer-review";
 
 export const BACKEND_CONTRACT_VERSION = 1 as const;
 export const LOCAL_PROTOCOL_VERSION = 1 as const;
@@ -34,6 +36,8 @@ export const joinSuccessSchema = z.object({
 export const publicErrorSchema = z.object({ code: z.string().trim().min(1), message: z.string().trim().min(1) }).strict();
 
 export const clientMessageSchema = z.discriminatedUnion("type", [
+  claimPeerReviewSchema,
+  submitPeerReviewSchema,
   z.object({
     protocolVersion: protocolVersionSchema,
     type: z.literal("ping"),
@@ -83,9 +87,12 @@ export const questionRevealViewSchema = z.object({ ...questionPublicViewSchema.s
 export const studentGroupingMemberSchema = z.object({ displayName: z.string().trim().min(1).max(200), seatNumber: z.number().int().positive(), isSelf: z.boolean() }).strict();
 export const studentGroupingGroupSchema = z.object({ groupId: uuidSchema, name: z.string().trim().min(1).max(200), position: z.number().int().nonnegative(), memberCount: z.number().int().nonnegative(), capacity: z.number().int().positive().nullable(), isFull: z.boolean(), members: z.array(studentGroupingMemberSchema) }).strict();
 export const studentGroupingViewSchema = z.object({ groupingMode: z.enum(["none", "self_selection", "finalized"]), draftId: uuidSchema.nullable(), draftState: z.literal("OPEN").nullable(), selectionOpen: z.boolean(), currentGroup: studentGroupingGroupSchema.nullable(), availableGroups: z.array(studentGroupingGroupSchema) }).strict();
-export const sessionSyncSchema = z.object({ sessionState: z.enum(["LOBBY", "ACTIVE", "ENDED"]), currentQuestion: questionPublicViewSchema.nullable(), ownLatestSubmission: ownSubmissionResultSchema.nullable(), reveal: questionRevealViewSchema.nullable(), grouping: studentGroupingViewSchema.nullable().optional() }).strict();
+export const sessionSyncSchema = z.object({ sessionState: z.enum(["LOBBY", "ACTIVE", "ENDED"]), currentQuestion: questionPublicViewSchema.nullable(), ownLatestSubmission: ownSubmissionResultSchema.nullable(), reveal: questionRevealViewSchema.nullable(), grouping: studentGroupingViewSchema.nullable().optional(), peerReview: peerReviewProjectionSchema.optional() }).strict();
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
+  peerReviewChangedSchema,
+  peerReviewAcknowledgedSchema,
+  peerReviewRejectedSchema,
   z.object({
     protocolVersion: protocolVersionSchema,
     type: z.literal("server_hello"),

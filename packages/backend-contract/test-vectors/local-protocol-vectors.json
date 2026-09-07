@@ -1,5 +1,7 @@
 {
   "validClientMessages": [
+    {"protocolVersion":1,"type":"claim_peer_review","requestId":"claim","activityId":"019b2af9-4fe6-7f2d-a5d5-711897ed2a31","targetId":"019b2af9-4fe6-7f2d-a5d5-711897ed2a32"},
+    {"protocolVersion":1,"type":"submit_peer_review","requestId":"submit","assignmentId":"019b2af9-4fe6-7f2d-a5d5-711897ed2a31","reviewSubmissionId":"c51a6f25-69d6-4e48-907a-12cce665913d","expectedBaseRevision":0,"body":"Feedback"},
     {
       "protocolVersion": 1,
       "type": "ping",
@@ -14,6 +16,9 @@
     }
   ],
   "validServerMessages": [
+    {"protocolVersion":1,"type":"peer_review_changed"},
+    {"protocolVersion":1,"type":"peer_review_acknowledged","requestId":"submit","acknowledgement":{"assignmentId":"019b2af9-4fe6-7f2d-a5d5-711897ed2a31","reviewSubmissionId":"c51a6f25-69d6-4e48-907a-12cce665913d","revision":1}},
+    {"protocolVersion":1,"type":"peer_review_rejected","requestId":"submit","code":"PEER_REVIEW_CLOSED"},
     {
       "protocolVersion": 1,
       "type": "server_hello",

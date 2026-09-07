@@ -1,6 +1,53 @@
-# Phase 12A — Peer Review Foundation
+# Peer Review — Foundation, Transport and Student UI
 
-This phase provides internal Rust domain/application/repository APIs and persistence only. It adds no Teacher UI commands, Student endpoints, WebSocket messages, credentials, grades, rubrics, or statistics integration. Feedback is text-only and is never an authoritative score.
+## Phase 12C-S2 implementation
+
+The Student feature uses the existing ParticipantTransport socket and authenticated HTTP reads. It offers paged activities, Random assignments, Student Select candidates/atomic moves, Cross Group frozen Essay bundles, a revision-aware editor and anonymous received feedback. It does not add Teacher monitoring/results, grading, same-group review or Phase 12D.
+
+Activity presentation includes a SessionQuestion snapshot `questionSummary` capped at 200 Unicode scalar values (including ellipsis), `receivedFeedbackCount`, and nullable reviewer-side frozen group labels. SQL counts authorized logical assignments with at least one accepted response; claims and extra revisions do not add feedback. Cross Group membership comes from the Activity's pinned GroupSet. Recipient feedback DTOs never include reviewer/contributor/group-origin identity. A selected activity can be revalidated through `activities/{activityId}`, using the same authorized bounded metadata projection, without scanning all activity pages.
+
+`feedback?activityId=<UUIDv7>` filters in SQL before the keyset predicate and LIMIT. Omission preserves Session-wide reads. Activity visibility and recipient authorization are rechecked; invalid, foreign or invisible activities return controlled errors. Cursor scopes distinguish Session-wide and each Activity-specific collection. Counts use correlated SQL aggregates/EXISTS with existing indexes, not response materialization in Rust or per-card HTTP requests. LIMIT bounds returned rows, not aggregate execution cost.
+
+Student pages load one bounded page at a time. Invalidation restarts pagination; abort/connection-epoch guards discard stale completions. Changing activities unmounts the previous detail scope. Metadata updates do not clear authored drafts or pending submissions. Quiz components remain mounted independently.
+
+Local draft/pending keys include server instance, Session, Participant, Activity and assignment. Only authored text/base revision and submission recovery metadata are stored, never credentials, Essay detail or received-feedback bodies. Pending normalized payload and UUID are persisted before sending. Reconnect retries exactly the same ID/payload, including CLOSED ACK-loss replay. A matching ACK clears pending/draft state. Revision conflicts retain text until the student explicitly confirms loading the latest version. CLOSED blocks new edits while retaining drafts; terminal Session behavior remains the existing recovery contract.
+
+S2 functional/mobile smoke and real-device Human QA are separate from automated regression gates; implementation does not by itself claim Human QA acceptance.
+
+## Phase 12C-S1 delivery checkpoint
+
+S1 established protocol/read delivery. S2 adds the feature UI and local recovery described above; Human QA remains a separate acceptance step.
+
+Safety decision: `FULL_LOAD_THEN_PAGINATE` is rejected. Student collection reads use `SQL_LEVEL_BOUNDED_KEYSET_PAGINATION`: SQL authorization/filtering, deterministic ordering and `LIMIT requested + 1` precede materialization. The extra row only indicates another page; no full collection is loaded or truncated. Teacher internal full-list APIs are unchanged and are not used by Student delivery.
+
+Authenticated GET routes under `/api/v1/peer-review/`:
+
+| Route | Purpose / ordering |
+| --- | --- |
+| `activities` | Visible OPEN/CLOSED activity metadata; `(created_at, id)` keyset |
+| `candidates/{activityId}` | Eligible Student Select metadata; zero submitted reviews first, then opaque target UUID ordering |
+| `feedback` | Authorized received metadata, latest revision per logical assignment; assignment UUID keyset |
+| `essays/{assignmentId}` | Authorized frozen individual/group Essay items; target UUID keyset |
+| `feedback/{assignmentId}` | Authorized recipient latest feedback body, no reviewer identity |
+| `own-review/{assignmentId}` | Authorized reviewer/shared reviewer-group latest body, or null |
+
+Collection defaults/maxima are 50/100. Invalid limits, malformed cursors and unknown query options are rejected. Base64url cursors carry collection scope and public ordering keys/opaque IDs, not credentials, student names or SQL. Every request reauthenticates via existing Bearer + `x-classroom-session` + `x-classroom-participant` headers and reauthorizes against SQLite. Cursors grant no authority. Responses use no-store and existing narrow same-origin infrastructure; no CORS expansion.
+
+Candidate counts are SQL correlated aggregates: capacity counts claims; received counts assignments with accepted responses, not claims or revision count. Live order may change between pages; an invalidation requires restarting relevant queries. There is no artificial participant/activity limit or snapshot pagination guarantee. Mutations retain transaction-based correctness.
+
+`session_sync.peerReview` is optional bounded `{ available, visibleActivityCount, receivedFeedbackCount }`. It never contains activities, candidates, feedback arrays or Essay bodies. Protocol version remains 1: the optional projection and new messages are deployed together in the bundled Student/server release; old required fields are unchanged. The 64 KiB WS limit is unchanged.
+
+Authenticated `claim_peer_review` performs claim/atomic move; `submit_peer_review` derives contributor identity from the authenticated socket and carries assignmentId, reviewSubmissionId, expectedBaseRevision and body. Acknowledgements correlate requestId plus accepted submission ID/revision. `peer_review_rejected` is separate from quiz errors so review errors do not clear quiz/grouping work. Only reviewSubmissionId accepts RFC4122 UUIDv4/v7; internal IDs remain UUIDv7.
+
+Teacher OPEN/CLOSE and Student claim/move/submit/edit publish a bounded `peer_review_changed` invalidation after commit. A bounded existing-tokio broadcast channel is owned by LocalSessionService's Student service, with no new thread/runtime/shared database lock. Lagged receivers invalidate too. Reconnect receives a fresh authoritative summary. ParticipantTransport uses its existing connection-generation guard for all new inbound messages; HTTP refresh gates reject stale completions. No second socket or credential lifecycle was added.
+
+Draft/Cancelled are hidden. CLOSED requires assignment or actual received-feedback relationship. Random detail is own-assignment-only. Student Select candidate visibility does not authorize Essay reading. Cross Group ownership uses activity-frozen group-set membership, not current grouping, and the bundle contains only frozen target items. Recipient feedback has no contributor/reviewer identifiers. SQL `MAX(revision)` delivers one latest item per assignment.
+
+Regression coverage includes 400 candidate records whose full metadata exceeds 64 KiB, complete 37-row pages without duplicates/omissions, 57 visible activities paged by 7, aggregate Cross Group Essay detail over 64 KiB, frozen membership after regrouping, shared revision conflict, application last-slot concurrency and failed-move preservation. Real HTTP/WS integration authenticates joins, claims, reads authorized detail, discards an old socket after post-commit notification without consuming ACK, reconnects/replays UUIDv4 and UUIDv7, closes the activity and replays again, then rejects a new ID. Exactly one revision persists. Shared protocol vectors are parsed by both Rust and TypeScript.
+
+No migration or dependency is added; 0001–0006 remain unchanged. This checkpoint is not Phase 12C Human QA completion.
+
+Historically, Phase 12A provided internal Rust domain/application/repository APIs and persistence only, without Teacher commands or Student transport. Phase 12B and 12C subsequently added the adapters described here. Feedback remains text-only and is never an authoritative score.
 
 ## Source and lifecycle
 
@@ -30,7 +77,7 @@ A persisted cycle maps each reviewer group to one different target group. A grou
 
 ## Responses and concurrency
 
-Responses are immutable revisions ordered per assignment. A UUIDv7 response ID is the idempotency key. The normalized body is trimmed, nonempty, contains no embedded NUL, and is at most 10,000 Unicode scalar values. Every mode requires `expected_base_revision`, starting at zero. The next revision is base + 1.
+Responses are immutable revisions ordered per assignment. The client-generated `reviewSubmissionId` accepts RFC 4122-variant UUIDv4 or UUIDv7 and is the response idempotency key. All other internally generated Peer Review IDs remain UUIDv7. The normalized body is trimmed, nonempty, contains no embedded NUL, and is at most 10,000 Unicode scalar values. Every mode requires `expected_base_revision`, starting at zero. The next revision is base + 1.
 
 An exact retry with the same assignment, submitter, normalized body and base returns its original record. Reusing the key with a different payload fails. A stale base fails with `ReviewRevisionConflict`; it does not overwrite another group member's edit. Latest response is derived from revision order; all older revisions remain available. Assignment status is derived as Assigned or Submitted, not maintained in a duplicate mutable column. There is no assignment-cancellation/release API in this phase.
 
@@ -50,7 +97,7 @@ Migrations 0001–0005 remain unchanged. Tests upgrade fresh and every prior sch
 
 `PeerReviewService` exposes `create_activity_draft`, `get_activity`, `list_session_activities`, `open_activity`, `close_activity`, `cancel_draft`, `claim_target`, `list_target_statuses`, `list_group_targets`, `list_assignments`, `get_assignment`, `submit_review_revision`, and `list_review_revisions`.
 
-These are Rust library APIs, not transport-safe Student DTOs. Future transport adapters must derive participant identity from authentication and build narrow authorized projections; they must not publish the internal target/assignment models wholesale. No adapter or future UI is implemented here.
+These are Rust library APIs, not transport-safe Student DTOs. The subsequent transport adapters derive participant identity from authentication and build narrow authorized projections; they do not publish internal target/assignment models wholesale.
 
 ## Verification coverage
 
@@ -70,10 +117,22 @@ DRAFT editing can change question, mode, capacity or GroupSet, but cannot move t
 
 OPEN confirmation explains fixed answer versions and locked settings. OPEN displays its persisted target count, never the current submission count. CLOSE preserves feedback history; only DRAFT offers CANCEL. Terminal Sessions show read-only records. Saved DRAFTs survive page navigation and repository reopen. **Full application restart retains the records but existing 12A stale-Session recovery ends the previous Session, cancels DRAFTs and closes OPEN activities.** 12B does not revive old Sessions or change this recovery contract; “survive restart” means retained history, not an editable DRAFT after stale recovery.
 
-The UI states: 同儕互評只作為回饋紀錄，不計入正式成績。There is no same-group mode, Student transport/UI, target claiming UI, feedback submission/viewer, completion monitoring, grade integration or results dashboard. Student UI remains deferred to 12C; monitoring/results to 12D. Cosmetic redesign is deferred. Migration files 0001–0006 are unchanged; no 0007 or new direct dependencies are introduced.
+The UI states: 同儕互評只作為回饋紀錄，不計入正式成績。Within the historical Phase 12B scope, Student transport/UI, target claiming and feedback submission/viewing were deferred to 12C, now described above. Same-group mode, grade integration, completion monitoring and results dashboards remain outside this implementation; Phase 12D has not started. Migration files 0001–0006 are unchanged; no 0007 or new direct dependencies are introduced.
 
 ### Phase 12B closeout acceptance
 
 User-reported Human QA: PASS (13/13). Functional UI QA: PASS. The accepted checks cover locked/revealed essay setup, Random draft/open/close, Student Select capacity 3 and invalid inputs, draft cancellation, current/historical Cross Group revisions, insufficient-group blocking, frozen GroupSet and essay targets, restart recovery, Session End, and keyboard/dirty-state operation.
 
-Restart semantics are `EXPECTED_RECOVERY_BEHAVIOR`, not a warning or blocker: stale Session recovery ends the Session, changes DRAFT to CANCELLED and OPEN to CLOSED, and retains all Peer Review records. It does not resume an editable draft. Phase 12A and Phase 12B acceptance are complete; Phase 12C/12D remain unimplemented. Starting Phase 12C still requires the baseline's manual push and remote verification.
+Restart semantics are `EXPECTED_RECOVERY_BEHAVIOR`, not a warning or blocker: stale Session recovery ends the Session, changes DRAFT to CANCELLED and OPEN to CLOSED, and retains all Peer Review records. It does not resume an editable draft. Phase 12A and Phase 12B acceptance are complete. Phase 12C implementation is described above; Phase 12D has not started.
+
+## Phase 12C-S2 verification evidence
+
+The standard parallel frontend suite passes (Teacher 113 tests, Student 52 tests), along with typecheck, build and lint. Rust format, check, all 96 tests and warning-denying Clippy pass. Regression coverage includes bounded/scoped metadata, logical response counts, frozen labels, stale request generations, draft restoration, persist-before-send, same-ID CLOSED replay, revision conflicts, claim movement and paginated anonymous feedback.
+
+Two real Tauri/local-server functional smokes used two browser Student participants. Random assignment covered authorized essay reading, hard-reload draft recovery, accepted review, anonymous recipient detail and CLOSED draft retention. Student Select covered capacity 3, keyboard claim/submission, bidirectional reviews, refreshed recipient counts and CLOSED readonly behavior. Both Sessions were ended and Tauri was closed normally, with no panic or EBUSY. Test records remain in application-managed history, not in the repository.
+
+The final Student Select candidate, editor and received-feedback surfaces were checked at viewport widths 320, 360, 390, 430 and 1280: document scroll width did not exceed client width, and visible Peer Review buttons were at least 44px high. Keyboard Enter activated claim and submission. The global body minimum width was removed to avoid scrollbar-induced overflow at 320px.
+
+The preceding checks are automation-assisted functional evidence. At Phase 12C final closeout, the user separately reported Human QA PASS and Functional UI QA PASS, including physical-phone refresh/Wi-Fi reconnect, Random restoration, Student Select capacity/move/failed-move preservation, Cross Group multi-device revision conflicts, frozen GroupSet references, ACK-loss/CLOSED pending replay, latest-revision feedback, anonymity and CLOSED readonly behavior.
+
+Phase 12C UUID contract fix, S1 protocol/read foundation and S2 Student UI/recovery are complete. Closeout changes documentation only and retains the existing passing verification evidence; no additional Computer Use or repeated QA is required. Phase 12D remains deferred until the local baseline is manually pushed and remotely verified.

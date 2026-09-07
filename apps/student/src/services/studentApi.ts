@@ -9,6 +9,7 @@ import {
   type SessionPublicView,
   type ServerMessage,
   type StudentAnswer,
+  type PeerReviewMutation,
 } from "@classtools/backend-contract";
 
 export class StudentApiError extends Error {
@@ -111,6 +112,7 @@ export type ParticipantConnectionState = {
 };
 
 export type ParticipantTransport = {
+  sendPeerReview: (message: PeerReviewMutation) => SubmitAnswerResult;
   start: () => void;
   retryReconnectNow: () => boolean;
   close: () => void;
@@ -297,6 +299,13 @@ export function createParticipantTransport(participant: StoredParticipant, callb
 
   return {
     start,
+    sendPeerReview: (message) => {
+      const connection = current;
+      if (!connection || !connection.authenticated || connection.socket.readyState !== WebSocket.OPEN) return "transport_unavailable";
+      let serialized: string;
+      try { serialized = JSON.stringify(clientMessageSchema.parse(message)); } catch { return "serialization_failed"; }
+      try { connection.socket.send(serialized); return "sent"; } catch { closeSocket(connection); return "send_failed"; }
+    },
     retryReconnectNow,
     close: () => {
       closed = true;

@@ -38,6 +38,26 @@ class TestWebSocket {
 }
 
 describe("student local transport", () => {
+  it("ignores stale Peer Review sync, invalidation and ACK after reconnect", () => {
+    vi.stubGlobal("WebSocket", TestWebSocket);
+    const onMessage = vi.fn();
+    const transport = createParticipantTransport(participant, { onAuthenticated: vi.fn(), onEnded: vi.fn(), onDisconnected: vi.fn(), onMessage });
+    transport.start();
+    const old = latestSocket(); authenticate(old, "ACTIVE"); old.networkFailure();
+    transport.start(); const current = latestSocket(); authenticate(current, "ACTIVE"); onMessage.mockClear();
+    const messages = [
+      { protocolVersion: 1, type: "peer_review_changed" },
+      { protocolVersion: 1, type: "peer_review_acknowledged", requestId: "submit", acknowledgement: { assignmentId: session.sessionId, reviewSubmissionId: "c51a6f25-69d6-4e48-907a-12cce665913d", revision: 1 } },
+      { protocolVersion: 1, type: "session_sync", sync: { sessionState: "ACTIVE", currentQuestion: null, ownLatestSubmission: null, reveal: null, peerReview: { available: true, visibleActivityCount: 1, receivedFeedbackCount: 0 } } },
+    ];
+    for (const message of messages) old.message(message);
+    expect(onMessage).not.toHaveBeenCalled();
+    for (const message of messages) current.message(message);
+    expect(onMessage).toHaveBeenCalledTimes(3);
+    expect(transport.sendPeerReview({ protocolVersion: 1, type: "submit_peer_review", requestId: "submit", reviewSubmissionId: "c51a6f25-69d6-4e48-907a-12cce665913d", assignmentId: session.sessionId, expectedBaseRevision: 0, body: "Feedback" })).toBe("sent");
+    expect(transport.submitAnswer(session.sessionId, session.sessionId, { type: "essay", text: "quiz unaffected" })).toBe("sent");
+    transport.close();
+  });
   afterEach(() => {
     vi.useRealTimers();
     TestWebSocket.instances = [];

@@ -5,6 +5,8 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBe
 type Result<T> = std::result::Result<T, PeerReviewError>;
 #[path = "peer_review_setup.rs"]
 pub(crate) mod setup;
+#[path = "peer_review_student.rs"]
+pub(crate) mod student;
 
 pub(crate) struct PeerReviewRepository;
 
@@ -240,8 +242,9 @@ impl PeerReviewRepository {
         let body = review_text(&request.body)?;
         if request.expected_base_revision < 0
             || request.expected_base_revision == i64::MAX
-            || uuid::Uuid::parse_str(&request.review_submission_id)
-                .map_or(true, |id| id.get_version_num() != 7)
+            || uuid::Uuid::parse_str(&request.review_submission_id).map_or(true, |id| {
+                id.get_variant() != uuid::Variant::RFC4122 || !matches!(id.get_version_num(), 4 | 7)
+            })
         {
             return Err(PeerReviewError::InvalidInput);
         }

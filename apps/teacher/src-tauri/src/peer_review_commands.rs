@@ -30,16 +30,22 @@ pub(crate) fn open_peer_review_activity(
     session_id: String,
     activity_id: String,
     service: tauri::State<'_, PeerReviewSetupService>,
+    sessions: tauri::State<'_, std::sync::Arc<crate::application::LocalSessionService>>,
 ) -> Result<SetupActivity, PeerReviewError> {
-    service.open(&session_id, &activity_id)
+    let result = service.open(&session_id, &activity_id)?;
+    sessions.peer_review.invalidate(&session_id);
+    Ok(result)
 }
 #[tauri::command]
 pub(crate) fn close_peer_review_activity(
     session_id: String,
     activity_id: String,
     service: tauri::State<'_, PeerReviewSetupService>,
+    sessions: tauri::State<'_, std::sync::Arc<crate::application::LocalSessionService>>,
 ) -> Result<SetupActivity, PeerReviewError> {
-    service.close(&session_id, &activity_id)
+    let result = service.close(&session_id, &activity_id)?;
+    sessions.peer_review.invalidate(&session_id);
+    Ok(result)
 }
 #[tauri::command]
 pub(crate) fn cancel_peer_review_activity(

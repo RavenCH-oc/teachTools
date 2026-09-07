@@ -18,12 +18,14 @@ use tokio::sync::oneshot;
 use tower_http::limit::RequestBodyLimitLayer;
 use uuid::Uuid;
 
+use super::peer_review_student::{Acknowledgement, PageRequest};
 use crate::application::grouping::GroupingService;
 use crate::application::{
     LiveQuizService, LocalSessionService, QuestionPublicView, QuestionRevealView, SessionSyncDto,
     StudentAssetLocation, StudentAssetProvider, SubmissionAckDto,
 };
 use crate::error::AppError;
+use crate::peer_review_domain::{PeerReviewError, SubmitPeerReview};
 use crate::question_domain::StudentAnswer;
 
 pub const LOCAL_PROTOCOL_VERSION: u8 = 1;
@@ -483,6 +485,14 @@ fn router(state: Arc<TransportState>) -> Router {
         .route("/student/join/{join_code}", get(student_join_page))
         .route("/student/assets/{file_name}", get(student_asset))
         .route("/api/v1/session-assets/{asset_id}", get(session_asset))
+        .route(
+            "/api/v1/peer-review/{collection}",
+            get(peer_review_collection),
+        )
+        .route(
+            "/api/v1/peer-review/{collection}/{id}",
+            get(peer_review_detail),
+        )
         .route("/api/v1/join/{join_code}", get(join_info).post(join))
         .fallback(not_found)
         .layer(RequestBodyLimitLayer::new(MAX_HTTP_BODY_BYTES))
@@ -664,6 +674,154 @@ fn asset_credentials(headers: &HeaderMap) -> Option<(String, String, String)> {
     Some((session_id, participant_id, credential))
 }
 
+fn peer_page_query(raw: Option<String>) -> Result<(PageRequest, Option<String>), PeerReviewError> {
+    let mut page = PageRequest::default();
+    let mut activity_id = None;
+    if let Some(raw) = raw {
+        if raw.len() > 1200 {
+            return Err(PeerReviewError::InvalidInput);
+        }
+        for pair in raw.split('&').filter(|v| !v.is_empty()) {
+            let (key, value) = pair.split_once('=').ok_or(PeerReviewError::InvalidInput)?;
+            match key {
+                "activityId" if activity_id.is_none() && internal_peer_id(value) => {
+                    activity_id = Some(value.to_owned())
+                }
+                "limit" if page.limit.is_none() => {
+                    page.limit = Some(value.parse().map_err(|_| PeerReviewError::InvalidInput)?)
+                }
+                "cursor"
+                    if page.cursor.is_none()
+                        && value
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-') =>
+                {
+                    page.cursor = Some(value.to_owned())
+                }
+                _ => return Err(PeerReviewError::InvalidInput),
+            }
+        }
+    }
+    Ok((page, activity_id))
+}
+
+async fn peer_review_collection(
+    State(state): State<Arc<TransportState>>,
+    Path(collection): Path<String>,
+    axum::extract::RawQuery(raw): axum::extract::RawQuery,
+    headers: HeaderMap,
+) -> Response {
+    peer_review_read(state, collection, None, raw, headers).await
+}
+async fn peer_review_detail(
+    State(state): State<Arc<TransportState>>,
+    Path((collection, id)): Path<(String, String)>,
+    axum::extract::RawQuery(raw): axum::extract::RawQuery,
+    headers: HeaderMap,
+) -> Response {
+    peer_review_read(state, collection, Some(id), raw, headers).await
+}
+async fn peer_review_read(
+    state: Arc<TransportState>,
+    collection: String,
+    id: Option<String>,
+    raw: Option<String>,
+    headers: HeaderMap,
+) -> Response {
+    let Some((session_id, participant_id, credential)) = asset_credentials(&headers) else {
+        return public_error(StatusCode::UNAUTHORIZED, "AUTH_FAILED", "請重新連線課堂。");
+    };
+    let session = Arc::clone(&state.session);
+    let instance = state.server_instance_id.clone();
+    let result = blocking(move || {
+        session.authenticate(&session_id, &participant_id, &credential, &instance)?;
+        let service = &session.peer_review;
+        let read = || -> Result<serde_json::Value, PeerReviewError> {
+            let (query, activity_id) = peer_page_query(raw)?;
+            if activity_id.is_some() && (collection != "feedback" || id.is_some()) {
+                return Err(PeerReviewError::InvalidInput);
+            }
+            let value = match (collection.as_str(), id.as_deref()) {
+                ("activities", Some(id)) if internal_peer_id(id) => serde_json::to_value(
+                    service.activity_metadata(&session_id, &participant_id, id)?,
+                ),
+                ("activities", None) => serde_json::to_value(service.activities(
+                    &session_id,
+                    &participant_id,
+                    &query,
+                )?),
+                ("feedback", None) => serde_json::to_value(match activity_id.as_deref() {
+                    Some(id) => {
+                        service.feedback_scoped(&session_id, &participant_id, &query, Some(id))?
+                    }
+                    None => service.feedback(&session_id, &participant_id, &query)?,
+                }),
+                ("candidates", Some(id)) => serde_json::to_value(service.candidates(
+                    &session_id,
+                    &participant_id,
+                    id,
+                    &query,
+                )?),
+                ("essays", Some(id)) => serde_json::to_value(service.essays(
+                    &session_id,
+                    &participant_id,
+                    id,
+                    &query,
+                )?),
+                ("feedback", Some(id)) => serde_json::to_value(service.feedback_detail(
+                    &session_id,
+                    &participant_id,
+                    id,
+                )?),
+                ("own-review", Some(id)) => {
+                    serde_json::to_value(service.own_review(&session_id, &participant_id, id)?)
+                }
+                _ => return Err(PeerReviewError::InvalidInput),
+            };
+            value.map_err(|_| PeerReviewError::Storage)
+        };
+        Ok(read())
+    })
+    .await;
+    match result {
+        Ok(Ok(value)) => with_static_security(Json(value).into_response()),
+        Ok(Err(PeerReviewError::InvalidInput)) => {
+            public_error(StatusCode::BAD_REQUEST, "INVALID_INPUT", "分頁參數無效。")
+        }
+        Ok(Err(_)) => public_error(StatusCode::NOT_FOUND, "NOT_FOUND", "無法讀取互評資料。"),
+        Err(_) => public_error(StatusCode::UNAUTHORIZED, "AUTH_FAILED", "請重新連線課堂。"),
+    }
+}
+
+fn internal_peer_id(value: &str) -> bool {
+    Uuid::parse_str(value)
+        .is_ok_and(|id| id.get_variant() == uuid::Variant::RFC4122 && id.get_version_num() == 7)
+}
+async fn send_peer_result(
+    socket: &mut WebSocket,
+    request_id: String,
+    result: Result<Result<Acknowledgement, PeerReviewError>, AppError>,
+) -> bool {
+    let message = match result {
+        Ok(Ok(acknowledgement)) => ServerMessage::PeerReviewAcknowledged {
+            protocol_version: LOCAL_PROTOCOL_VERSION,
+            request_id,
+            acknowledgement,
+        },
+        Ok(Err(code)) => ServerMessage::PeerReviewRejected {
+            protocol_version: LOCAL_PROTOCOL_VERSION,
+            request_id,
+            code,
+        },
+        Err(_) => ServerMessage::PeerReviewRejected {
+            protocol_version: LOCAL_PROTOCOL_VERSION,
+            request_id,
+            code: PeerReviewError::Storage,
+        },
+    };
+    send_server_message(socket, &message).await
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct JoinRequest {
@@ -840,6 +998,7 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
     let mut events = state.session.subscribe();
     let mut quiz_events = state.quiz.subscribe();
     let mut grouping_events = state.grouping.subscribe();
+    let mut peer_events = state.session.peer_review.subscribe();
     match student_sync(&state, &authenticated).await {
         Ok(sync) => {
             if !send_session_sync(&mut socket, sync).await {
@@ -891,6 +1050,16 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
                         Ok(sync) => if !send_session_sync(&mut socket, sync).await { break "grouping_sync_send_failed"; },
                         Err(_) => break "grouping_sync_failed",
                     }
+                }
+            },
+            event = peer_events.recv() => {
+                let refresh = match event {
+                    Ok(session) => session == authenticated.session_id,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => true,
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break "peer_event_channel_closed",
+                };
+                if refresh && !send_server_message(&mut socket, &ServerMessage::PeerReviewChanged {protocol_version: LOCAL_PROTOCOL_VERSION}).await {
+                    break "peer_invalidation_send_failed";
                 }
             },
         }
@@ -991,9 +1160,12 @@ async fn authenticate_socket(
                             }
                         }
                     }
-                    Ok(ClientMessage::SubmitAnswer { .. } | ClientMessage::SelectGroup { .. }) => {
-                        return SocketAuthentication::Rejected("PROTOCOL_ERROR")
-                    }
+                    Ok(
+                        ClientMessage::SubmitAnswer { .. }
+                        | ClientMessage::SelectGroup { .. }
+                        | ClientMessage::ClaimPeerReview { .. }
+                        | ClientMessage::SubmitPeerReview { .. },
+                    ) => return SocketAuthentication::Rejected("PROTOCOL_ERROR"),
                     Err(()) => {
                         return SocketAuthentication::Rejected("PROTOCOL_ERROR");
                     }
@@ -1019,6 +1191,48 @@ async fn handle_authenticated_socket_message(
     match next {
         Ok(Message::Text(text)) if text.len() <= MAX_MESSAGE_BYTES => {
             match parse_client_message(&text) {
+                Ok(ClientMessage::ClaimPeerReview {
+                    request_id,
+                    activity_id,
+                    target_id,
+                    ..
+                }) => {
+                    let service = state.session.peer_review.clone();
+                    let session = participant.session_id.clone();
+                    let participant = participant.participant_id.clone();
+                    let result = blocking(move || {
+                        Ok(service.claim(&session, &participant, &activity_id, &target_id))
+                    })
+                    .await;
+                    send_peer_result(socket, request_id, result).await
+                }
+                Ok(ClientMessage::SubmitPeerReview {
+                    request_id,
+                    review_submission_id,
+                    assignment_id,
+                    expected_base_revision,
+                    body,
+                    ..
+                }) => {
+                    let service = state.session.peer_review.clone();
+                    let session = participant.session_id.clone();
+                    let participant = participant.participant_id.clone();
+                    let result = blocking(move || {
+                        Ok(service.submit(
+                            &session,
+                            &participant,
+                            SubmitPeerReview {
+                                review_submission_id,
+                                assignment_id,
+                                expected_base_revision,
+                                body,
+                                submitted_by_participant_id: participant.clone(),
+                            },
+                        ))
+                    })
+                    .await;
+                    send_peer_result(socket, request_id, result).await
+                }
                 Ok(ClientMessage::Ping { request_id, .. }) => {
                     transport_connection_debug(connection_id, "ping_received");
                     state
@@ -1197,6 +1411,14 @@ async fn student_sync(
             .ok_or(AppError::SessionEnded)?;
         let mut sync = quiz.sync(&participant_id, &session_id, &current_session.state)?;
         sync.grouping = Some(grouping.student_grouping_view(&participant_id, &session_id)?);
+        if current_session.state == "ACTIVE" {
+            sync.peer_review = Some(
+                session
+                    .peer_review
+                    .projection(&session_id, &participant_id)
+                    .map_err(|_| AppError::Storage)?,
+            );
+        }
         Ok(sync)
     })
     .await
@@ -1337,6 +1559,39 @@ async fn send_server_message(socket: &mut WebSocket, message: &ServerMessage) ->
 fn parse_client_message(text: &str) -> Result<ClientMessage, ()> {
     let message: ClientMessage = serde_json::from_str(text).map_err(|_| ())?;
     match &message {
+        ClientMessage::ClaimPeerReview {
+            protocol_version,
+            request_id,
+            activity_id,
+            target_id,
+        } if *protocol_version == LOCAL_PROTOCOL_VERSION
+            && !request_id.trim().is_empty()
+            && request_id.len() <= 120
+            && internal_peer_id(activity_id)
+            && internal_peer_id(target_id) =>
+        {
+            Ok(message)
+        }
+        ClientMessage::SubmitPeerReview {
+            protocol_version,
+            request_id,
+            review_submission_id,
+            assignment_id,
+            expected_base_revision,
+            body,
+        } if *protocol_version == LOCAL_PROTOCOL_VERSION
+            && !request_id.trim().is_empty()
+            && request_id.len() <= 120
+            && internal_peer_id(assignment_id)
+            && Uuid::parse_str(review_submission_id).is_ok_and(|id| {
+                id.get_variant() == uuid::Variant::RFC4122 && matches!(id.get_version_num(), 4 | 7)
+            })
+            && *expected_base_revision >= 0
+            && *expected_base_revision < 9_007_199_254_740_991
+            && crate::peer_review_domain::review_text(body).is_ok() =>
+        {
+            Ok(message)
+        }
         ClientMessage::Ping {
             protocol_version,
             request_id,
@@ -1444,11 +1699,26 @@ struct HealthResponse {
 
 #[derive(Debug, Deserialize)]
 #[serde(
+    deny_unknown_fields,
     tag = "type",
     rename_all = "snake_case",
     rename_all_fields = "camelCase"
 )]
 enum ClientMessage {
+    ClaimPeerReview {
+        protocol_version: u8,
+        request_id: String,
+        activity_id: String,
+        target_id: String,
+    },
+    SubmitPeerReview {
+        protocol_version: u8,
+        request_id: String,
+        review_submission_id: String,
+        assignment_id: String,
+        expected_base_revision: i64,
+        body: String,
+    },
     Ping {
         protocol_version: u8,
         request_id: String,
@@ -1482,6 +1752,19 @@ enum ClientMessage {
     rename_all_fields = "camelCase"
 )]
 enum ServerMessage {
+    PeerReviewChanged {
+        protocol_version: u8,
+    },
+    PeerReviewAcknowledged {
+        protocol_version: u8,
+        request_id: String,
+        acknowledgement: Acknowledgement,
+    },
+    PeerReviewRejected {
+        protocol_version: u8,
+        request_id: String,
+        code: PeerReviewError,
+    },
     ServerHello {
         protocol_version: u8,
         server_instance_id: String,
@@ -1633,6 +1916,9 @@ fn web_socket_urls(port: u16, candidate_urls: &[String]) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    mod peer_review_tests {
+        include!("peer_review_transport_tests.rs");
+    }
     use std::str::FromStr;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;

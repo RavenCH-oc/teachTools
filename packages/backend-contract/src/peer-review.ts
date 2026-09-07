@@ -1,0 +1,27 @@
+import { z } from "zod";
+
+export const peerReviewIdSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+export const reviewSubmissionIdSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[47][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+const revision = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 1);
+const envelope = { protocolVersion: z.literal(1), requestId: z.string().min(1).refine(v => v.trim().length > 0 && new TextEncoder().encode(v).length <= 120) };
+export const claimPeerReviewSchema = z.object({ ...envelope, type: z.literal("claim_peer_review"), activityId: peerReviewIdSchema, targetId: peerReviewIdSchema }).strict();
+export const submitPeerReviewSchema = z.object({ ...envelope, type: z.literal("submit_peer_review"), reviewSubmissionId: reviewSubmissionIdSchema, assignmentId: peerReviewIdSchema, expectedBaseRevision: revision, body: z.string().refine(v => v.trim().length > 0 && !v.includes("\0") && Array.from(v.trim()).length <= 10_000) }).strict();
+export const peerReviewProjectionSchema = z.object({ available: z.boolean(), visibleActivityCount: revision, receivedFeedbackCount: revision }).strict();
+export const peerReviewChangedSchema = z.object({ protocolVersion: z.literal(1), type: z.literal("peer_review_changed") }).strict();
+export const peerReviewAcknowledgedSchema = z.object({ ...envelope, type: z.literal("peer_review_acknowledged"), acknowledgement: z.object({ assignmentId: peerReviewIdSchema, reviewSubmissionId: reviewSubmissionIdSchema.nullable(), revision }).strict() }).strict();
+export const peerReviewErrorSchema = z.enum(["PEER_REVIEW_ACTIVITY_NOT_FOUND", "PEER_REVIEW_NOT_OPEN", "PEER_REVIEW_ALREADY_OPEN", "PEER_REVIEW_CLOSED", "PEER_REVIEW_ESSAY_REQUIRED", "QUESTION_NOT_READY", "INSUFFICIENT_REVIEW_PARTICIPANTS", "SELF_REVIEW_NOT_ALLOWED", "TARGET_NOT_FOUND", "TARGET_REVIEW_CAPACITY_FULL", "REVIEWER_NOT_ELIGIBLE", "REVIEW_TARGET_LOCKED_AFTER_SUBMISSION", "GROUP_SET_REQUIRED", "GROUP_SET_SESSION_MISMATCH", "INSUFFICIENT_REVIEW_GROUPS", "SAME_GROUP_REVIEW_NOT_ALLOWED", "REVIEW_REVISION_CONFLICT", "REVIEW_SUBMISSION_CONFLICT", "ASSIGNMENT_NOT_FOUND", "REVIEWER_NOT_AUTHORIZED", "SESSION_ENDED", "SESSION_NOT_ACTIVE", "QUESTION_SESSION_MISMATCH", "INVALID_INPUT", "RANDOMIZATION_FAILED", "STORAGE"]);
+export const peerReviewRejectedSchema = z.object({ ...envelope, type: z.literal("peer_review_rejected"), code: peerReviewErrorSchema }).strict();
+const page = <T extends z.ZodTypeAny>(item: T) => z.object({ items: z.array(item).max(100), nextCursor: z.string().regex(/^[A-Za-z0-9_-]+$/).max(1024).nullable() }).strict();
+export const peerReviewActivitiesPageSchema = page(z.object({ activityId: peerReviewIdSchema, sessionQuestionId: peerReviewIdSchema, questionSummary: z.string().refine(v => Array.from(v).length <= 200), receivedFeedbackCount: revision, reviewerGroupLabel: z.string().max(200).nullable(), targetGroupLabel: z.string().max(200).nullable(), mode: z.enum(["RANDOM_ONE_TO_ONE", "STUDENT_SELECT", "CROSS_GROUP"]), state: z.enum(["OPEN", "CLOSED"]), assignmentId: peerReviewIdSchema.nullable(), latestReviewRevision: revision.nullable() }).strict());
+export const peerReviewCandidatesPageSchema = page(z.object({ peerReviewTargetId: peerReviewIdSchema, label: z.string(), submittedReviewCount: revision, hasReceivedAnyReview: z.boolean(), remainingCapacity: revision.nullable(), full: z.boolean(), currentClaim: z.boolean() }).strict());
+export const peerReviewFeedbackPageSchema = page(z.object({ assignmentId: peerReviewIdSchema, activityId: peerReviewIdSchema, revision }).strict());
+export const peerReviewEssaysPageSchema = page(z.object({ peerReviewTargetId: peerReviewIdSchema, label: z.string(), essay: z.string() }).strict());
+export const peerReviewFeedbackDetailSchema = z.object({ assignmentId: peerReviewIdSchema, revision, body: z.string() }).strict();
+export type PeerReviewMutation = z.infer<typeof claimPeerReviewSchema> | z.infer<typeof submitPeerReviewSchema>;
+export const peerReviewPageQuerySchema = z.object({ limit: z.number().int().min(1).max(100).optional(), cursor: z.string().regex(/^[A-Za-z0-9_-]+$/).max(1024).optional() }).strict();
+export const peerReviewFeedbackQuerySchema = peerReviewPageQuerySchema.extend({ activityId: peerReviewIdSchema.optional() }).strict();
+export const peerReviewDraftSchema = z.object({ body: z.string().refine(v => Array.from(v).length <= 10000), baseRevision: revision, updatedAt: z.string().datetime(), targetId: peerReviewIdSchema.optional() }).strict();
+export const peerReviewPendingSchema = z.object({ activityId: peerReviewIdSchema, assignmentId: peerReviewIdSchema, reviewSubmissionId: reviewSubmissionIdSchema, expectedBaseRevision: revision, body: submitPeerReviewSchema.shape.body }).strict();
+export type PeerReviewActivity = z.infer<typeof peerReviewActivitiesPageSchema>["items"][number];
+export type PeerReviewDraft = z.infer<typeof peerReviewDraftSchema>;
+export type PeerReviewPending = z.infer<typeof peerReviewPendingSchema>;
