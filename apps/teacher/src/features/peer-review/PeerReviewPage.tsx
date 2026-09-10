@@ -12,7 +12,7 @@ function formFor(context: PeerReviewSetup, a?: PeerReviewActivity, initial?: str
 const unchanged = (a: Form | null,b: Form | null) => JSON.stringify(a) === JSON.stringify(b);
 const confirmDiscard = () => window.confirm("尚有未儲存的變更，確定要放棄嗎？");
 
-export function PeerReviewPage({api,sessionId,initialQuestionId,onBack,onDirtyChange}: {api: PeerReviewApi;sessionId:string;initialQuestionId?:string;onBack:()=>void;onDirtyChange?:(value:boolean)=>void}) {
+export function PeerReviewPage({api,sessionId,initialQuestionId,onBack,onDirtyChange,onMonitor}: {api: PeerReviewApi;sessionId:string;initialQuestionId?:string;onBack:()=>void;onDirtyChange?:(value:boolean)=>void;onMonitor?:(id:string)=>void}) {
   const [context,setContext]=useState<PeerReviewSetup|null>(null);
   const [selected,setSelected]=useState("");
   const [form,setForm]=useState<Form|null>(null);
@@ -107,6 +107,7 @@ export function PeerReviewPage({api,sessionId,initialQuestionId,onBack,onDirtyCh
       {current && current.state!=="DRAFT" && <><p>已固定作品：{current.frozen_target_count}</p><p>互評使用開放當下固定的作品版本。</p></>}
       {dirty && <p role="status">尚有未儲存的變更</p>}
       <div className="form-actions">
+        {current && (current.state==="OPEN" || current.state==="CLOSED") && onMonitor && <button type="button" disabled={busy} onClick={()=>onMonitor(current.id)}>查看互評進度</button>}
         {canEdit && <button className="button primary" type="submit" disabled={busy || !question || !validCapacity || !!duplicate || (form.mode==="CROSS_GROUP" && !form.groupSet)}>{current ? "儲存設定" : "儲存草稿"}</button>}
         {current?.state==="DRAFT" && context.session_state==="ACTIVE" && <><button className="button primary" type="button" disabled={busy || dirty || !!block} onClick={()=>{if(window.confirm("開放後會固定目前的論述答案版本，並鎖定本次互評設定。後續答案版本不會替換此次作品。"))void mutate(()=>api.openPeerReviewActivity(sessionId,current.id));}}>開放互評</button><button className="button ghost" type="button" disabled={busy} onClick={()=>{if(window.confirm("確定取消此草稿活動？尚未儲存的變更將放棄，歷史紀錄會保留。"))void mutate(()=>api.cancelPeerReviewActivity(sessionId,current.id));}}>取消活動</button></>}
         {current?.state==="OPEN" && context.session_state==="ACTIVE" && <button className="button" type="button" disabled={busy} onClick={()=>{if(window.confirm("結束後學生將無法再新增或修改評論，既有評論紀錄會保留。"))void mutate(()=>api.closePeerReviewActivity(sessionId,current.id));}}>結束互評</button>}

@@ -12,9 +12,10 @@ import { LiveQuizPage } from "./features/live-quiz/LiveQuizPage";
 import { GroupPresetPage } from "./features/grouping/GroupPresetPage";
 import { SessionGroupingPage } from "./features/grouping/SessionGroupingPage";
 import { PeerReviewPage } from "./features/peer-review/PeerReviewPage";
+import { PeerReviewMonitor } from "./features/peer-review/PeerReviewMonitor";
 import { peerReviewApi, type PeerReviewApi } from "./services/peerReviewApi";
 
-type Page = "home" | "classrooms" | "students" | "courses" | "lessons" | "question-bank" | "grouping" | "session-grouping" | "local-session" | "live-quiz" | "session-history" | "session-analysis" | "peer-review";
+type Page = "home" | "classrooms" | "students" | "courses" | "lessons" | "question-bank" | "grouping" | "session-grouping" | "local-session" | "live-quiz" | "session-history" | "session-analysis" | "peer-review" | "peer-monitor";
 const nav: Array<{ id: Page; label: string }> = [
   { id: "home", label: "首頁" }, { id: "classrooms", label: "班級" }, { id: "students", label: "學生" },
   { id: "courses", label: "課程" }, { id: "lessons", label: "課程單元" }, { id: "question-bank", label: "題庫" }, { id: "grouping", label: "分組設定" }, { id: "local-session", label: "課堂" }, { id: "live-quiz", label: "即時測驗" }, { id: "session-history", label: "課堂紀錄" },
@@ -33,6 +34,7 @@ export function App({ api = teacherApi, reviewApi = peerReviewApi }: AppProps) {
   const [hasPresetDraft, setHasPresetDraft] = useState(false);
   const [hasSessionGroupingDraft, setHasSessionGroupingDraft] = useState(false);
   const [hasPeerReviewDraft, setHasPeerReviewDraft] = useState(false);
+  const [monitor,setMonitor]=useState<{sessionId:string;activityId:string;back:"peer-review"|"session-analysis"}|null>(null);
   const [peerReviewContext, setPeerReviewContext] = useState<{sessionId:string;questionId?:string}|null>(null);
   const [groupingClassroomId, setGroupingClassroomId] = useState<string | undefined>();
   const [sessionGroupingId, setSessionGroupingId] = useState<string | undefined>();
@@ -94,9 +96,10 @@ export function App({ api = teacherApi, reviewApi = peerReviewApi }: AppProps) {
         {status === "ready" && page === "session-grouping" && sessionGroupingId && <SessionGroupingPage api={api as Required<Pick<TeacherApi, "getSessionGrouping" | "listGroupPresets" | "createGroupingDraftFromPreset" | "createRandomGroupingDraft" | "createManualGroupingDraft" | "cloneCurrentGroupingDraft" | "updateSessionGroupingDraft" | "openSessionGroupingDraft" | "moveSessionGroupingParticipant" | "cancelSessionGroupingDraft" | "finalizeSessionGroupingDraft">>} sessionId={sessionGroupingId} onBack={() => navigate("local-session")} onDirtyChange={setHasSessionGroupingDraft} onError={setError} />}
         {status === "ready" && page === "local-session" && <LocalSessionLobbyPage api={api} classrooms={classrooms} onError={setError} onClearError={() => setError("")} onOpenLiveQuiz={() => navigate("live-quiz")} onOpenGrouping={(session) => openSessionGrouping(session.id)} />}
         {status === "ready" && page === "live-quiz" && <LiveQuizPage api={api as Required<Pick<TeacherApi, "getLocalServerStatus" | "getActiveLocalSession" | "listQuestionSets" | "listQuestions" | "startLocalSession" | "publishSessionQuestion" | "listSessionQuestions" | "openSessionQuestion" | "lockSessionQuestion" | "reopenSessionQuestion" | "revealSessionQuestion" | "getSessionQuestionProgress" | "getQuestionStatistics">>} onError={setError} onOpenSessionAnalysis={(session) => openAnalysis(session, "live-quiz")} onOpenSessionGrouping={(session) => openSessionGrouping(session.id)} onOpenPeerReview={(sessionId,questionId)=>{setPeerReviewContext({sessionId,questionId});navigate("peer-review");}} />}
-        {status === "ready" && page === "peer-review" && peerReviewContext && <PeerReviewPage api={reviewApi} sessionId={peerReviewContext.sessionId} initialQuestionId={peerReviewContext.questionId} onBack={()=>navigate("live-quiz")} onDirtyChange={setHasPeerReviewDraft} />}
+        {status === "ready" && page === "peer-review" && peerReviewContext && <PeerReviewPage api={reviewApi} sessionId={peerReviewContext.sessionId} initialQuestionId={peerReviewContext.questionId} onBack={()=>navigate("live-quiz")} onDirtyChange={setHasPeerReviewDraft} onMonitor={activityId=>{setMonitor({sessionId:peerReviewContext.sessionId,activityId,back:"peer-review"});navigate("peer-monitor");}} />}
+        {status === "ready" && page === "peer-monitor" && monitor && <PeerReviewMonitor key={`${monitor.sessionId}:${monitor.activityId}`} sessionId={monitor.sessionId} activityId={monitor.activityId} onBack={()=>navigate(monitor.back)}/>}
         {status === "ready" && page === "session-history" && <SessionHistoryPage api={api as Required<Pick<TeacherApi, "listClassroomSessionHistory">>} classrooms={classrooms} onOpenSessionAnalysis={(session) => openAnalysis(session, "session-history")} />}
-        {status === "ready" && page === "session-analysis" && analysisContext && <SessionAnalysisPage api={api as Required<Pick<TeacherApi, "getSessionStatistics" | "getDifficultQuestions" | "listSessionQuestions">>} session={analysisContext.session} onBack={() => navigate(analysisContext.returnPage)} />}
+        {status === "ready" && page === "session-analysis" && analysisContext && <SessionAnalysisPage api={api as Required<Pick<TeacherApi, "getSessionStatistics" | "getDifficultQuestions" | "listSessionQuestions">>} session={analysisContext.session} onBack={() => navigate(analysisContext.returnPage)} onPeerReview={activityId=>{const s=analysisContext.session;setMonitor({sessionId:"id" in s?s.id:s.sessionId,activityId,back:"session-analysis"});navigate("peer-monitor");}} />}
         {status === "ready" && page !== "home" && <p className="page-kicker">教師工作區 / {pageTitle}</p>}
       </main>
     </div>

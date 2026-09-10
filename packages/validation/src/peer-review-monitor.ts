@@ -1,0 +1,14 @@
+import { z } from "zod";
+const count = z.number().int().nonnegative();
+const id = z.string().uuid();
+export const monitorQuerySchema = z.object({ limit: z.number().int().min(1).max(100).optional(), cursor: z.string().regex(/^[0-9a-f]+$/).max(2048).optional() }).strict();
+export const monitorSummarySchema = z.object({ activity_id:id, question_summary:z.string().refine(v=>[...v].length<=200), mode:z.enum(["RANDOM_ONE_TO_ONE","STUDENT_SELECT","CROSS_GROUP"]), state:z.enum(["DRAFT","OPEN","CLOSED","CANCELLED"]), opened_at:z.string().nullable(),closed_at:z.string().nullable(),eligible_reviewers:count,assignment_count:count,submitted_count:count,target_count:count,covered_count:count }).strict();
+export const monitorStatusSchema = z.object({id,label:z.string(),assignment_id:id.nullable(),target_label:z.string().nullable(),latest_revision:count,claimed_count:count,submitted_count:count,capacity:count.nullable(),remaining_capacity:count.nullable()}).strict();
+export const monitorRevisionSchema = z.object({revision:count.positive(),body:z.string().refine(v=>[...v].length<=10000),submitted_at:z.string(),submitted_by:z.string()}).strict();
+const page = <T extends z.ZodTypeAny>(schema:T)=>z.object({items:z.array(schema).max(100),next_cursor:z.string().nullable(),total:count}).strict();
+export const monitorActivitiesSchema=page(monitorSummarySchema);
+export const monitorStatusesSchema=page(monitorStatusSchema);
+export const monitorRevisionsSchema=page(monitorRevisionSchema);
+export type MonitorSummary=z.infer<typeof monitorSummarySchema>;
+export type MonitorStatus=z.infer<typeof monitorStatusSchema>;
+export type MonitorRevision=z.infer<typeof monitorRevisionSchema>;

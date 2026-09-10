@@ -1,0 +1,40 @@
+import { useEffect, useState } from "react";
+import type { MonitorSummary,MonitorStatus,MonitorRevision } from "@classtools/validation";
+import { peerReviewMonitorApi,type PeerReviewMonitorApi,type MonitorKind } from "../../services/peerReviewMonitorApi";
+type Page<T>={items:T[];next_cursor:string|null;total:number};
+const modes={RANDOM_ONE_TO_ONE:"隨機互評",STUDENT_SELECT:"學生自行選擇",CROSS_GROUP:"跨組互評"};
+const states={DRAFT:"草稿",OPEN:"進行中",CLOSED:"互評已結束",CANCELLED:"已取消"};
+export function Completion({summary:s}:{summary:MonitorSummary}) {return <><p>符合資格：{s.eligible_reviewers}{s.mode==="CROSS_GROUP"?" 組":" 人"} · 指派：{s.assignment_count} · 已提交：{s.submitted_count}</p><p>完成率：{s.submitted_count}/{s.eligible_reviewers}（{s.eligible_reviewers ? `${Math.round(s.submitted_count/s.eligible_reviewers*100)}%`:"—"}）</p><p>已有回饋作品：{s.covered_count}/{s.target_count} · 尚未收到評論：{s.target_count-s.covered_count}</p></>;}
+export function PeerReviewRecordsEntry({sessionId,onOpen,api=peerReviewMonitorApi}:{sessionId:string;onOpen:(id:string)=>void;api?:PeerReviewMonitorApi}) {
+  const [data,setData]=useState<Page<MonitorSummary>|null>(null);const [history,setHistory]=useState<(string|undefined)[]>([undefined]);const [error,setError]=useState("");const [loading,setLoading]=useState(true);const [retry,setRetry]=useState(0);
+  const cursor=history[history.length-1];
+  useEffect(()=>{let cancelled=false;setLoading(true);setError("");void api.activities(sessionId,{limit:10,cursor}).then(v=>{if(!cancelled)setData(v);}).catch(()=>{if(!cancelled)setError("無法載入同儕互評紀錄。");}).finally(()=>{if(!cancelled)setLoading(false);});return()=>{cancelled=true;};},[api,sessionId,cursor,retry]);
+  return <section aria-label="同儕互評紀錄"><h3>同儕互評紀錄{data ? `（${data.total} 個活動）`:""}</h3>{loading&&<p role="status">正在載入互評紀錄…</p>}{error&&<p role="alert">{error}<button type="button" onClick={()=>setRetry(v=>v+1)}>重試</button></p>}{data?.items.map(a=><article key={a.activity_id}><h4>{a.question_summary}</h4><p>{modes[a.mode]} · {states[a.state]}</p>{(a.state==="OPEN"||a.state==="CLOSED")&&<><Completion summary={a}/><button type="button" onClick={()=>onOpen(a.activity_id)}>查看紀錄</button></>}{a.state==="DRAFT"&&<p>尚未開放，請回互評設定管理。</p>}</article>)}{data&&<Pages history={history} setHistory={setHistory} next={data.next_cursor} busy={loading}/>}</section>;
+}
+export function PeerReviewMonitor({sessionId,activityId,onBack,api=peerReviewMonitorApi}:{sessionId:string;activityId:string;onBack:()=>void;api?:PeerReviewMonitorApi}) {
+  const [summary,setSummary]=useState<MonitorSummary|null>(null);const [data,setData]=useState<Page<MonitorStatus>|null>(null);const [kind,setKind]=useState<MonitorKind>("reviewers");const [history,setHistory]=useState<(string|undefined)[]>([undefined]);const [error,setError]=useState("");const [busy,setBusy]=useState(true);const [refresh,setRefresh]=useState(0);const [record,setRecord]=useState<MonitorStatus|null>(null);
+  const cursor=history[history.length-1];
+  useEffect(()=>{
+    let cancelled=false;let timer:ReturnType<typeof setTimeout>|undefined;
+    setBusy(true);setError("");
+    const read=async()=>{
+      let open=false;
+      try {
+        const s=await api.summary(sessionId,activityId); if(cancelled)return;
+        open=s.state==="OPEN";
+        const rows=(s.state==="OPEN"||s.state==="CLOSED") ? await api.statuses(sessionId,activityId,kind,{limit:20,cursor}) : {items:[],next_cursor:null,total:0};
+        if(cancelled)return;setSummary(s);setData(rows);setError("");
+      }catch{if(!cancelled)setError("無法讀取互評進度；資料可能已過時，請重新整理。");}
+      finally{if(!cancelled){setBusy(false);if(open)timer=setTimeout(()=>void read(),1000);}}
+    };
+    void read();return()=>{cancelled=true;if(timer)clearTimeout(timer);};
+  },[api,sessionId,activityId,kind,cursor,refresh]);
+  const newer=record ? data?.items.find(r=>r.assignment_id===record.assignment_id)?.latest_revision : undefined;
+  return <section className="peer-monitor"><h2>同儕互評進度 / 紀錄</h2><button type="button" onClick={onBack}>返回</button><button type="button" onClick={()=>setRefresh(v=>v+1)}>重新整理</button><p>同儕互評只作為回饋紀錄，不計入正式成績。</p>{error&&<p role="alert">{error}</p>}{busy&&!summary&&<p role="status">正在載入互評進度…</p>}{summary&&<><h3>{summary.question_summary}</h3><p>{modes[summary.mode]} · {states[summary.state]}</p><p>開放：{summary.opened_at??"—"} · 結束：{summary.closed_at??"—"}</p>{(summary.state==="OPEN"||summary.state==="CLOSED") ? <><Completion summary={summary}/><nav aria-label="互評監控列表">{(["reviewers","targets","uncovered","reviews"] as const).map((k,i)=><button type="button" key={k} aria-pressed={kind===k} onClick={()=>{setKind(k);setHistory([undefined]);setData(null);}}>{["評論者狀態","作品覆蓋","尚未收到評論","已提交評論"][i]}</button>)}</nav>{data&&<><p>共 {data.total} 筆</p><table><caption>{kind==="targets"||kind==="uncovered"?"作品回饋覆蓋":"評論者與互評對象"}</caption><thead><tr><th>學生 / 組別</th>{kind==="targets"||kind==="uncovered"?<><th>已選擇</th><th>已收到</th><th>上限 / 剩餘</th></>:<><th>互評對象</th><th>狀態</th><th>紀錄</th></>}</tr></thead><tbody>{data.items.map(r=><tr key={r.id}><th scope="row">{r.label}</th>{kind==="targets"||kind==="uncovered"?<><td>{r.claimed_count}</td><td>{r.submitted_count}</td><td>{r.capacity===null?"不限":`${r.capacity} / ${r.remaining_capacity}`}</td></>:<><td>{r.target_label??"尚未選擇"}</td><td>{r.latest_revision ? `已提交第 ${r.latest_revision} 版`:r.assignment_id?"已指派 / 已選擇、未提交":"未選擇"}</td><td>{r.latest_revision>0&&<button type="button" onClick={()=>setRecord(r)}>查看評論</button>}</td></>}</tr>)}</tbody></table><Pages history={history} setHistory={setHistory} next={data.next_cursor} busy={busy}/></>}</>:<p>此活動尚無互評進度，請返回設定。</p>}</>}{record?.assignment_id&&<RecordViewer key={record.assignment_id} api={api} sessionId={sessionId} activityId={activityId} record={record} newer={newer} onClose={()=>setRecord(null)}/>}</section>;
+}
+function RecordViewer({api,sessionId,activityId,record,newer,onClose}:{api:PeerReviewMonitorApi;sessionId:string;activityId:string;record:MonitorStatus;newer?:number;onClose:()=>void}){
+  const [data,setData]=useState<Page<MonitorRevision>|null>(null);const [expanded,setExpanded]=useState(false);const [history,setHistory]=useState<(string|undefined)[]>([undefined]);const [refresh,setRefresh]=useState(0);const [error,setError]=useState("");const [busy,setBusy]=useState(true);const cursor=history[history.length-1];
+  useEffect(()=>{let cancelled=false;setBusy(true);setError("");void api.revisions(sessionId,activityId,record.assignment_id!,!expanded,{limit:10,cursor}).then(v=>{if(!cancelled)setData(v);}).catch(()=>{if(!cancelled)setError("找不到評論或無法讀取版本紀錄。");}).finally(()=>{if(!cancelled)setBusy(false);});return()=>{cancelled=true;};},[api,sessionId,activityId,record.assignment_id,expanded,cursor,refresh]);
+  return <section aria-label="評論內容"><h3>{record.label} → {record.target_label}</h3><button type="button" onClick={onClose}>關閉評論</button><button type="button" onClick={()=>{setHistory([undefined]);setRefresh(v=>v+1);}}>載入最新版本</button>{newer!==undefined&&data?.items[0]&&newer>data.items[0].revision&&<p role="status">有較新版本；目前閱讀內容保持不變。</p>}{error&&<p role="alert">{error}</p>}{busy&&<p role="status">正在載入評論…</p>}{data?.items.map(r=><article key={r.revision}><h4>第 {r.revision} 版</h4><p>{r.submitted_at} · 送出者：{r.submitted_by}</p><p style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{r.body}</p></article>)}<button type="button" onClick={()=>{setExpanded(v=>!v);setHistory([undefined]);}}>{expanded?"只看最新版本":"查看版本紀錄"}</button>{expanded&&data&&<Pages history={history} setHistory={setHistory} next={data.next_cursor} busy={busy}/>}</section>;
+}
+function Pages({history,setHistory,next,busy}:{history:(string|undefined)[];setHistory:(v:(string|undefined)[])=>void;next:string|null;busy:boolean}){return <nav aria-label="紀錄分頁"><button type="button" disabled={busy||history.length===1} onClick={()=>setHistory(history.slice(0,-1))}>上一頁</button><span>第 {history.length} 頁</span><button type="button" disabled={busy||!next} onClick={()=>{if(next)setHistory([...history,next]);}}>下一頁</button></nav>;}

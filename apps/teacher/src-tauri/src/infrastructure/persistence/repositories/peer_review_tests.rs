@@ -5,6 +5,8 @@ use crate::infrastructure::persistence::repositories::{
     local_session::LocalSessionRepository,
 };
 use std::sync::{Arc, Barrier};
+#[path = "peer_review_monitor_tests.rs"]
+mod monitor_tests;
 #[path = "peer_review_student_tests.rs"]
 mod student_tests;
 #[path = "peer_review_setup_tests.rs"]

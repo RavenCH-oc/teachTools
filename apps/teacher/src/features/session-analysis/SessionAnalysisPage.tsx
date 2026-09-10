@@ -1,15 +1,16 @@
 import { useMemo, useState } from "react";
+import { PeerReviewRecordsEntry } from "../peer-review/PeerReviewMonitor";
 import type { LocalSession, QuestionDifficulty, QuestionStatistics, SessionHistory, SessionQuestion, SessionStatistics } from "../../types/teacher";
 import { formatRate, formatScore } from "../live-quiz/statisticsFormatting";
 import { formatSessionDate } from "./SessionHistoryPage";
 import { useSessionAnalysis, type SessionAnalysisApi } from "./useSessionAnalysis";
 
 export type AnalysisSession = Pick<LocalSession, "id" | "classroomName" | "state" | "createdAt" | "endedAt"> | SessionHistory;
-type Props = { api: SessionAnalysisApi; session: AnalysisSession; onBack: () => void };
+type Props = { api: SessionAnalysisApi; session: AnalysisSession; onBack: () => void; onPeerReview?: (id:string)=>void };
 
 const QUESTION_TYPES: Record<string, string> = { true_false: "是非題", single_choice: "單選題", multiple_choice: "複選題", fill_blank: "填空題", essay: "論述題" };
 
-export function SessionAnalysisPage({ api, session, onBack }: Props) {
+export function SessionAnalysisPage({ api, session, onBack, onPeerReview }: Props) {
   const state = useSessionAnalysis({ api, sessionId: sessionIdOf(session), initialState: session.state });
   const snapshot = state.snapshot;
   if (state.loading && !snapshot) return <section className="state-card"><span className="spinner" />正在載入課堂統計…</section>;
@@ -23,6 +24,7 @@ export function SessionAnalysisPage({ api, session, onBack }: Props) {
     {state.error && <div className="error-banner" role="status"><span>{state.error}</span><button type="button" onClick={state.retry}>重新載入</button></div>}
     {safeMode && <div className="analysis-safe-banner" role="status">目前仍在作答中，為避免投影畫面影響作答，詳細分析會在停止作答後顯示。</div>}
     <SummarySection statistics={statistics} safeMode={safeMode} />
+    {statistics.sessionState==="ENDED" && onPeerReview && <PeerReviewRecordsEntry key={sessionIdOf(session)} sessionId={sessionIdOf(session)} onOpen={onPeerReview}/>}
     <QuestionSection statistics={statistics} questions={questions} safeMode={safeMode} />
     {!safeMode && <DifficultSection difficultQuestions={difficultQuestions} />}
     <ParticipantSection statistics={statistics} safeMode={safeMode} />

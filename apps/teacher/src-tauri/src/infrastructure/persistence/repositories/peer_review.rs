@@ -3,6 +3,8 @@ use crate::infrastructure::persistence::database::Database;
 use crate::peer_review_domain::*;
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 type Result<T> = std::result::Result<T, PeerReviewError>;
+#[path = "peer_review_monitor.rs"]
+pub(crate) mod monitor;
 #[path = "peer_review_setup.rs"]
 pub(crate) mod setup;
 #[path = "peer_review_student.rs"]

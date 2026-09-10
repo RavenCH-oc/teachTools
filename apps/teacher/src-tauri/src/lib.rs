@@ -4,6 +4,7 @@ mod grading;
 mod infrastructure;
 mod peer_review_commands;
 pub mod peer_review_domain;
+mod peer_review_monitor_commands;
 mod question_domain;
 pub use application::peer_review;
 
@@ -673,10 +674,19 @@ pub fn run() -> Result<(), String> {
                     service.database_for_local_session(),
                 ),
             );
+            app.manage(
+                application::peer_review_monitor::PeerReviewMonitorService::initialize(
+                    service.database_for_local_session(),
+                ),
+            );
             app.manage(service);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            peer_review_monitor_commands::list_peer_review_monitor_activities,
+            peer_review_monitor_commands::get_peer_review_monitor_summary,
+            peer_review_monitor_commands::list_peer_review_monitor_statuses,
+            peer_review_monitor_commands::list_peer_review_record_revisions,
             peer_review_commands::get_peer_review_setup_context,
             peer_review_commands::create_peer_review_activity,
             peer_review_commands::update_peer_review_activity_draft,

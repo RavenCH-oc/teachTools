@@ -1,4 +1,30 @@
-# Peer Review — Foundation, Transport and Student UI
+# Peer Review — Foundation, Transport, Student UI and Teacher Records
+
+## Phase 12D — Teacher monitoring and records
+
+Teacher setup links OPEN/CLOSED activities to a read-only monitor. ENDED Session Analysis has a separately loaded, paginated activity overview and record entry; its statistics payload does not contain review bodies. DRAFT/CANCELLED show basic state only, with no invented progress. No Student behavior or protocol changes are made.
+
+The validated Teacher service calls thin Tauri commands backed by `PeerReviewMonitorService` and connection-per-operation repository reads. Summary and each page use a read transaction for consistency, not a dashboard write lock. Commands list activity summaries, get one summary, list reviewer/target/uncovered/submitted statuses and read latest/paginated immutable revisions. All queries validate Session/Activity ownership; assignment reads additionally validate Activity ownership. No HTTP Student routes or additional sockets are introduced.
+
+SQL aggregates count one accepted logical review per assignment regardless of revision count. Random completion is submitted/assigned reviewers; Student Select is submitted/eligible frozen participants (including unselected reviewers); Cross Group is submitted shared assignments/assigned reviewer groups, never Essay item count. Zero denominators display a dash. Target coverage distinguishes claims from submitted reviews and reports received-at-least-one, zero-review, capacity and remaining slots (or unlimited). Random count inconsistency fails closed. Teacher identity labels use persisted Session participant seat/name and activity-pinned GroupSet labels, not live roster or latest grouping. Contributor identity appears only in revision detail for audit. Student anonymity remains unchanged.
+
+Activities, reviewers, targets, submitted reviews and revision history are bounded in SQL with LIMIT + 1, default 50/max 100 and deterministic keyset ordering. Opaque cursors carry only scope and ordering identity, are validated, and cannot cross Session/Activity/list types (or assignments for history). Summary counts use COUNT/EXISTS rather than materializing full collections. Activity overview performs bounded per-page summary reads in one transaction.
+
+Only the mounted monitor owns a non-overlapping one-second timeout chain. Polling reads summary and the currently selected metadata page, never bodies/history. Cleanup cancels the timer and rejects late completions on navigation or query changes. CLOSED stops automatic polling; manual refresh remains. Latest review is fetched only on click; history is fetched only when expanded and paginated. Metadata can indicate a newer revision without replacing the text currently being read. Session End/stale recovery keeps existing 12A/12B semantics; historical reads need no runtime connection.
+
+This is feedback/record-only: no edit/delete/reply/score/reassignment controls, grading changes, analytics dashboard, export or Phase 12E work. Migrations 0001–0006, dependencies and Student protocol remain unchanged. Automated tests cover mode-specific counts, coverage, revisions, frozen grouping, historical reopen, grading independence, >100-row paging/scopes and UI polling/lazy reads.
+
+Implementation verification: workspace typecheck and standard parallel tests pass; Rust format and all 100 tests pass. Additional lint and all-target/all-feature warning-denying Clippy pass because this phase adds React hooks and a Teacher IPC module boundary. Codex performed no Computer Use, Tauri visual walkthrough or mobile QA. The documentation-only final closeout reuses this evidence; NO_ADDITIONAL_QA_REQUIRED.
+
+### Phase 12D final closeout
+
+User-reported Human QA 1–8: PASS. Functional UI QA: PASS. The user verified Random, Student Select and Cross Group monitoring; latest/revision history; polling cleanup; CLOSED/Session End; history after restart; and functional UI. Phase 12D implementation and automated verification are accepted. Phase 12E remains unstarted and requires manual push plus remote verification of the local baseline before proceeding.
+
+### Deferred UI issue: MOBILE_PEER_REVIEW_SUBMIT_CONFIRMATION
+
+Status: DEFERRED / NON_BLOCKING. Decision: DEFER_TO_FINAL_UX_PHASE. Target: FINAL_UI_UX_REVIEW.
+
+Student mobile Peer Review submission succeeds, but lacks an explicit success confirmation beyond the visible submitted revision/version state. This does not affect submission correctness, persistence, ACK-loss/idempotency, revision semantics or Teacher monitoring, and does not block Phase 12D or Phase 12. No Student UI polish is included in this closeout.
 
 ## Phase 12C-S2 implementation
 
