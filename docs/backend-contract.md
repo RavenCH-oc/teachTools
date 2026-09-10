@@ -1,5 +1,11 @@
 # SessionBackend 契約
 
+## Current implementation scope (Phase 12E audit)
+
+The general command/capability/event vocabulary below is the target Local-first/BYO-cloud architecture, not a claim that all cloud, archive, voting or student-question capabilities already exist. The implemented Phase 12 local Peer Review contract is documented in [Peer Review](peer-review.md): Teacher validated IPC setup/reads, one authenticated Student WebSocket for mutations and bounded summary/invalidation, and authenticated HTTP for SQL-paginated collections and authorized details. Protocol version 1 and 64 KiB WS limit remain unchanged. Server-to-client delivery never includes full Peer Review collections or Essay/feedback bodies; the submit mutation carries only its bounded authored payload. Peer Review is feedback-only, not grading.
+
+Peer Review `reviewSubmissionId` accepts UUIDv4/v7; other internal Peer Review IDs remain UUIDv7. Exact accepted replay precedes OPEN validation, while authorization is always enforced. Student recipient feedback is anonymous; Teacher history may include safe contributor identity. Default/max page sizes are 50/100 for Student delivery and Teacher monitoring, with collection-scoped deterministic SQL keysets. These concrete local contracts take precedence over the illustrative future event names below.
+
 ## 責任與一致性
 
 SessionBackend 代表課堂 session 的 command、query 與 realtime 行為。LocalBackend 以教師電腦的 Rust LAN server 與 SQLite 實作；SupabaseBackend 以受 RLS 保護的 Supabase runtime layer 實作。兩者必須回傳相同的 domain outcome、錯誤碼、idempotency 語意與 realtime event envelope，transport 實作差異不得洩漏至 React UI。

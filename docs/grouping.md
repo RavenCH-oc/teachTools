@@ -1,6 +1,6 @@
 # Grouping foundation
 
-Phase 11A建立分組的本機 persistence/application foundation；Phase 11B、11C、11D 已依序補上 Teacher preset、Session grouping，以及 Student self-selection / delivery；Phase 11E 完成跨功能整合與 lifecycle closeout。Peer review、group statistics、group scoring、competition、export 與 cloud 同步仍未實作。
+Phase 11A建立分組的本機 persistence/application foundation；Phase 11B、11C、11D 已依序補上 Teacher preset、Session grouping，以及 Student self-selection / delivery；Phase 11E 完成跨功能整合與 lifecycle closeout。Phase 12 已實作獨立的 Peer Review，透過固定 `sessionGroupSetId` 引用分組歷史；group statistics、group scoring、competition、export 與 cloud 同步不在此範圍。
 
 ## Student 與 Participant
 
@@ -78,7 +78,7 @@ H1 診斷狀態為 `CONFIRMED_LOBBY_SYNC_DEFECT`：舊版 LOBBY participant auth
 
 LOBBY／ACTIVE auth 後的 sync 共用安全 projection；ENDED、auth failure 與 credential lifecycle 仍沿用既有 contract。`LOCAL_PROTOCOL_VERSION` 維持 1：Student bundle/server 同 build 部署，grouping 是 optional extension，既有 required shape 未破壞，TS/Rust parser 與 fixtures 保持 parity；H1 沒有新增 message shape。
 
-Phase 11A–11E 與 H1 的功能範圍已完成。Grouping foundation 已具備供下一階段 Peer Review 引用 immutable `sessionGroupSetId` 的條件，但 Peer Review 本身尚未實作，cosmetic UI polish 仍延後。歷史 QuestionBank async timing／Presence timing 偶發觀察保留追蹤；只有本次標準 final gates 通過後，才可將其歸類為 `NON_BLOCKING_FLAKY_OBSERVATIONS`。
+Phase 11A–11E 與 H1 的功能範圍已完成。以下為 Phase 11 closeout 的歷史驗證紀錄；Peer Review 當時尚未實作，現在已於 Phase 12A–12D 完成並引用 immutable `sessionGroupSetId`。Cosmetic grouping polish 仍延後，歷史 QuestionBank async timing／Presence timing 觀察的分類以以下當時 final gates 紀錄為準，不代表 Phase 12E 重跑過測試。
 
 Final concurrency review 補強 OPEN structure lock：bulk draft save 除了 application precheck，也必須在 `BEGIN IMMEDIATE` transaction 內重新確認仍為 DRAFT，避免 precheck 後 OPEN／Student move 已 commit，舊 bulk save 卻覆蓋 live selection。Deterministic stale-save regression 驗證拒絕時 groups、capacity、membership 與 timestamps 全部不變；OPEN 仍只允許既有 atomic single-participant moves 與 lifecycle control。
 

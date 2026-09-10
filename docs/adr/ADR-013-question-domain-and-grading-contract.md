@@ -6,7 +6,7 @@ Accepted for Phase 4.
 
 ## Decision
 
-Questions use a discriminated union for `true_false`, `single_choice`, `multiple_choice`, `fill_blank`, and `essay`. Choice options have stable IDs, multiple choice uses exact-set matching, fill-blank grading is deterministic (`trim`, Unicode NFKC, configurable case sensitivity), and essay answers remain pending manual or peer review.
+Questions use a discriminated union for `true_false`, `single_choice`, `multiple_choice`, `fill_blank`, and `essay`. Choice options have stable IDs, multiple choice uses exact-set matching, fill-blank grading is deterministic (`trim`, Unicode NFKC, configurable case sensitivity), and Essay answers remain pending grading. Phase 12 Peer Review is feedback/record-only: receiving or revising peer feedback does not resolve pending grading or change score, correctness or statistics. This clarification does not introduce manual grading functionality.
 
 The TypeScript grading package is reusable for editor previews and future cloud adapters. The Rust grading module consumes the same checked-in JSON vectors and is the authoritative local grading boundary. Neither implementation depends on React, Tauri, SQLite, network services, or Supabase.
 

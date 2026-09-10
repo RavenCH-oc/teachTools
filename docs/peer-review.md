@@ -1,5 +1,33 @@
 # Peer Review — Foundation, Transport, Student UI and Teacher Records
 
+## Phase 12E integration audit — current status
+
+Phase 12A–12E code/documentation closeout is complete locally, based on `12a6621bb293768a0f897413292d2167af172b85` and the documentation-only final closeout commit. Phase 12B, 12C and 12D Human QA and Functional UI QA are user-reported PASS; the existing automated acceptance remains applicable. Phase 12E adds no production workflow. DOCS_ONLY_CLOSEOUT / NO_ADDITIONAL_AUTOMATED_QA_REQUIRED: no additional tests or walkthrough were run. Remote closeout remains pending manual push and remote verification; the next feature phase is blocked until that verification.
+
+| Phase | Authority / responsibility | Accepted status |
+| --- | --- | --- |
+| 12A | Domain, transactional SQLite persistence, immutable revisions | COMPLETE |
+| 12B | Teacher setup and lifecycle adapter | COMPLETE |
+| 12C | Existing authenticated Student transport, authorized reads, draft/pending recovery | COMPLETE |
+| 12D | Teacher-only read models, monitoring and historical records | COMPLETE |
+| 12E | Integration audit and documentation closeout | COMPLETE |
+
+Only RANDOM_ONE_TO_ONE, STUDENT_SELECT and CROSS_GROUP are supported. Random freezes Essay targets and one-to-one assignments at OPEN. Student Select counts claims separately from submitted reviews, moves atomically before first submission, and locks the target after any accepted response. Cross Group pins the selected GroupSet and shares one assignment/review across its frozen reviewer members. New Essay revisions, question edits, regrouping and roster changes do not replace the frozen targets or response history. Peer Review never changes Essay pending status, scores, correctness or Phase 10 statistics.
+
+Teacher DRAFT is editable/cancellable; OPEN settings are locked; CLOSED/CANCELLED are readonly. Student DRAFT/CANCELLED are hidden; CLOSED related records remain readonly while the Session is accessible. Session End/stale recovery atomically cancels DRAFT and closes OPEN, retaining history. Ended Session credentials are not revived: Teacher history is the durable access path after Session End/restart. Exact accepted replay precedes OPEN validation, but does not bypass transport authentication or assignment authorization.
+
+Student server-to-client WS delivery is bounded summary/invalidation/ACK, never a full collection or Essay/received-feedback body. The existing client-to-server `submit_peer_review` mutation necessarily carries the bounded authored body; this is not a body-read projection. One ParticipantTransport and credential lifecycle remain authoritative; no query-string credentials or second socket are introduced. Authorized detail and collections use authenticated HTTP. Teacher reads use validated IPC. Student collection and Teacher monitoring/history pages both default to 50/max 100 and SQL LIMIT + 1 before materialization. Legacy Teacher setup context/internal domain lists remain separate aggregate APIs, not full-load-then-paginate adapters, and are not used by the new paginated delivery paths.
+
+Client pending persists the exact normalized payload before send and retries its UUID after reconnect. `reviewSubmissionId` accepts UUIDv4/v7; internal IDs stay UUIDv7. Same-ID/different-payload conflicts; new-ID-after-CLOSED fails. All modes use expectedBaseRevision to avoid silent overwrite. Student recipient feedback hides reviewer/contributor identity, while Teacher revision detail exposes safe Session identity for audit. Metadata invalidation is isolated from quiz/grouping and authored recovery state. Teacher polling owns only the mounted OPEN view and reads no bodies/history.
+
+### Deferred inventory
+
+| Issue | Severity | Blocking | Target |
+| --- | --- | --- | --- |
+| MOBILE_PEER_REVIEW_SUBMIT_CONFIRMATION | UI feedback/polish | NON_BLOCKING | FINAL_UI_UX_PHASE |
+
+Decision: DEFER_TO_FINAL_UI_UX_PHASE. No additional blocking Peer Review defect identified. No other Peer Review-specific deferred defect was identified in the reviewed documents/comments. Grouping cosmetic polish/drag-and-drop and general asset retention are existing out-of-scope deferrals, not new Phase 12 blockers. No cosmetic change is included.
+
 ## Phase 12D — Teacher monitoring and records
 
 Teacher setup links OPEN/CLOSED activities to a read-only monitor. ENDED Session Analysis has a separately loaded, paginated activity overview and record entry; its statistics payload does not contain review bodies. DRAFT/CANCELLED show basic state only, with no invented progress. No Student behavior or protocol changes are made.
@@ -18,11 +46,11 @@ Implementation verification: workspace typecheck and standard parallel tests pas
 
 ### Phase 12D final closeout
 
-User-reported Human QA 1–8: PASS. Functional UI QA: PASS. The user verified Random, Student Select and Cross Group monitoring; latest/revision history; polling cleanup; CLOSED/Session End; history after restart; and functional UI. Phase 12D implementation and automated verification are accepted. Phase 12E remains unstarted and requires manual push plus remote verification of the local baseline before proceeding.
+User-reported Human QA 1–8: PASS. Functional UI QA: PASS. The user verified Random, Student Select and Cross Group monitoring; latest/revision history; polling cleanup; CLOSED/Session End; history after restart; and functional UI. Phase 12D implementation and automated verification are accepted. Its baseline is the starting point for the Phase 12E audit above; local main and origin/main tracking matched at the audit gate.
 
 ### Deferred UI issue: MOBILE_PEER_REVIEW_SUBMIT_CONFIRMATION
 
-Status: DEFERRED / NON_BLOCKING. Decision: DEFER_TO_FINAL_UX_PHASE. Target: FINAL_UI_UX_REVIEW.
+Status: DEFERRED / NON_BLOCKING. Decision: DEFER_TO_FINAL_UI_UX_PHASE. Target: FINAL_UI_UX_PHASE.
 
 Student mobile Peer Review submission succeeds, but lacks an explicit success confirmation beyond the visible submitted revision/version state. This does not affect submission correctness, persistence, ACK-loss/idempotency, revision semantics or Teacher monitoring, and does not block Phase 12D or Phase 12. No Student UI polish is included in this closeout.
 
@@ -129,7 +157,7 @@ These are Rust library APIs, not transport-safe Student DTOs. The subsequent tra
 
 Repository tests cover 2/5-person cycles, source validation, frozen latest submissions, rollback after a partial OPEN failure, claim/move/capacity rules, concurrent last-slot contention, unlimited capacity, revision idempotency, concurrent group edits, immutable group revision selection, retained history after restart/Session End/roster deletion, and foreign-key restrictions. Statistics snapshots before and after feedback remain identical; essays stay pending with no score or correctness assigned.
 
-This foundation is ready for a separately authorized Phase 12B Teacher setup workflow. It does not constitute Peer Review human UI QA.
+Historically, this was the Phase 12A foundation acceptance. Teacher setup, Student delivery and Teacher monitoring subsequently completed in 12B–12D; their Human QA records are recorded separately.
 
 ## Phase 12B — Teacher activity setup
 
@@ -143,13 +171,13 @@ DRAFT editing can change question, mode, capacity or GroupSet, but cannot move t
 
 OPEN confirmation explains fixed answer versions and locked settings. OPEN displays its persisted target count, never the current submission count. CLOSE preserves feedback history; only DRAFT offers CANCEL. Terminal Sessions show read-only records. Saved DRAFTs survive page navigation and repository reopen. **Full application restart retains the records but existing 12A stale-Session recovery ends the previous Session, cancels DRAFTs and closes OPEN activities.** 12B does not revive old Sessions or change this recovery contract; “survive restart” means retained history, not an editable DRAFT after stale recovery.
 
-The UI states: 同儕互評只作為回饋紀錄，不計入正式成績。Within the historical Phase 12B scope, Student transport/UI, target claiming and feedback submission/viewing were deferred to 12C, now described above. Same-group mode, grade integration, completion monitoring and results dashboards remain outside this implementation; Phase 12D has not started. Migration files 0001–0006 are unchanged; no 0007 or new direct dependencies are introduced.
+The UI states: 同儕互評只作為回饋紀錄，不計入正式成績。Within the historical Phase 12B scope, Student delivery and Teacher monitoring were deferred; they are now implemented in 12C and 12D respectively. Same-group mode and grade integration remain excluded. Migration files 0001–0006 are unchanged; no 0007 or new direct dependencies are introduced.
 
 ### Phase 12B closeout acceptance
 
 User-reported Human QA: PASS (13/13). Functional UI QA: PASS. The accepted checks cover locked/revealed essay setup, Random draft/open/close, Student Select capacity 3 and invalid inputs, draft cancellation, current/historical Cross Group revisions, insufficient-group blocking, frozen GroupSet and essay targets, restart recovery, Session End, and keyboard/dirty-state operation.
 
-Restart semantics are `EXPECTED_RECOVERY_BEHAVIOR`, not a warning or blocker: stale Session recovery ends the Session, changes DRAFT to CANCELLED and OPEN to CLOSED, and retains all Peer Review records. It does not resume an editable draft. Phase 12A and Phase 12B acceptance are complete. Phase 12C implementation is described above; Phase 12D has not started.
+Restart semantics are `EXPECTED_RECOVERY_BEHAVIOR`, not a warning or blocker: stale Session recovery ends the Session, changes DRAFT to CANCELLED and OPEN to CLOSED, and retains all Peer Review records. It does not resume an editable draft. Phase 12A–12D acceptance is complete; current integration status is recorded above.
 
 ## Phase 12C-S2 verification evidence
 
@@ -161,4 +189,4 @@ The final Student Select candidate, editor and received-feedback surfaces were c
 
 The preceding checks are automation-assisted functional evidence. At Phase 12C final closeout, the user separately reported Human QA PASS and Functional UI QA PASS, including physical-phone refresh/Wi-Fi reconnect, Random restoration, Student Select capacity/move/failed-move preservation, Cross Group multi-device revision conflicts, frozen GroupSet references, ACK-loss/CLOSED pending replay, latest-revision feedback, anonymity and CLOSED readonly behavior.
 
-Phase 12C UUID contract fix, S1 protocol/read foundation and S2 Student UI/recovery are complete. Closeout changes documentation only and retains the existing passing verification evidence; no additional Computer Use or repeated QA is required. Phase 12D remains deferred until the local baseline is manually pushed and remotely verified.
+Phase 12C UUID contract fix, S1 protocol/read foundation and S2 Student UI/recovery are complete. That closeout changed documentation only and retained existing verification evidence. Phase 12D subsequently completed Teacher monitoring and records as described above.
