@@ -42,6 +42,13 @@ fn list_latest_submissions(
     session_id: &str,
 ) -> Result<Vec<SubmissionRecord>, AppError> {
     let connection = database.connection()?;
+    latest_submissions_on(&connection, session_id)
+}
+
+pub(super) fn latest_submissions_on(
+    connection: &rusqlite::Connection,
+    session_id: &str,
+) -> Result<Vec<SubmissionRecord>, AppError> {
     let mut statement = connection.prepare(
         "WITH ranked AS (
             SELECT s.id, s.session_question_id, s.participant_id, s.revision,

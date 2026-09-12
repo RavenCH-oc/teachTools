@@ -325,6 +325,13 @@ impl LocalSessionRepository {
         session_id: &str,
     ) -> Result<Vec<ParticipantRecord>, AppError> {
         let connection = database.connection()?;
+        Self::list_participants_on(&connection, session_id)
+    }
+
+    pub(super) fn list_participants_on(
+        connection: &rusqlite::Connection,
+        session_id: &str,
+    ) -> Result<Vec<ParticipantRecord>, AppError> {
         let mut statement = connection.prepare(&participant_select(
             "WHERE p.session_id = ?1 ORDER BY p.seat_number, p.id",
         ))?;

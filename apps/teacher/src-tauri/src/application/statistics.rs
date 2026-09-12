@@ -193,6 +193,12 @@ impl StatisticsService {
     }
 }
 
+pub(super) fn statistics_from_snapshot(
+    snapshot: &StatisticsSnapshot,
+) -> Result<SessionStatisticsDto, AppError> {
+    session_statistics(snapshot, &latest_by_pair(snapshot))
+}
+
 #[derive(Default)]
 struct Aggregate {
     answered_count: i64,

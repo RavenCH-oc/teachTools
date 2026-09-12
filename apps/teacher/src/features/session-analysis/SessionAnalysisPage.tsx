@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { SessionReportExport } from "./SessionReportExport";
 import { PeerReviewRecordsEntry } from "../peer-review/PeerReviewMonitor";
 import type { LocalSession, QuestionDifficulty, QuestionStatistics, SessionHistory, SessionQuestion, SessionStatistics } from "../../types/teacher";
 import { formatRate, formatScore } from "../live-quiz/statisticsFormatting";
@@ -23,6 +24,7 @@ export function SessionAnalysisPage({ api, session, onBack, onPeerReview }: Prop
     <div className="page-heading compact"><div><p className="eyebrow">教師工作區 / Session Analysis</p><h2>課堂統計</h2><p className="intro">{session.classroomName} · {statistics.sessionState === "ACTIVE" ? "進行中" : "已結束"} · {formatSessionDate(session.endedAt ?? session.createdAt)}</p></div><button className="button ghost" type="button" onClick={onBack}>返回{session.state === "ACTIVE" ? "即時測驗" : "課堂紀錄"}</button></div>
     {state.error && <div className="error-banner" role="status"><span>{state.error}</span><button type="button" onClick={state.retry}>重新載入</button></div>}
     {safeMode && <div className="analysis-safe-banner" role="status">目前仍在作答中，為避免投影畫面影響作答，詳細分析會在停止作答後顯示。</div>}
+    {statistics.sessionState === "ENDED" && <SessionReportExport key={sessionIdOf(session)} sessionId={sessionIdOf(session)} />}
     <SummarySection statistics={statistics} safeMode={safeMode} />
     {statistics.sessionState==="ENDED" && onPeerReview && <PeerReviewRecordsEntry key={sessionIdOf(session)} sessionId={sessionIdOf(session)} onOpen={onPeerReview}/>}
     <QuestionSection statistics={statistics} questions={questions} safeMode={safeMode} />

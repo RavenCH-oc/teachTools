@@ -265,3 +265,22 @@ impl Serialize for AppError {
         state.end()
     }
 }
+
+#[derive(Debug, serde::Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReportError {
+    InvalidSessionId,
+    InvalidSections,
+    InvalidOutputPath,
+    SessionNotFound,
+    SessionNotEnded,
+    Storage,
+    Generation,
+    Write,
+}
+impl std::fmt::Display for ReportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Report operation failed")
+    }
+}
+impl std::error::Error for ReportError {}

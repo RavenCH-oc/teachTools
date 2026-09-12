@@ -13,6 +13,7 @@ describe("SessionAnalysisPage", () => {
   it("renders ended summary, deterministic participant order, and collapsed distribution", async () => {
     render(<SessionAnalysisPage api={apiFor("ENDED", "REVEALED")} session={session} onBack={vi.fn()} />);
     expect(await screen.findByText("課堂摘要")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "匯出報表" })).toBeInTheDocument();
     expect(screen.getAllByText("已評分得分").length).toBeGreaterThan(0);
     expect(screen.getByText("易錯題")).toBeInTheDocument();
     const participantTable = screen.getByRole("table", { name: "學生作答與評分統計" });
@@ -26,6 +27,7 @@ describe("SessionAnalysisPage", () => {
     render(<SessionAnalysisPage api={apiFor("ACTIVE", "OPEN")} session={{ ...session, state: "ACTIVE", endedAt: null }} onBack={vi.fn()} />);
     expect(await screen.findByText("目前仍在作答中，為避免投影畫面影響作答，詳細分析會在停止作答後顯示。")).toBeInTheDocument();
     expect(screen.queryByText("易錯題")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "匯出報表" })).not.toBeInTheDocument();
     expect(screen.queryByText("已評分得分")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "查看作答分布" })).not.toBeInTheDocument();
   });

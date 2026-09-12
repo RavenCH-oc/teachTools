@@ -8,6 +8,7 @@ pub(crate) mod peer_review;
 pub(crate) mod question;
 pub(crate) mod question_asset;
 pub(crate) mod question_set;
+pub(crate) mod session_report;
 pub(crate) mod statistics;
 pub(crate) mod student;
 

@@ -6,6 +6,7 @@ mod peer_review_commands;
 pub mod peer_review_domain;
 mod peer_review_monitor_commands;
 mod question_domain;
+mod session_report_commands;
 pub use application::peer_review;
 
 use application::grouping::{
@@ -679,6 +680,11 @@ pub fn run() -> Result<(), String> {
                     service.database_for_local_session(),
                 ),
             );
+            app.manage(
+                application::session_report::SessionReportService::initialize(
+                    service.database_for_local_session(),
+                ),
+            );
             app.manage(service);
             Ok(())
         })
@@ -693,6 +699,7 @@ pub fn run() -> Result<(), String> {
             peer_review_commands::open_peer_review_activity,
             peer_review_commands::close_peer_review_activity,
             peer_review_commands::cancel_peer_review_activity,
+            session_report_commands::export_session_report,
             get_app_runtime_info,
             get_local_database_status,
             list_group_presets,

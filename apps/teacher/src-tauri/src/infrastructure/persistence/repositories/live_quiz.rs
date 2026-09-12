@@ -125,6 +125,13 @@ impl LiveQuizRepository {
     }
     pub fn list_questions(d: &Database, sid: &str) -> Result<Vec<SessionQuestionRecord>, AppError> {
         let c = d.connection()?;
+        Self::list_questions_on(&c, sid)
+    }
+
+    pub(super) fn list_questions_on(
+        c: &rusqlite::Connection,
+        sid: &str,
+    ) -> Result<Vec<SessionQuestionRecord>, AppError> {
         let mut s = c.prepare(&question_select("WHERE session_id=?1 ORDER BY position,id"))?;
         let rows = s
             .query_map([sid], question_row)?

@@ -18,6 +18,8 @@ pub(crate) mod peer_review_monitor;
 pub(crate) mod peer_review_setup;
 pub(crate) mod peer_review_student;
 mod questions;
+pub(crate) mod session_report;
+mod session_report_xlsx;
 mod statistics;
 mod student_assets;
 pub use assets::{
