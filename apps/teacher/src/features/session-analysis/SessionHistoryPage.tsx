@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Classroom, SessionHistory, TeacherApi } from "../../types/teacher";
 
 type HistoryApi = Required<Pick<TeacherApi, "listClassroomSessionHistory">>;
@@ -12,26 +12,31 @@ export function SessionHistoryPage({ api, classrooms, onOpenSessionAnalysis }: {
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [reload, setReload] = useState(0);
+  const queryGeneration = useRef(0);
 
   useEffect(() => { if (!classroomId && classrooms[0]) setClassroomId(classrooms[0].id); }, [classroomId, classrooms]);
   useEffect(() => {
-    if (!classroomId) { setRows([]); return; }
-    let active = true;
+    const generation = ++queryGeneration.current;
+    if (!classroomId) { setRows([]); setLoading(false); setError(""); setHasMore(false); setOffset(0); return; }
+    const isCurrent = () => queryGeneration.current === generation;
     setLoading(true); setError(""); setOffset(0);
     void api.listClassroomSessionHistory(classroomId, PAGE_SIZE, 0).then((items) => {
-      if (!active) return;
+      if (!isCurrent()) return;
       setRows(items); setHasMore(items.length === PAGE_SIZE);
-    }).catch(() => { if (active) { setRows([]); setHasMore(false); setError("無法載入課堂紀錄。"); } }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    }).catch(() => { if (isCurrent()) { setRows([]); setHasMore(false); setError("無法載入課堂紀錄。"); } }).finally(() => { if (isCurrent()) setLoading(false); });
+    return () => { queryGeneration.current += 1; };
   }, [api, classroomId, reload]);
 
   const loadMore = () => {
     if (!classroomId || loading || !hasMore) return;
+    const generation = queryGeneration.current;
+    const isCurrent = () => queryGeneration.current === generation;
     const nextOffset = offset + PAGE_SIZE;
     setLoading(true);
     void api.listClassroomSessionHistory(classroomId, PAGE_SIZE, nextOffset).then((items) => {
+      if (!isCurrent()) return;
       setRows((current) => [...current, ...items]); setOffset(nextOffset); setHasMore(items.length === PAGE_SIZE);
-    }).catch(() => setError("無法載入更多課堂紀錄。")).finally(() => setLoading(false));
+    }).catch(() => { if (isCurrent()) setError("無法載入更多課堂紀錄。"); }).finally(() => { if (isCurrent()) setLoading(false); });
   };
 
   return <section className="session-history-page">

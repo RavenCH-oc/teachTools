@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { TeacherApiError } from "./services/teacherApi";
 import type { LocalSession, QuestionSet, TeacherApi } from "./types/teacher";
 import { draftFixture, reviewApiFixture, setupFixture } from "./features/peer-review/testFixtures";
 
@@ -189,5 +190,35 @@ describe("Teacher basic data workspace", () => {
     } finally {
       confirm.mockRestore();
     }
+  });
+});
+
+describe("Teacher initialization reliability", () => {
+  it.each(["success", "failure"])("reaches the error UI and handles retry %s", async (outcome) => {
+    const failure = new TeacherApiError({ code: "storage", message: "本機資料暫時無法讀取。" });
+    const listClassrooms = vi.fn().mockRejectedValueOnce(failure);
+    if (outcome === "success") listClassrooms.mockResolvedValueOnce([]);
+    else listClassrooms.mockRejectedValueOnce(failure);
+    render(<App api={mockApi({ listClassrooms })} />);
+    await screen.findByRole("heading", { name: "本機儲存空間無法使用" });
+    expect(screen.getByRole("alert")).toHaveTextContent(failure.message);
+    expect(screen.queryByText("正在載入本機工作區…")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重試" }));
+    if (outcome === "success") {
+      await screen.findByText("本機儲存空間已就緒");
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    } else {
+      await screen.findByRole("heading", { name: "本機儲存空間無法使用" });
+      expect(screen.getByRole("alert")).toHaveTextContent(failure.message);
+      expect(screen.getByRole("button", { name: "重試" })).toBeEnabled();
+    }
+    expect(listClassrooms).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("正在載入本機工作區…")).not.toBeInTheDocument();
+  });
+
+  it("does not treat a closed database as an empty successful workspace", async () => {
+    render(<App api={mockApi({ getLocalDatabaseStatus: vi.fn().mockResolvedValue({ database_open: false }) })} />);
+    await screen.findByRole("heading", { name: "本機儲存空間無法使用" });
+    expect(screen.queryByText("本機儲存空間已就緒")).not.toBeInTheDocument();
   });
 });

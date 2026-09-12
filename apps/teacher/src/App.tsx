@@ -45,9 +45,14 @@ export function App({ api = teacherApi, reviewApi = peerReviewApi }: AppProps) {
     try { await operation(); } catch (cause) { setError(cause instanceof TeacherApiError ? cause.message : "操作未完成，請再試一次。"); }
   };
   const refresh = async () => run(async () => {
-    const [storage, nextClassrooms, nextCourses] = await Promise.all([api.getLocalDatabaseStatus(), api.listClassrooms(), api.listCourses()]);
-    if (!storage.database_open) throw new Error("Local storage is unavailable.");
-    setClassrooms(nextClassrooms); setCourses(nextCourses); setStatus("ready");
+    try {
+      const [storage, nextClassrooms, nextCourses] = await Promise.all([api.getLocalDatabaseStatus(), api.listClassrooms(), api.listCourses()]);
+      if (!storage.database_open) throw new Error("Local storage is unavailable.");
+      setClassrooms(nextClassrooms); setCourses(nextCourses); setStatus("ready");
+    } catch (cause) {
+      setStatus("error");
+      throw cause;
+    }
   });
   useEffect(() => { void refresh(); }, []);
 
