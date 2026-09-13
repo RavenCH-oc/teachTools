@@ -3,6 +3,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+#[cfg(not(debug_assertions))]
+use tauri::Manager;
+
 use crate::error::AppError;
 
 #[derive(Clone)]

@@ -32,6 +32,12 @@
   },
   "bundle": {
     "active": true,
+    "targets": ["nsis"],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
     "resources": {
       "../../student/dist": "student"
     }
