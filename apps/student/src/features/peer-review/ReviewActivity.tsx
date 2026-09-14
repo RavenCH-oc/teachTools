@@ -71,6 +71,8 @@ function ReviewEditor({ participant, activity: a, assignmentId, targetId, refres
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showLatest, setShowLatest] = useState(false);
+  const observedAccepted = useRef(accepted);
+  const [confirmedRevision, setConfirmedRevision] = useState<number | null>(null);
   const acceptedRef = useRef(accepted); acceptedRef.current = accepted;
   const dirtyRef = useRef<PeerReviewDraft | null>(null);
   useEffect(() => {
@@ -89,9 +91,10 @@ function ReviewEditor({ participant, activity: a, assignmentId, targetId, refres
     }).catch(() => { if (!controller.signal.aborted && generation() === connection) { setError("無法載入評論，草稿仍保留。請重新整理。"); setLoading(false); } });
     return () => controller.abort();
   }, [participant, assignmentId, a.activityId, targetId, refresh, generation, storage]);
-  useEffect(() => { if (accepted) { dirtyRef.current = null; setBody(accepted.body); setBase(accepted.revision); setLatest(accepted); setDirty(false); setError(""); } }, [accepted]);
+  useEffect(() => { if (accepted && accepted !== observedAccepted.current) setConfirmedRevision(accepted.revision); observedAccepted.current = accepted; if (accepted) { dirtyRef.current = null; setBody(accepted.body); setBase(accepted.revision); setLatest(accepted); setDirty(false); setError(""); } }, [accepted]);
   const edit = (text: string) => {
     if (Array.from(text).length > 10000) return;
+    setConfirmedRevision(null);
     setBody(text); setDirty(true);
     dirtyRef.current = { body: text, baseRevision: base, updatedAt: new Date().toISOString(), targetId };
     try { storage.saveDraft(a.activityId, assignmentId, dirtyRef.current); setError(""); }
@@ -99,6 +102,7 @@ function ReviewEditor({ participant, activity: a, assignmentId, targetId, refres
   };
   const stale = dirty && latest.revision > base;
   const loadLatest = () => {
+    setConfirmedRevision(null);
     if (dirty && !window.confirm("會以伺服器最新內容取代目前未送出文字，是否繼續？")) return;
     try { storage.clearDraft(a.activityId, assignmentId); dirtyRef.current = null; setBody(latest.body); setBase(latest.revision); setDirty(false); setError(""); setShowLatest(false); }
     catch { setError("無法更新本機草稿。"); }
@@ -108,6 +112,7 @@ function ReviewEditor({ participant, activity: a, assignmentId, targetId, refres
     try {
       const normalized = body.trim();
       storage.saveDraft(a.activityId, assignmentId, { body: normalized, baseRevision: base, updatedAt: new Date().toISOString(), targetId });
+      setConfirmedRevision(null);
       actions.submit({ activityId: a.activityId, assignmentId, reviewSubmissionId: secureUuid(), expectedBaseRevision: base, body: normalized });
     } catch { setError("無法安全保存評論提交資料，尚未送出。"); }
   };
@@ -118,7 +123,8 @@ function ReviewEditor({ participant, activity: a, assignmentId, targetId, refres
     {(error || rejection) && <p role="alert">{error || peerError(rejection)}</p>}
     <label htmlFor={`review-${assignmentId}`}>評論內容</label><textarea id={`review-${assignmentId}`} rows={7} value={body} readOnly={loading || !!pending || claiming || a.state === "CLOSED"} onChange={e => edit(e.target.value)} aria-describedby={`review-count-${assignmentId}`} />
     <p id={`review-count-${assignmentId}`}>{Array.from(body).length} / 10000 字</p>
-    <button type="button" disabled={loading || !!pending || claiming || a.state !== "OPEN" || !online || stale || !body.trim() || body.includes("\0")} onClick={submit}>送出評論</button>
+    <button className="peer-submit" type="button" disabled={loading || !!pending || claiming || a.state !== "OPEN" || !online || stale || !body.trim() || body.includes("\0")} onClick={submit}>送出評論</button>
+    {confirmedRevision !== null && confirmedRevision === latest.revision && !dirty && !pending && !error && !rejection && <p className="student-success" role="status">評論已送出（第 {confirmedRevision} 版）。</p>}
     {(stale || rejection || dirty) && <div className="peer-actions"><button type="button" onClick={() => setShowLatest(v => !v)}>查看最新版本</button><button type="button" disabled={!!pending || loading} onClick={loadLatest}>載入最新版本</button><button type="button" onClick={() => setShowLatest(false)}>保留我的草稿</button></div>}
     {showLatest && <article className="peer-card"><h5>伺服器最新版本：第 {latest.revision} 版</h5><p className="peer-body">{latest.body || "尚無已送出的評論。"}</p></article>}
   </section>;

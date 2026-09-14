@@ -32,3 +32,13 @@ it("ignores a previous Activity completion after navigation",async()=>{
   view.unmount();render(<PeerReviewMonitor api={api} sessionId="s" activityId="b" onBack={()=>{}}/>);await screen.findByText("Frozen question");
   await act(async()=>finish({...summary,question_summary:"Stale activity"}));expect(screen.queryByText("Stale activity")).not.toBeInTheDocument();expect(api.statuses).toHaveBeenCalledTimes(1);
 });
+
+it("Phase 14 presents empty filters with an explicit selected button", async () => {
+  const api=fixture(); api.summary.mockResolvedValue({...summary,state:"CLOSED"}); api.statuses.mockResolvedValue({items:[],next_cursor:null,total:0});
+  render(<PeerReviewMonitor api={api} sessionId="s" activityId="a" onBack={()=>{}}/>);
+  expect(await screen.findByText("目前沒有符合此分類的紀錄。")).toBeInTheDocument();
+  expect(screen.getByRole("button",{name:"評論者狀態"})).toHaveAttribute("aria-pressed","true");
+  fireEvent.click(screen.getByRole("button",{name:"尚未收到評論"}));
+  expect(screen.getByRole("button",{name:"尚未收到評論"})).toHaveAttribute("aria-pressed","true");
+  expect(screen.getByRole("button",{name:"評論者狀態"})).toHaveAttribute("aria-pressed","false");
+});

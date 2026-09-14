@@ -40,7 +40,7 @@ export function SessionHistoryPage({ api, classrooms, onOpenSessionAnalysis }: {
   };
 
   return <section className="session-history-page">
-    <div className="page-heading compact"><div><p className="eyebrow">教師工作區 / History</p><h2>課堂紀錄</h2><p className="intro">檢視已結束課堂的統計與分析。</p></div></div>
+    <div className="page-heading compact"><div><p className="eyebrow">教師工作區 / 課堂紀錄</p><h2>課堂紀錄</h2><p className="intro">檢視已結束課堂的統計與分析。</p></div></div>
     <label className="select-label" htmlFor="history-classroom">班級<select id="history-classroom" value={classroomId} onChange={(event) => setClassroomId(event.target.value)}><option value="">請選擇班級</option>{classrooms.map((classroom) => <option key={classroom.id} value={classroom.id}>{classroom.name}</option>)}</select></label>
     {error && <div className="error-banner" role="alert"><span>{error}</span><button type="button" onClick={() => setReload((value) => value + 1)}>重試</button></div>}
     {loading && rows.length === 0 && <div className="state-card"><span className="spinner" />正在載入課堂紀錄…</div>}

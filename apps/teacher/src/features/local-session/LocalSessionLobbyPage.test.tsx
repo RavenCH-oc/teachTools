@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LocalSessionLobbyPage, type LocalSessionLobbyApi } from "./LocalSessionLobbyPage";
+import { candidateLabel, LocalSessionLobbyPage, type LocalSessionLobbyApi } from "./LocalSessionLobbyPage";
 import type { LocalSession, LocalSessionParticipant } from "../../types/teacher";
 
 const session: LocalSession = {
@@ -62,4 +62,12 @@ describe("LocalSessionLobbyPage", () => {
     expect(api.createLocalSession).not.toHaveBeenCalled();
     expect(api.startLocalServer).not.toHaveBeenCalled();
   });
+});
+
+it.each([
+  ["172.16.1.1", "私有區網"], ["172.31.1.1", "私有區網"],
+  ["172.15.1.1", "其他網路"], ["172.32.1.1", "其他網路"],
+  ["10.0.0.1", "私有區網"], ["192.168.1.1", "私有區網"], ["169.254.1.1", "Link-local"],
+])("Phase 14 labels %s as %s without changing its URL", (host, label) => {
+  expect(candidateLabel(`http://${host}:8000`)).toBe(`${host}（${label}）`);
 });

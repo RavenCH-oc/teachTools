@@ -59,5 +59,11 @@ export function LocalSessionLobbyPage({ api, classrooms, onError, onClearError, 
 }
 
 function ParticipantList({ participants }: { participants: LocalSessionParticipant[] }) { return <section className="participant-list" aria-label="已加入學生"><h3>已加入學生</h3>{participants.length === 0 ? <p>尚未有學生加入。</p> : <ul>{participants.map((participant) => <li key={participant.participantId}><span>{participant.seatNumber} 號 {participant.displayName}</span><span>{participant.online ? "線上" : "離線"}</span><time>{new Date(participant.joinedAt).toLocaleTimeString("zh-TW")}</time></li>)}</ul>}</section>; }
-function candidateLabel(url: string): string { const host = new URL(url).hostname; return `${host}（${host.startsWith("192.168.") || host.startsWith("10.") || host.startsWith("172.") ? "私有區網" : host.startsWith("169.254.") ? "Link-local" : "其他網路"}）`; }
+export function candidateLabel(url: string): string {
+  const host = new URL(url).hostname;
+  const octets = host.split(".").map(Number);
+  const ipv4 = octets.length === 4 && octets.every(value => Number.isInteger(value) && value >= 0 && value <= 255);
+  const privateAddress = ipv4 && (octets[0] === 10 || (octets[0] === 172 && (octets[1] ?? -1) >= 16 && (octets[1] ?? -1) <= 31) || (octets[0] === 192 && octets[1] === 168));
+  return `${host}（${privateAddress ? "私有區網" : ipv4 && octets[0] === 169 && octets[1] === 254 ? "Link-local" : "其他網路"}）`;
+}
 function errorMessage(cause: unknown): string { return cause instanceof TeacherApiError ? cause.message : "無法完成課堂操作。"; }

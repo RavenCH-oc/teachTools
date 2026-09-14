@@ -85,23 +85,27 @@ describe("Student Peer Review S2", () => {
     mount(); await open(); expect(await editor()).toHaveValue("我的未送出草稿");
     expect(screen.getByText("Frozen essay")).toBeInTheDocument(); expect(send).not.toHaveBeenCalled();
   });
-  it("persists pending before send, acknowledges rev1/rev2 and does not resurrect the old draft", async () => {
+  it("Phase 14 confirms accepted rev1/rev2 and clears success on edit and pending", async () => {
     send.mockImplementation(message => { if (message.type === "submit_peer_review") expect(peerStorage(participant).pending()[0]?.reviewSubmissionId).toBe(message.reviewSubmissionId); return "sent"; });
     const view = mount(); await open(); fireEvent.change(await editor(), { target: { value: "  first  " } }); fireEvent.click(screen.getByRole("button", { name: "送出評論" }));
     const first = lastSubmit(); expect(first.body).toBe("first"); expect(screen.getByLabelText("評論內容")).toHaveAttribute("readonly");
     own = { assignmentId: id(6), revision: 1, body: "first" }; activity.latestReviewRevision = 1; ack(first);
     await waitFor(() => expect(peerStorage(participant).pending()).toHaveLength(0)); expect(peerStorage(participant).draft(id(4), id(6))).toBeNull();
-    fireEvent.change(await editor(), { target: { value: "second" } }); fireEvent.click(screen.getByRole("button", { name: "送出評論" })); const second = lastSubmit();
+    expect(await screen.findByText("評論已送出（第 1 版）。")).toHaveAttribute("role", "status");
+    fireEvent.change(await editor(), { target: { value: "second" } });
+    expect(screen.queryByText(/評論已送出/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "送出評論" })); const second = lastSubmit();
+    expect(screen.queryByText(/評論已送出/)).not.toBeInTheDocument();
     expect(second.expectedBaseRevision).toBe(1); expect(second.reviewSubmissionId).not.toBe(first.reviewSubmissionId);
-    own = { assignmentId: id(6), revision: 2, body: "second" }; activity.latestReviewRevision = 2; ack(second, 2); view.unmount();
-    mount(); await open(); expect(await editor()).toHaveValue("second"); expect(peerStorage(participant).pending()).toHaveLength(0);
+    own = { assignmentId: id(6), revision: 2, body: "second" }; activity.latestReviewRevision = 2; ack(second, 2); expect(await screen.findByText("評論已送出（第 2 版）。")).toBeInTheDocument(); view.unmount();
+    mount(); await open(); expect(await editor()).toHaveValue("second"); expect(peerStorage(participant).pending()).toHaveLength(0); expect(screen.queryByText(/評論已送出/)).not.toBeInTheDocument();
   });
-  it("replays the exact pending ID after reconnect and CLOSED, ignores an old ACK", async () => {
+  it("Phase 14 ignores an old ACK for success and confirms the matching replay", async () => {
     mount(); await open(); fireEvent.change(await editor(), { target: { value: "lost ACK" } }); fireEvent.click(screen.getByRole("button", { name: "送出評論" })); const submitted = lastSubmit();
     act(() => channel.emit({ type: "connection", online: false, generation: 1 })); activity.state = "CLOSED";
     act(() => channel.emit({ type: "connection", online: true, generation: 2 }));
     await waitFor(() => expect(send).toHaveBeenCalledTimes(2)); expect(lastSubmit()).toEqual(submitted);
-    ack(submitted, 1, 1); expect(peerStorage(participant).pending()).toHaveLength(1);
+    ack(submitted, 1, 1); expect(peerStorage(participant).pending()).toHaveLength(1); expect(screen.queryByText(/評論已送出/)).not.toBeInTheDocument();
     own = { assignmentId: id(6), revision: 1, body: "lost ACK" }; ack(submitted, 1, 2);
     await waitFor(() => expect(peerStorage(participant).pending()).toHaveLength(0)); expect(screen.getByRole("button", { name: "送出評論" })).toBeDisabled();
   });
@@ -142,4 +146,49 @@ describe("Student Peer Review S2", () => {
     mount(); await open(); fireEvent.click(await screen.findByRole("button", { name: "同學回饋 1 · 第 2 版" })); await screen.findByText("匿名最新回饋");
     change(); expect(screen.getByText("匿名最新回饋")).toBeInTheDocument(); expect(api.getPeerReviewFeedback).toHaveBeenCalledWith(participant, expect.objectContaining({ activityId: id(4) })); expect(screen.queryByText(id(20))).not.toBeInTheDocument();
   });
+});
+
+it("Phase 14 never confirms a conflict or HTTP revision and isolates activity success", async () => {
+  const first = {...activity};
+  const second = {...activity, activityId:id(30), assignmentId:id(31), questionSummary:"另一個活動"};
+  vi.mocked(api.getPeerReviewActivities).mockResolvedValue({items:[first,second],nextCursor:null});
+  vi.mocked(api.getPeerReviewActivity).mockImplementation(async (_p, requested)=>({items:[requested===first.activityId?first:second],nextCursor:null}));
+  own={assignmentId:id(6),revision:1,body:"既有評論"};
+  mount(); fireEvent.click(await screen.findByRole("button",{name:"同儕互評"}));
+  fireEvent.click((await screen.findAllByRole("button",{name:"開啟活動"}))[0]!);
+  expect(await editor()).toHaveValue("既有評論");
+  expect(screen.queryByText(/評論已送出/)).not.toBeInTheDocument();
+  own={assignmentId:id(6),revision:2,body:"其他組員更新"}; change();
+  await waitFor(()=>expect(screen.getByLabelText("評論內容")).toHaveValue("其他組員更新"));
+  expect(screen.queryByText(/評論已送出/)).not.toBeInTheDocument();
+  fireEvent.change(await editor(),{target:{value:"衝突的草稿"}}); fireEvent.click(screen.getByRole("button",{name:"送出評論"}));
+  const submitted=lastSubmit();
+  act(()=>channel.emit({type:"message",generation:1,message:{...envelope,type:"peer_review_rejected",requestId:submitted.requestId,code:"REVIEW_REVISION_CONFLICT"}}));
+  expect(screen.queryByText(/評論已送出/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText("評論內容")).toHaveValue("衝突的草稿");
+  fireEvent.click(screen.getByRole("button",{name:"返回活動列表"}));
+  fireEvent.click((await screen.findAllByRole("button",{name:"開啟活動"}))[1]!);
+  expect(await editor()).toBeInTheDocument();
+  expect(screen.queryByText(/評論已送出/)).not.toBeInTheDocument();
+});
+
+it("Phase 14 clears accepted confirmation when switching activity or reopening the editor", async () => {
+  const first={...activity};
+  const second={...activity,activityId:id(30),assignmentId:id(31),questionSummary:"另一個活動"};
+  vi.mocked(api.getPeerReviewActivities).mockResolvedValue({items:[first,second],nextCursor:null});
+  vi.mocked(api.getPeerReviewActivity).mockImplementation(async (_p,requested)=>({items:[requested===first.activityId?first:second],nextCursor:null}));
+  mount(); fireEvent.click(await screen.findByRole("button",{name:"同儕互評"}));
+  fireEvent.click((await screen.findAllByRole("button",{name:"開啟活動"}))[0]!);
+  fireEvent.change(await editor(),{target:{value:"已接受的評論"}}); fireEvent.click(screen.getByRole("button",{name:"送出評論"}));
+  const sent=lastSubmit(); own={assignmentId:id(6),revision:1,body:sent.body}; ack(sent);
+  expect(await screen.findByText("評論已送出（第 1 版）。")).toBeInTheDocument();
+  own={assignmentId:id(6),revision:2,body:"其他組員的新版本"}; change();
+  await waitFor(()=>expect(screen.getByLabelText("評論內容")).toHaveValue("其他組員的新版本"));
+  expect(screen.queryByText(/評論已送出/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button",{name:"返回活動列表"}));
+  fireEvent.click((await screen.findAllByRole("button",{name:"開啟活動"}))[1]!);
+  await editor(); expect(screen.queryByText(/評論已送出/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button",{name:"返回活動列表"}));
+  fireEvent.click((await screen.findAllByRole("button",{name:"開啟活動"}))[0]!);
+  await editor(); expect(screen.queryByText(/評論已送出/)).not.toBeInTheDocument();
 });

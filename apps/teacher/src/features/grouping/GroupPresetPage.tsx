@@ -346,7 +346,7 @@ export function GroupPresetPage({ api, classrooms, initialClassroomId, onBack, o
             <button className="button primary compact-button" disabled={saving} type="submit">建立分組預設</button>
           </form>
           {presets.length === 0 ? <div className="empty-state compact-empty"><span>＋</span><p>目前還沒有分組預設。</p><button className="button ghost compact-button" type="button" onClick={() => document.getElementById("new-preset-name")?.focus()}>建立分組預設</button></div> : <ul className="preset-list">{presets.map((preset) => <li className={preset.id === selectedPresetId ? "selected" : ""} key={preset.id}>
-            <button className="preset-select" type="button" onClick={() => void selectPreset(preset.id)}><strong>{preset.name}</strong><small>{preset.groupCount} 個組別 · {preset.assignedStudentCount} 位學生</small><small>更新於 {formatUpdatedAt(preset.updatedAt)}</small></button>
+            <button aria-pressed={preset.id === selectedPresetId} className="preset-select" type="button" onClick={() => void selectPreset(preset.id)}><strong>{preset.name}</strong><small>{preset.groupCount} 個組別 · {preset.assignedStudentCount} 位學生</small><small>更新於 {formatUpdatedAt(preset.updatedAt)}</small></button>
             <button className="text-button danger" type="button" disabled={saving} onClick={() => void deletePreset(preset)}>刪除</button>
           </li>)}</ul>}
         </section>

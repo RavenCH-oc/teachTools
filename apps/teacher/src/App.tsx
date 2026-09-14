@@ -20,7 +20,6 @@ const nav: Array<{ id: Page; label: string }> = [
   { id: "home", label: "首頁" }, { id: "classrooms", label: "班級" }, { id: "students", label: "學生" },
   { id: "courses", label: "課程" }, { id: "lessons", label: "課程單元" }, { id: "question-bank", label: "題庫" }, { id: "grouping", label: "分組設定" }, { id: "local-session", label: "課堂" }, { id: "live-quiz", label: "即時測驗" }, { id: "session-history", label: "課堂紀錄" },
 ];
-const later = ["設定"];
 
 interface AppProps { api?: TeacherApi; reviewApi?: PeerReviewApi }
 
@@ -56,7 +55,7 @@ export function App({ api = teacherApi, reviewApi = peerReviewApi }: AppProps) {
   });
   useEffect(() => { void refresh(); }, []);
 
-  const pageTitle = useMemo(() => nav.find((item) => item.id === page)?.label ?? (page === "session-analysis" ? "課堂統計" : page === "session-grouping" ? "課堂分組" : page === "peer-review" ? "同儕互評" : "首頁"), [page]);
+  const pageTitle = useMemo(() => nav.find((item) => item.id === page)?.label ?? (page === "session-analysis" ? "課堂統計" : page === "session-grouping" ? "課堂分組" : page === "peer-review" ? "同儕互評" : page === "peer-monitor" ? "同儕互評進度 / 紀錄" : "首頁"), [page]);
   const navigate = (next: Page) => {
     if (page === "peer-review" && hasPeerReviewDraft && next !== page) {
       if (!window.confirm("尚有未儲存的變更，確定要離開嗎？")) return;
@@ -80,16 +79,14 @@ export function App({ api = teacherApi, reviewApi = peerReviewApi }: AppProps) {
   const openSessionGrouping = (sessionId: string) => { setSessionGroupingId(sessionId); navigate("session-grouping"); };
   const openAnalysis = (session: AnalysisSession, returnPage: "session-history" | "live-quiz") => { setAnalysisContext({ session, returnPage }); setError(""); setPage("session-analysis"); };
   return <div className="teacher-shell">
-    <header className="teacher-header"><div><p className="eyebrow">教師工作區</p><h1>{APP_NAME}</h1></div><span className="phase-badge">第 9 階段</span></header>
+    <header className="teacher-header"><div><p className="eyebrow">教師工作區</p><h1>{APP_NAME}</h1></div></header>
     <div className="teacher-body">
       <nav aria-label="教師導覽" className="teacher-nav">
-        {nav.map((item) => <button className={`nav-item ${page === item.id ? "active" : ""}`} key={item.id} onClick={() => navigate(item.id)} type="button">{item.label}</button>)}
-        <div className="nav-divider" />
-        {later.map((item) => <button className="nav-item disabled" disabled key={item} type="button">{item}<span>後續階段</span></button>)}
+        {nav.map((item) => <button aria-current={page === item.id ? "page" : undefined} className={`nav-item ${page === item.id ? "active" : ""}`} key={item.id} onClick={() => navigate(item.id)} type="button">{item.label}</button>)}
       </nav>
       <main className="teacher-main">
         {error && <div className="error-banner" role="alert"><strong>無法完成此操作。</strong><span>{error}</span><button onClick={() => setError("")} type="button">關閉</button></div>}
-        {status === "loading" && <div className="state-card"><span className="spinner" />正在載入本機工作區…</div>}
+        {status === "loading" && <div className="state-card" role="status"><span className="spinner" />正在載入本機工作區…</div>}
         {status === "error" && <div className="state-card"><h2>本機儲存空間無法使用</h2><p>{error || "無法開啟本機資料庫。"}</p><button className="button primary" onClick={() => { setStatus("loading"); void refresh(); }} type="button">重試</button></div>}
         {status === "ready" && page === "home" && <Home api={api} classrooms={classrooms} courses={courses} onNavigate={navigate} />}
         {status === "ready" && page === "classrooms" && <Classrooms api={api} data={classrooms} onChange={setClassrooms} onError={setError} onOpenSessionHistory={() => navigate("session-history")} onOpenGrouping={openGrouping} />}
@@ -125,11 +122,22 @@ function Classrooms({ api, data, onChange, onError, onOpenSessionHistory, onOpen
 
 function Students({ api, classrooms, onError }: { api: TeacherApi; classrooms: Classroom[]; onError: (message: string) => void }) {
   const [classId, setClassId] = useState(classrooms[0]?.id ?? ""); const [data, setData] = useState<Student[]>([]); const [editing, setEditing] = useState<Student | null>(null); const [seat, setSeat] = useState(""); const [name, setName] = useState(""); const [saving, setSaving] = useState(false);
-  useEffect(() => { if (classId) void api.listStudents(classId).then(setData).catch((cause) => onError(cause instanceof TeacherApiError ? cause.message : "無法載入學生資料。")); }, [classId]);
+  const [listState, setListState] = useState<"loading" | "ready" | "error">("loading");
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    setData([]);
+    if (!classId) { setListState("ready"); return; }
+    setListState("loading");
+    void api.listStudents(classId).then(items => {
+      if (!cancelled) { setData(items); setListState("ready"); }
+    }).catch(() => { if (!cancelled) setListState("error"); });
+    return () => { cancelled = true; };
+  }, [api, classId, reload]);
   const reset = () => { setEditing(null); setSeat(""); setName(""); };
   const submit = async (event: React.FormEvent) => { event.preventDefault(); const numeric = Number(seat); if (!Number.isInteger(numeric) || numeric <= 0 || numeric > 1000) return onError("座號必須為正整數。"); if (!name.trim()) return onError("請輸入學生姓名。"); setSaving(true); try { const item = editing ? await api.updateStudent(editing.id, { seat_number: numeric, name }) : await api.createStudent({ class_id: classId, seat_number: numeric, name }); setData(editing ? data.map((row) => row.id === item.id ? item : row) : [...data, item].sort((a, b) => a.seat_number - b.seat_number)); reset(); } catch (cause) { onError(cause instanceof TeacherApiError ? cause.message : "無法儲存學生資料。"); } finally { setSaving(false); } };
   const remove = async (item: Student) => { if (!window.confirm(`確定要刪除「${item.name}」嗎？`)) return; try { await api.deleteStudent(item.id); setData(data.filter((row) => row.id !== item.id)); } catch (cause) { onError(cause instanceof TeacherApiError ? cause.message : "無法刪除學生資料。"); } };
-  return <><PageHeading title="學生" description="為所選班級維護清楚、依座號排序的名冊。" /><label className="select-label" htmlFor="student-class">班級<select id="student-class" value={classId} onChange={(event) => { setClassId(event.target.value); reset(); }}><option value="">請選擇班級</option>{classrooms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{classId && <div className="split-layout"><form className="form-card" onSubmit={submit}><h3>{editing ? "編輯學生" : "新增學生"}</h3><Field label="座號" value={seat} onChange={setSeat} placeholder="1" type="number" /><Field label="學生姓名" value={name} onChange={setName} placeholder="姓名" /><div className="form-actions"><button className="button primary" disabled={saving} type="submit">{saving ? "儲存中…" : editing ? "儲存變更" : "新增學生"}</button>{editing && <button className="button ghost" onClick={reset} type="button">取消</button>}</div></form><section className="list-card"><div className="list-card-header"><h3>名冊</h3><span>{data.length}</span></div>{data.length === 0 ? <EmptyState text="這個班級尚未有學生。" /> : <ul className="entity-list">{data.map((item) => <li key={item.id}><div className="seat"><b>{item.seat_number}</b><strong>{item.name}</strong></div><div className="row-actions"><button className="text-button" onClick={() => { setEditing(item); setSeat(String(item.seat_number)); setName(item.name); }} type="button">編輯</button><button className="text-button danger" onClick={() => void remove(item)} type="button">刪除</button></div></li>)}</ul>}</section></div>}</>;
+  return <><PageHeading title="學生" description="為所選班級維護清楚、依座號排序的名冊。" /><label className="select-label" htmlFor="student-class">班級<select id="student-class" value={classId} onChange={(event) => { setClassId(event.target.value); reset(); }}><option value="">請選擇班級</option>{classrooms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{classId && <div className="split-layout"><form className="form-card" onSubmit={submit}><h3>{editing ? "編輯學生" : "新增學生"}</h3><Field label="座號" value={seat} onChange={setSeat} placeholder="1" type="number" /><Field label="學生姓名" value={name} onChange={setName} placeholder="姓名" /><div className="form-actions"><button className="button primary" disabled={saving} type="submit">{saving ? "儲存中…" : editing ? "儲存變更" : "新增學生"}</button>{editing && <button className="button ghost" onClick={reset} type="button">取消</button>}</div></form><section className="list-card"><div className="list-card-header"><h3>名冊</h3><span>{data.length}</span></div>{listState === "loading" ? <p className="field-status" role="status">正在載入學生名冊…</p> : listState === "error" ? <div className="error-banner" role="alert">無法載入學生名冊。<button type="button" onClick={() => setReload(value => value + 1)}>重試</button></div> : data.length === 0 ? <EmptyState text="這個班級尚未有學生。" /> : <ul className="entity-list">{data.map((item) => <li key={item.id}><div className="seat"><b>{item.seat_number}</b><strong>{item.name}</strong></div><div className="row-actions"><button className="text-button" onClick={() => { setEditing(item); setSeat(String(item.seat_number)); setName(item.name); }} type="button">編輯</button><button className="text-button danger" onClick={() => void remove(item)} type="button">刪除</button></div></li>)}</ul>}</section></div>}</>;
 }
 
 function Courses({ api, data, onChange, onError }: { api: TeacherApi; data: Course[]; onChange: (items: Course[]) => void; onError: (message: string) => void }) {
@@ -141,11 +149,22 @@ function Courses({ api, data, onChange, onError }: { api: TeacherApi; data: Cour
 
 function Lessons({ api, courses, onError }: { api: TeacherApi; courses: Course[]; onError: (message: string) => void }) {
   const [courseId, setCourseId] = useState(courses[0]?.id ?? ""); const [data, setData] = useState<Lesson[]>([]); const [editing, setEditing] = useState<Lesson | null>(null); const [title, setTitle] = useState(""); const [description, setDescription] = useState(""); const [position, setPosition] = useState("0"); const [saving, setSaving] = useState(false);
-  useEffect(() => { if (courseId) void api.listLessons(courseId).then(setData).catch((cause) => onError(cause instanceof TeacherApiError ? cause.message : "無法載入課程單元。")); }, [courseId]);
+  const [listState, setListState] = useState<"loading" | "ready" | "error">("loading");
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    setData([]);
+    if (!courseId) { setListState("ready"); return; }
+    setListState("loading");
+    void api.listLessons(courseId).then(items => {
+      if (!cancelled) { setData(items); setListState("ready"); }
+    }).catch(() => { if (!cancelled) setListState("error"); });
+    return () => { cancelled = true; };
+  }, [api, courseId, reload]);
   const reset = () => { setEditing(null); setTitle(""); setDescription(""); setPosition(String(data.length)); };
   const submit = async (event: React.FormEvent) => { event.preventDefault(); const numeric = Number(position); if (!title.trim()) return onError("請輸入課程單元標題。"); if (!Number.isInteger(numeric) || numeric < 0) return onError("排序位置必須為零或正整數。"); setSaving(true); try { const item = editing ? await api.updateLesson(editing.id, { title, description: description || null, position: numeric }) : await api.createLesson({ course_id: courseId, title, description: description || null, position: numeric }); setData((editing ? data.map((row) => row.id === item.id ? item : row) : [...data, item]).sort((a, b) => a.position - b.position)); reset(); } catch (cause) { onError(cause instanceof TeacherApiError ? cause.message : "無法儲存課程單元。"); } finally { setSaving(false); } };
   const remove = async (item: Lesson) => { if (!window.confirm(`確定要刪除「${item.title}」嗎？`)) return; try { await api.deleteLesson(item.id); setData(data.filter((row) => row.id !== item.id)); } catch (cause) { onError(cause instanceof TeacherApiError ? cause.message : "無法刪除課程單元。"); } };
-  return <><PageHeading title="課程單元" description="為每門課程建立簡潔、有順序的課程大綱。" /><label className="select-label" htmlFor="lesson-course">課程<select id="lesson-course" value={courseId} onChange={(event) => { setCourseId(event.target.value); reset(); }}><option value="">請選擇課程</option>{courses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{courseId && <div className="split-layout"><form className="form-card" onSubmit={submit}><h3>{editing ? "編輯課程單元" : "新增課程單元"}</h3><Field label="課程單元標題" value={title} onChange={setTitle} placeholder="例如：三角形性質" /><Field label="排序位置" value={position} onChange={setPosition} type="number" /><label className="field"><span>說明 <em>選填</em></span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} /></label><div className="form-actions"><button className="button primary" disabled={saving} type="submit">{saving ? "儲存中…" : editing ? "儲存變更" : "建立課程單元"}</button>{editing && <button className="button ghost" onClick={reset} type="button">取消</button>}</div></form><section className="list-card"><div className="list-card-header"><h3>課程大綱</h3><span>{data.length}</span></div>{data.length === 0 ? <EmptyState text="尚未建立課程單元。請新增第一個課程單元。" /> : <ul className="entity-list">{data.map((item) => <li key={item.id}><div className="seat"><b>{item.position + 1}</b><div><strong>{item.title}</strong><small>{item.description || "未填寫說明"}</small></div></div><div className="row-actions"><button className="text-button" onClick={() => { setEditing(item); setTitle(item.title); setDescription(item.description ?? ""); setPosition(String(item.position)); }} type="button">編輯</button><button className="text-button danger" onClick={() => void remove(item)} type="button">刪除</button></div></li>)}</ul>}</section></div>}</>;
+  return <><PageHeading title="課程單元" description="為每門課程建立簡潔、有順序的課程大綱。" /><label className="select-label" htmlFor="lesson-course">課程<select id="lesson-course" value={courseId} onChange={(event) => { setCourseId(event.target.value); reset(); }}><option value="">請選擇課程</option>{courses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{courseId && <div className="split-layout"><form className="form-card" onSubmit={submit}><h3>{editing ? "編輯課程單元" : "新增課程單元"}</h3><Field label="課程單元標題" value={title} onChange={setTitle} placeholder="例如：三角形性質" /><Field label="排序位置" value={position} onChange={setPosition} type="number" /><label className="field"><span>說明 <em>選填</em></span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} /></label><div className="form-actions"><button className="button primary" disabled={saving} type="submit">{saving ? "儲存中…" : editing ? "儲存變更" : "建立課程單元"}</button>{editing && <button className="button ghost" onClick={reset} type="button">取消</button>}</div></form><section className="list-card"><div className="list-card-header"><h3>課程大綱</h3><span>{data.length}</span></div>{listState === "loading" ? <p className="field-status" role="status">正在載入課程單元…</p> : listState === "error" ? <div className="error-banner" role="alert">無法載入課程單元。<button type="button" onClick={() => setReload(value => value + 1)}>重試</button></div> : data.length === 0 ? <EmptyState text="尚未建立課程單元。請新增第一個課程單元。" /> : <ul className="entity-list">{data.map((item) => <li key={item.id}><div className="seat"><b>{item.position + 1}</b><div><strong>{item.title}</strong><small>{item.description || "未填寫說明"}</small></div></div><div className="row-actions"><button className="text-button" onClick={() => { setEditing(item); setTitle(item.title); setDescription(item.description ?? ""); setPosition(String(item.position)); }} type="button">編輯</button><button className="text-button danger" onClick={() => void remove(item)} type="button">刪除</button></div></li>)}</ul>}</section></div>}</>;
 }
 
 function PageHeading({ title, description }: { title: string; description: string }) { return <div className="page-heading compact"><div><p className="eyebrow">教師工作區</p><h2>{title}</h2><p className="intro">{description}</p></div></div>; }

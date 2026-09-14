@@ -56,7 +56,7 @@ export function LocalServerPanel({ api }: LocalServerPanelProps) {
       <div>
         <p className="eyebrow">本機傳輸服務</p>
         <h2 id="local-server-title">本機教室伺服器</h2>
-        <p>按需啟動 HTTP 與 WebSocket transport；尚未提供 QR、學生加入或課堂資料 API。</p>
+        <p>啟動伺服器後，前往「課堂」開放等候大廳，讓同一區網的學生透過 QR Code 加入。</p>
       </div>
       <span className={`server-state server-state-${lifecycle}`}>{loading ? "讀取狀態中" : lifecycleLabels[lifecycle]}</span>
     </div>

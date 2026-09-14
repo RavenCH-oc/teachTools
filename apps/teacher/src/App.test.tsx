@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { TeacherApiError } from "./services/teacherApi";
@@ -221,4 +221,32 @@ describe("Teacher initialization reliability", () => {
     await screen.findByRole("heading", { name: "本機儲存空間無法使用" });
     expect(screen.queryByText("本機儲存空間已就緒")).not.toBeInTheDocument();
   });
+});
+
+it.each([
+  ["學生", "班級", "學生名冊", "這個班級尚未有學生。"],
+  ["課程單元", "課程", "課程單元", "尚未建立課程單元。請新增第一個課程單元。"],
+])("Phase 14 distinguishes %s loading, empty, failed and obsolete requests", async (page, selector, label, empty) => {
+  let failOld: (cause: Error) => void = () => { throw new Error("not started"); };
+  const read = vi.fn().mockImplementationOnce(() => new Promise((_resolve, reject) => { failOld = reject; })).mockResolvedValue([]);
+  const records = ["a", "b"].map(id => ({ id, name: id, academic_year: null, description: null, created_at: "now", updated_at: "now" }));
+  render(<App api={mockApi({ listClassrooms: vi.fn().mockResolvedValue(records), listCourses: vi.fn().mockResolvedValue(records), listStudents: read, listLessons: read })} />);
+  await screen.findByText("本機儲存空間已就緒");
+  const navigation = screen.getByRole("navigation", { name: "教師導覽" });
+  fireEvent.click(within(navigation).getByRole("button", { name: page }));
+  expect(within(navigation).getByRole("button", { name: page })).toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("status")).toHaveTextContent(`正在載入${label}…`);
+  expect(screen.queryByText(empty)).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText(selector), { target: { value: "b" } });
+  await screen.findByText(empty);
+  await act(async () => { failOld(new Error("obsolete")); });
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  read.mockRejectedValueOnce(new Error("failed"));
+  fireEvent.change(screen.getByLabelText(selector), { target: { value: "a" } });
+  expect(await screen.findByRole("alert")).toHaveTextContent(`無法載入${label}。`);
+  expect(screen.queryByText(empty)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "重試" }));
+  expect(await screen.findByText(empty)).toBeInTheDocument();
+  expect(screen.queryByText("第 9 階段")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /設定.*後續階段/ })).not.toBeInTheDocument();
 });

@@ -108,3 +108,9 @@ describe("Question Bank feature", () => {
     expect(screen.getByRole("heading", { name: "建立題目" })).toBeInTheDocument();
   });
 });
+
+it("Phase 14 exposes selected question and set button semantics", async () => {
+  await renderHydratedBank(mockApi());
+  expect(within(screen.getByRole("region", { name: "題組" })).getByRole("button", { pressed: true })).toHaveTextContent("Fractions");
+  expect(within(screen.getByRole("region", { name: "所選題組的題目" })).getByRole("button", { pressed: true })).toHaveTextContent("2 + 2 = 4?");
+});

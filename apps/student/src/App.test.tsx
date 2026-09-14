@@ -41,13 +41,18 @@ describe("Student application shell", () => {
     expect(screen.getByLabelText("姓名").closest(".student-field")).toHaveTextContent("姓名");
   });
 
-  it("keeps incomplete identity input on the join form", async () => {
+  it("Phase 14 associates incomplete identity errors with the join inputs", async () => {
     window.history.pushState({}, "", "/student/join/AB7K9M2Q");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ sessionId: "019fe91e-7606-7d00-aede-59c50a724f4d", classroomName: "三年甲班", state: "LOBBY", joinMode: "roster_match", serverInstanceId: "019fe91f-5d66-7e40-a01b-0a69f36caeff", protocolVersion: 1 }), { status: 200 })));
     render(<App />);
     await screen.findByRole("heading", { name: "加入課堂" });
     fireEvent.click(screen.getByRole("button", { name: "加入課堂" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("請輸入正確的座號與姓名。"));
+    expect(screen.getByLabelText("座號")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("姓名")).toHaveAttribute("aria-describedby", "join-error");
+    fireEvent.change(screen.getByLabelText("座號"), { target: { value: "1" } });
+    expect(screen.getByLabelText("座號")).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("stores a successful HTTP join credential before authenticating the WebSocket", async () => {
@@ -391,13 +396,13 @@ describe("Student application shell", () => {
 
     const essayId = "019fe924-3e72-7d4e-9e4b-5c52f2a3c1d6";
     socket.message({ protocolVersion: 1, type: "session_sync", sync: { sessionState: "ACTIVE", currentQuestion: { sessionQuestionId: essayId, type: "essay", prompt: "請說明理由", points: 5, state: "REVEALED", options: [], blanks: [], assets: [] }, ownLatestSubmission: { submissionId: "019fe925-8c94-7d5e-8e52-d4706e87f65e", revision: 1, gradingStatus: "pending", isCorrect: null, score: null, maxScore: 5, answer: { type: "essay", text: "我的理由" } }, reveal: { sessionQuestionId: essayId, type: "essay", prompt: "請說明理由", points: 5, state: "REVEALED", options: [], blanks: [], assets: [], correctAnswer: null } } });
-    expect(await screen.findByText("本題等待老師評閱。")).toBeInTheDocument();
+    expect(await screen.findByText("本題為待評閱狀態。")).toBeInTheDocument();
     expect(screen.getByLabelText("公布結果")).toHaveTextContent("你的作答：我的理由");
-    expect(screen.getByLabelText("公布結果")).toHaveTextContent("本題由老師評閱，不提供標準答案。");
+    expect(screen.getByLabelText("公布結果")).toHaveTextContent("本題不提供標準答案。");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("renders authenticated images responsively and provides an accessible fullscreen viewer", async () => {
+  it("Phase 14 renders authenticated images with modal focus containment and restoration", async () => {
     const createObjectURL = vi.fn(() => "blob:student-image");
     const revokeObjectURL = vi.fn();
     const openWindow = vi.spyOn(window, "open").mockReturnValue(null);
@@ -414,15 +419,25 @@ describe("Student application shell", () => {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: viewportWidth });
       expect(image.closest(".live-question-media")).toHaveClass("live-question-media");
     }
-    fireEvent.click(screen.getByRole("button", { name: "查看圖片：diagram.png" }));
+    const trigger = screen.getByRole("button", { name: "查看圖片：diagram.png" });
+    trigger.focus();
+    fireEvent.click(trigger);
     expect(screen.getByRole("dialog", { name: "圖片檢視器" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "開啟原圖" })).toHaveClass("media-viewer-action", "media-viewer-action-secondary");
     expect(screen.getByRole("button", { name: "關閉圖片檢視器" })).toHaveClass("media-viewer-action", "media-viewer-close");
-    fireEvent.click(screen.getByRole("button", { name: "開啟原圖" }));
+    const close = screen.getByRole("button", { name: "關閉圖片檢視器" });
+    const original = screen.getByRole("button", { name: "開啟原圖" });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(close, { key: "Tab" }); expect(original).toHaveFocus();
+    fireEvent.keyDown(original, { key: "Tab" }); expect(close).toHaveFocus();
+    fireEvent.keyDown(close, { key: "Tab", shiftKey: true }); expect(original).toHaveFocus();
+    fireEvent.keyDown(original, { key: "Tab", shiftKey: true }); expect(close).toHaveFocus();
+    fireEvent.click(original);
     expect(openWindow).toHaveBeenCalledWith("blob:student-image", "_blank", "noopener,noreferrer");
     expect(document.body.textContent).not.toContain("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "圖片檢視器" })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
     fireEvent.click(screen.getByRole("button", { name: "查看圖片：diagram.png" }));
     fireEvent.click(screen.getByRole("dialog", { name: "圖片檢視器" }));
     expect(screen.queryByRole("dialog", { name: "圖片檢視器" })).not.toBeInTheDocument();
@@ -633,6 +648,50 @@ describe("Student application shell", () => {
     expect(screen.getByRole("button", { name: "送出中…" })).toBeDisabled();
     expect(StudentWebSocket.instances).toHaveLength(1);
   });
+  it("Phase 14 keeps fill blank IDs and editable states while distinguishing pending updates", async () => {
+    await renderLiveMedia([], vi.fn());
+    const socket = latestSocket();
+    const question = { sessionQuestionId: "019fe923-090a-7aa0-85dc-c216080117fa", type: "fill_blank", prompt: "填入兩個答案", points: 2, state: "OPEN", options: [], blanks: ["blank-alpha", "blank-beta"], assets: [] };
+    const sync = async (state: string) => {
+      await act(async () => socket.message(serverMessageSchema.parse({ protocolVersion: 1, type: "session_sync", sync: { sessionState: "ACTIVE", currentQuestion: { ...question, state }, ownLatestSubmission: null, reveal: null } })));
+    };
+    await sync("OPEN");
+    const first = screen.getByLabelText("空格 1"); const second = screen.getByLabelText("空格 2");
+    expect(first).toBeEnabled(); expect(second).toBeEnabled();
+    fireEvent.change(first, { target: { value: "A" } }); fireEvent.change(second, { target: { value: "B" } });
+    fireEvent.click(screen.getByRole("button", { name: "送出答案" }));
+    expect(first).toBeDisabled();
+    const sent = clientMessageSchema.parse(JSON.parse(socket.sent.at(-1) ?? "{}"));
+    if(sent.type !== "submit_answer") throw new Error("expected submission");
+    expect(sent.answer).toEqual({ type: "fill_blank", values: { "blank-alpha": "A", "blank-beta": "B" } });
+    const accept = async (submissionId: string, revision: number) => {
+      await act(async () => socket.message({ protocolVersion: 1, type: "submission_acknowledged", acknowledgement: { submissionId, sessionQuestionId: question.sessionQuestionId, revision, accepted: true, submittedAt: "2026-09-13T00:00:00Z", gradingStatus: "graded" } }));
+    };
+    await accept(sent.submissionId, 1);
+    expect(first).toBeEnabled(); expect(screen.getByText("答案已送出。")).toBeInTheDocument();
+    fireEvent.change(first, { target: { value: "C" } });
+    fireEvent.click(screen.getByRole("button", { name: "更新答案" }));
+    expect(first).toBeDisabled(); expect(screen.queryByText("答案已送出。")).not.toBeInTheDocument();
+    expect(screen.getByText("正在確認本次答案，尚未確認送出。")).toHaveAttribute("role", "status");
+    const update = clientMessageSchema.parse(JSON.parse(socket.sent.at(-1) ?? "{}"));
+    if(update.type !== "submit_answer") throw new Error("expected update");
+    await accept(update.submissionId, 2);
+    await sync("LOCKED"); expect(first).toBeDisabled();
+    await sync("OPEN"); expect(first).toBeEnabled();
+    await sync("REVEALED"); expect(first).toBeDisabled();
+  });
+  it("Phase 14 gives Essay a visible label and choices independent native rows", async () => {
+    await renderLiveMedia([], vi.fn()); const socket=latestSocket();
+    const question={ sessionQuestionId:"019fe923-090a-7aa0-85dc-c216080117fa",prompt:"回答",points:1,state:"OPEN",options:[],blanks:[],assets:[] };
+    const sync=async(type:string,options:{id:string;text:string}[]=[])=>{await act(async()=>socket.message(serverMessageSchema.parse({protocolVersion:1,type:"session_sync",sync:{sessionState:"ACTIVE",currentQuestion:{...question,type,options},ownLatestSubmission:null,reveal:null}})));};
+    await sync("essay"); expect(screen.getByLabelText("你的回答")).toBeEnabled();
+    for(const type of ["single_choice","multiple_choice"]) {
+      await sync(type,[{id:"a",text:"選項甲"},{id:"b",text:"選項乙"}]);
+      const choice=screen.getByLabelText("選項甲"); expect(choice.closest("label")).toHaveClass("answer-option");
+      fireEvent.click(choice); expect(choice).toBeChecked(); expect(choice.closest("label")).toHaveClass("selected");
+    }
+  });
+
 });
 
 function latestSocket(): StudentWebSocket {

@@ -124,3 +124,9 @@ describe("GroupPresetPage", () => {
     }
   });
 });
+
+it("Phase 14 exposes the selected preset as a pressed button", async () => {
+  renderPage(api());
+  const selected = await screen.findByRole("button", { pressed: true });
+  expect(selected).toHaveTextContent("平時分組");
+});

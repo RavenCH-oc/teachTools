@@ -1,9 +1,16 @@
-.peer-review { min-width: 0; margin-block: 1rem; border-top: 1px solid #cbd5e1; padding-top: 1rem; overflow-wrap: anywhere; }
+.peer-review { min-width: 0; margin-block: 1rem; border-top: 1px solid var(--border); padding-top: 1rem; overflow-wrap: anywhere; }
 .peer-review [hidden] { display: none; }
 .peer-review section, .peer-review article { min-width: 0; max-width: 100%; }
-.peer-card { padding: .75rem; margin-block: .75rem; border: 1px solid #cbd5e1; border-radius: .5rem; }
+.peer-card { padding: .75rem; margin-block: .75rem; border: 1px solid var(--border); border-radius: .5rem; }
 .peer-review button { min-height: 44px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; margin: .25rem; }
 .peer-review textarea { display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-height: 10rem; resize: vertical; font: inherit; padding: .5rem; }
 .peer-body { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
 .peer-pages, .peer-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-block: .75rem; }
-.peer-review button:focus-visible, .peer-review textarea:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.peer-review button:focus-visible, .peer-review textarea:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.peer-review { text-align: left; }
+.peer-card { background: var(--surface-muted); }
+.peer-review button { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 10px 12px; cursor: pointer; }
+.peer-review .peer-submit { background: var(--primary); color: #123447; font-weight: 800; }
+.peer-review [role="alert"] { color: var(--error); overflow-wrap: anywhere; }
+.peer-review textarea { border: 1px solid var(--border); border-radius: 10px; color: #123447; background: #fff; }
