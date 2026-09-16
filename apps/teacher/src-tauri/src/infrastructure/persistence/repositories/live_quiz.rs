@@ -195,6 +195,24 @@ impl LiveQuizRepository {
     ) -> Result<(SubmissionRecord, bool), AppError> {
         let mut c = d.connection()?;
         let tx = c.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        // Scope and lifecycle must be checked under the same lock as the write.
+        let scope: Option<(String, bool)> = tx.query_row(
+            "SELECT s.state, EXISTS(SELECT 1 FROM session_participants p WHERE p.id=?2 AND p.session_id=q.session_id)
+             FROM session_questions q JOIN local_sessions s ON s.id=q.session_id WHERE q.id=?1",
+            params![input.session_question_id, input.participant_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).optional()?;
+        let (session_state, authorized) =
+            scope.ok_or(AppError::NotFound("session question".to_owned()))?;
+        if !authorized {
+            return Err(AppError::AuthenticationFailed);
+        }
+        if session_state == "ENDED" {
+            return Err(AppError::SessionEnded);
+        }
+        if session_state != "ACTIVE" {
+            return Err(AppError::SessionNotOpen);
+        }
         if let Some(e) = tx
             .query_row(
                 &submission_select("WHERE id=?1"),
@@ -332,4 +350,60 @@ fn json(raw: String) -> rusqlite::Result<Value> {
 }
 fn json_text(v: &Value) -> Result<String, AppError> {
     serde_json::to_string(v).map_err(|_| AppError::Storage)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn phase15_submission_scope_and_session_end_are_checked_in_write_transaction() {
+        let directory = tempfile::tempdir().expect("temporary database");
+        let db = Database::open(directory.path().join("audit.sqlite3"));
+        db.initialize().expect("schema");
+        let c = db.connection().expect("connection");
+        c.execute_batch("INSERT INTO classes VALUES ('class','Class',NULL,'now','now');
+            INSERT INTO local_sessions(id,classroom_id,server_instance_id,state,join_mode,join_code,created_at,updated_at) VALUES
+            ('session','class','server','ACTIVE','roster_match','ABCDEFGH','now','now'),
+            ('other','class','server','ENDED','roster_match','BCDEFGHJ','now','now');
+            INSERT INTO session_participants(id,session_id,seat_number,display_name,credential_hash,joined_at,updated_at) VALUES
+            ('own','session',1,'Own','hash','now','now'),('foreign','other',1,'Foreign','hash','now','now');
+            INSERT INTO session_questions(id,session_id,question_type,prompt,points,position,answer_config,grading_config,metadata,config_version,state,created_at,updated_at)
+            VALUES ('question','session','true_false','Question',1,0,'{}','{}','{}',1,'OPEN','now','now');").expect("fixture");
+        let submission = |id: &str, participant: &str| NewSubmission {
+            id: id.to_owned(),
+            session_question_id: "question".to_owned(),
+            participant_id: participant.to_owned(),
+            answer_json: serde_json::json!({"type":"true_false","value":true}),
+            grading_status: "graded".to_owned(),
+            is_correct: Some(true),
+            score: Some(1),
+            max_score: 1,
+        };
+        let foreign_rejected = matches!(
+            LiveQuizRepository::submit(&db, submission("foreign-attempt", "foreign")),
+            Err(AppError::AuthenticationFailed)
+        );
+        let (accepted, duplicate) = LiveQuizRepository::submit(&db, submission("accepted", "own"))
+            .expect("active submission");
+        assert_eq!(accepted.revision, 1);
+        assert!(!duplicate);
+        c.execute(
+            "UPDATE local_sessions SET state='ENDED' WHERE id='session'",
+            [],
+        )
+        .expect("end before queued write");
+        let ended_rejected = matches!(
+            LiveQuizRepository::submit(&db, submission("after-end", "own")),
+            Err(AppError::SessionEnded)
+        );
+        assert!(
+            foreign_rejected && ended_rejected,
+            "foreign rejected: {foreign_rejected}; ended rejected: {ended_rejected}"
+        );
+        let count: i64 = c
+            .query_row("SELECT COUNT(*) FROM submissions", [], |r| r.get(0))
+            .expect("count");
+        assert_eq!(count, 1, "rejected writes must not create revisions");
+    }
 }

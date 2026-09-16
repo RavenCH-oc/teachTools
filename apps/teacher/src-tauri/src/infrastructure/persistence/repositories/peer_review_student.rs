@@ -159,7 +159,7 @@ fn activities_query(
     request: &PageRequest,
     activity_id: Option<&str>,
 ) -> Result<Page<ActivityMetadata>> {
-    let scope = format!("activities:{session}");
+    let scope = format!("activities:{session}:{participant}");
     let (limit, key, id) = request.bounds(&scope)?;
     let connection = database.connection()?;
     authorize(&connection, session, participant)?;
@@ -259,7 +259,7 @@ pub fn candidates(
     activity_id: &str,
     request: &PageRequest,
 ) -> Result<Page<CandidateMetadata>> {
-    let scope = format!("candidates:{activity_id}");
+    let scope = format!("candidates:{session}:{participant}:{activity_id}");
     let (limit, key, id) = request.bounds(&scope)?;
     // Only a public received/not-received bucket and opaque target ID enter the cursor.
     let bucket = if key.is_empty() {
@@ -348,8 +348,8 @@ pub fn feedback_scoped(
     activity_id: Option<&str>,
 ) -> Result<Page<FeedbackMetadata>> {
     let scope = match activity_id {
-        Some(id) => format!("feedback:{session}:activity:{id}"),
-        None => format!("feedback:{session}"),
+        Some(id) => format!("feedback:{session}:{participant}:activity:{id}"),
+        None => format!("feedback:{session}:{participant}"),
     };
     let (limit, _, id) = request.bounds(&scope)?;
     let connection = database.connection()?;
@@ -454,7 +454,7 @@ pub fn essays(
     request: &PageRequest,
 ) -> Result<Page<EssayDetail>> {
     authorize_assignment(database, session, participant, assignment_id)?;
-    let scope = format!("essays:{assignment_id}");
+    let scope = format!("essays:{session}:{participant}:{assignment_id}");
     let (limit, _, id) = request.bounds(&scope)?;
     let connection = database.connection()?;
     let mut statement=connection.prepare(

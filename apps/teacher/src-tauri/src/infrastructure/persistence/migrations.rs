@@ -69,6 +69,33 @@ pub fn run(connection: &mut Connection) -> Result<(), AppError> {
         )",
     )?;
 
+    // Validate the complete applied prefix before executing any pending migration.
+    {
+        let mut statement = connection.prepare(
+            "SELECT version, migration_id, checksum FROM schema_migrations ORDER BY version",
+        )?;
+        let mut rows = statement.query([])?;
+        let mut index = 0;
+        while let Some(row) = rows.next()? {
+            let version: i64 = row.get(0)?;
+            let id: String = row.get(1)?;
+            let actual_checksum: String = row.get(2)?;
+            let Some(expected) = MIGRATIONS.get(index) else {
+                return Err(AppError::MigrationFailed(
+                    "unknown migration version".to_owned(),
+                ));
+            };
+            if version != expected.version
+                || id != expected.id
+                || actual_checksum != checksum(expected.sql)
+            {
+                return Err(AppError::MigrationFailed(
+                    "incompatible migration history".to_owned(),
+                ));
+            }
+            index += 1;
+        }
+    }
     for migration in MIGRATIONS {
         let expected_checksum = checksum(migration.sql);
         let existing = connection
@@ -205,6 +232,32 @@ mod tests {
     use super::run;
     use rusqlite::Connection;
 
+    #[test]
+    fn phase15_rejects_unknown_or_noncontiguous_migration_history_before_writes() {
+        for unknown in [true, false] {
+            let directory = tempfile::tempdir().expect("temporary database");
+            let mut connection =
+                Connection::open(directory.path().join("audit.sqlite3")).expect("connection");
+            run(&mut connection).expect("initialize");
+            if unknown {
+                connection.execute("INSERT INTO schema_migrations VALUES (7, 'future_schema', 'unknown', 'original')", []).expect("future metadata");
+            } else {
+                connection
+                    .execute("DELETE FROM schema_migrations WHERE version=2", [])
+                    .expect("missing metadata");
+            }
+            let before = connection.total_changes();
+            assert!(
+                run(&mut connection).is_err(),
+                "incompatible history must fail closed"
+            );
+            assert_eq!(
+                connection.total_changes(),
+                before,
+                "must reject before applying migrations"
+            );
+        }
+    }
     #[test]
     fn migration_is_idempotent_and_records_checksum() {
         let mut connection = Connection::open_in_memory().expect("connection");

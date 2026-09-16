@@ -535,3 +535,107 @@ fn activity_keysets_return_every_visible_activity_not_drafts() {
         57
     );
 }
+
+#[test]
+fn phase15_student_cursors_reject_other_participants_without_changing_authorization() {
+    let f = Fixture::new(4);
+    f.ready();
+    let a = f.draft(PeerReviewMode::StudentSelect, None, None);
+    let b = f.draft(PeerReviewMode::StudentSelect, None, None);
+    f.service.open_activity(&a.id).expect("open A");
+    f.service.open_activity(&b.id).expect("open B");
+    for reviewer in [1, 2] {
+        let assigned = f
+            .service
+            .claim_target(&a.id, &f.participants[reviewer], &f.target(&a.id, 0).id)
+            .expect("claim");
+        f.service
+            .submit_review_revision(f.request(&assigned.id, reviewer, 0, "feedback"))
+            .expect("submit");
+    }
+    let first = PageRequest {
+        limit: Some(1),
+        cursor: None,
+    };
+    let next = |cursor: Option<String>| PageRequest {
+        limit: Some(1),
+        cursor: Some(cursor.expect("next page")),
+    };
+    let owner = &f.participants[0];
+    let other = &f.participants[1];
+    let mut rejected = Vec::new();
+    let q = next(
+        activities(&f.db, &f.session, owner, &first)
+            .expect("activities")
+            .next_cursor,
+    );
+    assert!(activities(&f.db, &f.session, owner, &q).is_ok());
+    rejected.push((
+        "activities",
+        matches!(
+            activities(&f.db, &f.session, other, &q),
+            Err(PeerReviewError::InvalidInput)
+        ),
+    ));
+    let q = next(
+        candidates(&f.db, &f.session, owner, &a.id, &first)
+            .expect("candidates")
+            .next_cursor,
+    );
+    assert!(candidates(&f.db, &f.session, owner, &a.id, &q).is_ok());
+    rejected.push((
+        "candidates",
+        matches!(
+            candidates(&f.db, &f.session, other, &a.id, &q),
+            Err(PeerReviewError::InvalidInput)
+        ),
+    ));
+    for activity in [None, Some(a.id.as_str())] {
+        let q = next(
+            feedback_scoped(&f.db, &f.session, owner, &first, activity)
+                .expect("feedback")
+                .next_cursor,
+        );
+        assert!(feedback_scoped(&f.db, &f.session, owner, &q, activity).is_ok());
+        rejected.push((
+            "feedback",
+            matches!(
+                feedback_scoped(&f.db, &f.session, other, &q, activity),
+                Err(PeerReviewError::InvalidInput)
+            ),
+        ));
+    }
+    let (set, groups) = f.groups(1, &[vec![0, 1], vec![2, 3]]);
+    let cross = f.draft(PeerReviewMode::CrossGroup, None, Some(set));
+    f.service
+        .open_activity(&cross.id)
+        .expect("open Cross Group");
+    let assigned = f
+        .service
+        .list_assignments(&cross.id)
+        .expect("assignments")
+        .into_iter()
+        .find(|a| a.reviewer_session_group_id.as_ref() == Some(&groups[0]))
+        .expect("own assignment");
+    let q = next(
+        essays(&f.db, &f.session, owner, &assigned.id, &first)
+            .expect("essays")
+            .next_cursor,
+    );
+    assert!(essays(&f.db, &f.session, owner, &assigned.id, &q).is_ok());
+    assert!(
+        essays(&f.db, &f.session, other, &assigned.id, &first).is_ok(),
+        "frozen group member remains authorized"
+    );
+    rejected.push((
+        "essays",
+        matches!(
+            essays(&f.db, &f.session, other, &assigned.id, &q),
+            Err(PeerReviewError::InvalidInput)
+        ),
+    ));
+    assert!(
+        rejected.iter().all(|(_, rejected)| *rejected),
+        "cross-participant cursor results: {rejected:?}"
+    );
+}

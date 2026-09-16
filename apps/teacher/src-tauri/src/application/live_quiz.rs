@@ -288,7 +288,13 @@ impl LiveQuizService {
         let public = self.public_view(&question)?;
         let latest =
             LiveQuizRepository::latest_submission(&self.database, &question.id, participant_id)?;
-        let own = latest.clone().map(submission_result).transpose()?;
+        let mut own = latest.clone().map(submission_result).transpose()?;
+        if question.state != "REVEALED" {
+            if let Some(result) = own.as_mut() {
+                result.is_correct = None;
+                result.score = None;
+            }
+        }
         let reveal = if question.state == "REVEALED" {
             Some(self.reveal_view(&question)?)
         } else {
@@ -712,6 +718,31 @@ mod tests {
             .expect("first");
         assert_eq!(first.revision, 1);
         assert_eq!(first.grading_status, "graded");
+        for state in ["OPEN", "LOCKED"] {
+            if state == "LOCKED" {
+                quiz.lock(opened.id.clone()).expect("lock before sync");
+            }
+            let sync = quiz
+                .sync(&joined.participant_id, &lobby.id, "ACTIVE")
+                .expect("unrevealed sync");
+            assert!(sync.reveal.is_none());
+            let own = sync.own_latest_submission.expect("restored answer");
+            assert!(
+                own.is_correct.is_none(),
+                "unrevealed sync must not disclose correctness"
+            );
+            assert!(
+                own.score.is_none(),
+                "unrevealed sync must not disclose score"
+            );
+            assert_eq!(own.revision, 1);
+            assert!(matches!(
+                own.answer,
+                StudentAnswer::TrueFalse { value: true }
+            ));
+        }
+        quiz.reopen(opened.id.clone())
+            .expect("reopen after privacy check");
         let retry = quiz
             .submit(
                 joined.participant_id.clone(),
