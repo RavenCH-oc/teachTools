@@ -5,9 +5,9 @@ import type { Classroom, LocalServerStatus, LocalSession, LocalSessionParticipan
 
 export type LocalSessionLobbyApi = Pick<TeacherApi, "startLocalServer" | "getLocalServerStatus" | "createLocalSession" | "openLocalSessionLobby" | "getActiveLocalSession" | "endLocalSession" | "listLocalSessionParticipants">;
 
-interface Props { api: LocalSessionLobbyApi; classrooms: Classroom[]; onError: (message: string) => void; onClearError: () => void; onOpenLiveQuiz: () => void; onOpenGrouping?: (session: LocalSession) => void; }
+interface Props { api: LocalSessionLobbyApi; classrooms: Classroom[]; onError: (message: string) => void; onClearError: () => void; onOpenLiveQuiz: () => void; onOpenRemote?: () => void; onOpenGrouping?: (session: LocalSession) => void; }
 
-export function LocalSessionLobbyPage({ api, classrooms, onError, onClearError, onOpenLiveQuiz, onOpenGrouping }: Props) {
+export function LocalSessionLobbyPage({ api, classrooms, onError, onClearError, onOpenLiveQuiz, onOpenRemote, onOpenGrouping }: Props) {
   const [server, setServer] = useState<LocalServerStatus | null>(null);
   const [session, setSession] = useState<LocalSession | null>(null);
   const [participants, setParticipants] = useState<LocalSessionParticipant[]>([]);
@@ -37,7 +37,8 @@ export function LocalSessionLobbyPage({ api, classrooms, onError, onClearError, 
   useEffect(() => { setCandidateUrl(""); }, [session?.id, server?.serverInstanceId]);
   const selectedClassroom = classrooms.find((classroom) => classroom.id === classroomId);
   const sessionMatchesServer = Boolean(session && server?.running && session.serverInstanceId === server.serverInstanceId);
-  const staleSession = Boolean(session && session.state !== "ENDED" && !sessionMatchesServer);
+  const remoteSession = Boolean(session?.serverInstanceId.startsWith("remote:"));
+  const staleSession = Boolean(session && session.state !== "ENDED" && !sessionMatchesServer && !remoteSession);
   const joinUrl = useMemo(() => candidateUrl && session?.state === "LOBBY" && sessionMatchesServer ? `${candidateUrl}/student/join/${session.joinCode}` : "", [candidateUrl, session, sessionMatchesServer]);
   const candidates = server?.candidateUrls ?? [];
 
@@ -50,6 +51,7 @@ export function LocalSessionLobbyPage({ api, classrooms, onError, onClearError, 
     <header className="page-heading"><div><p className="eyebrow">本機課堂</p><h2 id="local-lobby-title">{session?.state === "ACTIVE" && sessionMatchesServer ? "課堂進行中" : "建立學生等候大廳"}</h2><p className="intro">{session?.state === "ACTIVE" && sessionMatchesServer ? "目前課堂正在進行；可返回即時測驗繼續發布與管理題目。" : "選擇課堂、開放大廳，再由你選擇學生要使用的區網網址。"}</p></div></header>
     {!server?.running && <section className="form-card"><h3>第一步：啟動本機伺服器</h3><p>伺服器不會自動啟動。</p><button className="button primary" disabled={working} onClick={() => void startServer()} type="button">啟動本機伺服器</button></section>}
     {server?.running && !session && <section className="form-card"><h3>第二步：建立課堂</h3><label className="field"><span>課堂</span><select aria-label="選擇課堂" value={classroomId} onChange={(event) => setClassroomId(event.target.value)}><option value="">請選擇課堂</option>{classrooms.map((classroom) => <option key={classroom.id} value={classroom.id}>{classroom.name}</option>)}</select></label>{selectedClassroom && <p>將使用名冊比對模式；學生需自行輸入座號與姓名。</p>}<button className="button primary" disabled={working || !classroomId} onClick={() => void createSession()} type="button">建立課堂</button></section>}
+    {remoteSession && <section className="form-card"><h3>遠端課堂進行中</h3><p>目前課堂使用 Remote Mode。請先前往「遠端課堂」關閉，才能建立新的本機課堂。</p><button className="button ghost" onClick={onOpenRemote} type="button">前往遠端課堂</button></section>}
     {staleSession && <section className="form-card"><h3>課堂伺服器狀態已變更</h3><p>這個未結束課堂不屬於目前的伺服器執行個體，無法繼續使用。請先結束舊課堂，再建立新的課堂。</p><button className="button danger" disabled={working} onClick={() => void endSession()} type="button">結束舊課堂</button></section>}
     {sessionMatchesServer && session?.state === "CREATED" && <section className="form-card"><h3>第三步：開放等候大廳</h3><p>課堂：{session.classroomName}</p><button className="button primary" disabled={working} onClick={() => void openLobby()} type="button">開放大廳</button><button className="button ghost" disabled={working} onClick={() => void endSession()} type="button">結束課堂</button></section>}
     {sessionMatchesServer && session?.state === "LOBBY" && <section className="lobby-card"><div><p className="eyebrow">等候大廳已開放</p><h3>{session.classroomName}</h3><p>課堂代碼：<strong>{session.joinCode}</strong></p><p>已加入：{participants.length} 人</p></div><label className="field"><span>學生連線網址</span><select aria-label="選擇學生連線網址" value={candidateUrl} onChange={(event) => setCandidateUrl(event.target.value)}><option value="">請選擇一個網路位址</option>{candidates.map((url) => <option key={url} value={url}>{candidateLabel(url)}</option>)}</select></label>{candidates.length === 0 && <p>目前沒有可用 IPv4 區網位址；可確認網路後重新啟動伺服器。</p>}{joinUrl && <div className="qr-panel"><QRCodeSVG aria-label="學生加入 QR Code" value={joinUrl} size={180} level="M" includeMargin /><p>網址：<code>{joinUrl}</code></p><p>課堂代碼：{session.joinCode}</p></div>}<div className="form-actions"><button className="button ghost" disabled={working} onClick={() => onOpenGrouping?.(session)} type="button">課堂分組</button><button className="button danger" disabled={working} onClick={() => void endSession()} type="button">結束課堂</button></div>{participantRefreshError && <p className="participant-refresh-error" role="status">學生連線狀態暫時無法更新。</p>}<ParticipantList participants={participants} /></section>}

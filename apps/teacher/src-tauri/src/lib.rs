@@ -15,6 +15,7 @@ use application::grouping::{
     MoveSessionGroupingParticipantRequest, UpdateGroupPresetRequest,
     UpdateSessionGroupingDraftRequest,
 };
+use application::remote_control::{RemoteControlService, RemoteSessionStatus};
 use application::{
     CreateClassroomRequest, CreateCourseRequest, CreateLessonRequest, CreateQuestionRequest,
     CreateQuestionSetRequest, CreateQuestionWithDraftAssetsRequest, CreateStudentRequest,
@@ -355,8 +356,64 @@ fn list_classroom_session_history(
 fn end_local_session(
     session_id: String,
     sessions: tauri::State<'_, std::sync::Arc<LocalSessionService>>,
+    remote: tauri::State<'_, RemoteControlService>,
 ) -> Result<LocalSessionDto, AppError> {
+    if remote
+        .status()?
+        .as_ref()
+        .is_some_and(|active| active.local_session_id == session_id)
+    {
+        return Err(AppError::Conflict(
+            "close the Remote Session from Remote Mode".to_owned(),
+        ));
+    }
     sessions.end(session_id, "teacher_ended")
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoteControlStatusDto {
+    configured: bool,
+    enrolled: bool,
+    session: Option<RemoteSessionStatus>,
+}
+
+#[tauri::command]
+fn get_remote_control_status(
+    remote: tauri::State<'_, RemoteControlService>,
+) -> Result<RemoteControlStatusDto, AppError> {
+    Ok(RemoteControlStatusDto {
+        configured: remote.configured(),
+        enrolled: if remote.configured() {
+            remote.enrolled()?
+        } else {
+            false
+        },
+        session: remote.status()?,
+    })
+}
+
+#[tauri::command]
+async fn enroll_remote_installation(
+    activation_code: String,
+    remote: tauri::State<'_, RemoteControlService>,
+) -> Result<(), AppError> {
+    remote.enroll(activation_code).await
+}
+
+#[tauri::command]
+async fn create_remote_session(
+    classroom_id: String,
+    remote: tauri::State<'_, RemoteControlService>,
+) -> Result<RemoteSessionStatus, AppError> {
+    remote.create_session(classroom_id).await
+}
+
+#[tauri::command]
+async fn close_remote_session(
+    remote: tauri::State<'_, RemoteControlService>,
+) -> Result<(), AppError> {
+    remote.close_session().await
 }
 
 #[tauri::command]
@@ -666,6 +723,9 @@ pub fn run() -> Result<(), String> {
                 grouping.clone(),
                 student_assets,
             ));
+            app.manage(RemoteControlService::initialize(std::sync::Arc::clone(
+                &sessions,
+            )));
             app.manage(quiz);
             app.manage(sessions);
             app.manage(statistics);
@@ -726,6 +786,10 @@ pub fn run() -> Result<(), String> {
             get_active_local_session,
             list_classroom_session_history,
             end_local_session,
+            get_remote_control_status,
+            enroll_remote_installation,
+            create_remote_session,
+            close_remote_session,
             list_local_session_participants,
             publish_session_question,
             list_session_questions,
@@ -782,6 +846,8 @@ pub fn run() -> Result<(), String> {
         .map_err(|error| error.to_string())?;
     application.run(|app, event| {
         if let tauri::RunEvent::ExitRequested { .. } = event {
+            let remote = app.state::<RemoteControlService>();
+            tauri::async_runtime::block_on(remote.close_on_exit());
             let sessions = app.state::<std::sync::Arc<LocalSessionService>>();
             if sessions.end_active_for_exit().is_err() {
                 eprintln!("Local session shutdown failed during application exit.");

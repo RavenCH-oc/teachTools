@@ -62,6 +62,17 @@ describe("LocalSessionLobbyPage", () => {
     expect(api.createLocalSession).not.toHaveBeenCalled();
     expect(api.startLocalServer).not.toHaveBeenCalled();
   });
+
+  it("identifies a Remote Session without offering the stale LAN close path", async () => {
+    const api = apiFixture();
+    vi.mocked(api.getActiveLocalSession).mockResolvedValue({ ...session, serverInstanceId: "remote:" + "a".repeat(32) });
+    const openRemote = vi.fn();
+    render(<LocalSessionLobbyPage api={api} classrooms={[]} onError={vi.fn()} onClearError={vi.fn()} onOpenLiveQuiz={vi.fn()} onOpenRemote={openRemote} />);
+    expect(await screen.findByText("遠端課堂進行中")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "結束舊課堂" })).not.toBeInTheDocument();
+    screen.getByRole("button", { name: "前往遠端課堂" }).click();
+    expect(openRemote).toHaveBeenCalledOnce();
+  });
 });
 
 it.each([

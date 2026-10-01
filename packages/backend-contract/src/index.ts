@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { claimPeerReviewSchema, submitPeerReviewSchema, peerReviewProjectionSchema, peerReviewChangedSchema, peerReviewAcknowledgedSchema, peerReviewRejectedSchema } from "./peer-review";
 export * from "./peer-review";
+export * from "./remote";
 
 export const BACKEND_CONTRACT_VERSION = 1 as const;
 export const LOCAL_PROTOCOL_VERSION = 1 as const;

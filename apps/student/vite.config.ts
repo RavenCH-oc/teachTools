@@ -1,8 +1,8 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-export default defineConfig({
-  base: "/student/",
+export default defineConfig(({ mode }) => ({
+  base: mode === "remote" ? "/" : "/student/",
   plugins: [react()],
   server: {
     port: 1421,
@@ -13,4 +13,4 @@ export default defineConfig({
     setupFiles: "./src/test-setup.ts",
     css: true
   }
-});
+}));

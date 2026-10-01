@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { APP_NAME } from "@classtools/shared";
-import type { QuestionPublicView, ServerMessage, SessionPublicView, StudentAnswer, StudentGroupingView } from "@classtools/backend-contract";
+import { remoteBootstrapSchema, type QuestionPublicView, type ServerMessage, type SessionPublicView, type StudentAnswer, type StudentGroupingView } from "@classtools/backend-contract";
 import { clearParticipant, createParticipantTransport, fetchSessionAsset, getJoinInfo, joinClassroom, saveParticipant, secureUuid, storedParticipant, storedParticipantForJoinCode, StudentApiError, type ParticipantTransport, type StoredParticipant, type SubmitAnswerResult } from "./services/studentApi";
 import type { PeerReviewMutation } from "@classtools/backend-contract";
 import { PeerReviewPanel } from "./features/peer-review/PeerReviewPanel";
@@ -19,6 +19,29 @@ function nextSubmissionState(pending: Pending, result: SubmitAnswerResult): { st
 }
 
 export function App() {
+  return import.meta.env.MODE === "remote" ? <RemoteShell /> : <LanApp />;
+}
+
+function RemoteShell() {
+  const remoteSessionId = /^\/join\/([A-Za-z0-9_-]{32})$/.exec(window.location.pathname)?.[1];
+  const [status, setStatus] = useState("正在檢查遠端課堂…");
+  useEffect(() => {
+    if (!remoteSessionId) { setStatus("請使用老師提供的遠端課堂連結。"); return; }
+    let active = true;
+    void fetch(`/v1/sessions/${remoteSessionId}/bootstrap`, { cache: "no-store" })
+      .then(async (response) => response.ok ? remoteBootstrapSchema.parse(await response.json() as unknown) : null)
+      .then((bootstrap) => {
+        if (active) setStatus(bootstrap?.status === "available"
+          ? "遠端課堂已連線。學生加入功能即將開放。"
+          : "遠端課堂目前無法使用。");
+      })
+      .catch(() => { if (active) setStatus("目前無法連線到遠端課堂。"); });
+    return () => { active = false; };
+  }, [remoteSessionId]);
+  return <main className="student-shell"><section className="student-card"><p className="eyebrow">學生端</p><h1>{APP_NAME}</h1><p role="status">{status}</p></section></main>;
+}
+
+function LanApp() {
   const joinCode = useMemo(() => joinCodeFromPath(window.location.pathname), []);
   const [manualCode, setManualCode] = useState(""); const [info, setInfo] = useState<SessionPublicView | null>(null);
   const [screen, setScreen] = useState<Screen>(joinCode ? "loading" : "join"); const [seatNumber, setSeatNumber] = useState(""); const [name, setName] = useState("");

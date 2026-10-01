@@ -1,0 +1,31 @@
+{
+  "name": "classroom-relay",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-24",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": false }
+  },
+  "assets": {
+    "directory": "../student/dist-remote",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/*"]
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "CLASSROOM_SESSION", "class_name": "ClassroomSession" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ClassroomSession"] }],
+  "d1_databases": [{
+    "binding": "INSTALLATIONS",
+    "database_name": "classroom-installations",
+    "database_id": "15ee911b-f982-4597-a4d5-2224055e13a7",
+    "migrations_dir": "migrations"
+  }],
+  "vars": {
+    "RELAY_MAX_LIFETIME_SECONDS": "43200",
+    "CONNECT_TICKET_TTL_SECONDS": "60"
+  }
+}

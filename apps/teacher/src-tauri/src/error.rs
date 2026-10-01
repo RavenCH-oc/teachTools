@@ -90,6 +90,16 @@ pub enum AppError {
     SessionEnded,
     #[error("grouping revision could not be created")]
     RevisionConflict,
+    #[error("remote relay is unavailable")]
+    RemoteUnavailable,
+    #[error("remote credential store is unavailable")]
+    RemoteCredentialStore,
+    #[error("remote installation is not enrolled")]
+    RemoteNotEnrolled,
+    #[error("remote authentication was rejected")]
+    RemoteAuthRejected,
+    #[error("remote protocol is incompatible")]
+    RemoteProtocolMismatch,
 }
 
 impl From<rusqlite::Error> for AppError {
@@ -257,6 +267,31 @@ impl Serialize for AppError {
                 "revision_conflict",
                 "The grouping revision could not be created. Refresh and try again.",
                 true,
+            ),
+            Self::RemoteUnavailable => (
+                "remote_service_unavailable",
+                "The remote classroom service is unavailable. Local Mode remains available.",
+                true,
+            ),
+            Self::RemoteCredentialStore => (
+                "remote_credential_store",
+                "Windows Credential Manager could not access the remote installation credential.",
+                true,
+            ),
+            Self::RemoteNotEnrolled => (
+                "remote_not_enrolled",
+                "Enroll this Teacher installation before using Remote Mode.",
+                false,
+            ),
+            Self::RemoteAuthRejected => (
+                "remote_auth_rejected",
+                "The remote installation credential or activation code was rejected.",
+                false,
+            ),
+            Self::RemoteProtocolMismatch => (
+                "remote_protocol_mismatch",
+                "The Teacher app and relay use different remote protocol versions.",
+                false,
             ),
         };
         state.serialize_field("code", code)?;

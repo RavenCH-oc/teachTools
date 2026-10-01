@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@classtools/backend-contract": "workspace:*",
     "@classtools/domain": "workspace:*",
     "@classtools/shared": "workspace:*",
     "@classtools/validation": "workspace:*",

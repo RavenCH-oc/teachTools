@@ -14,11 +14,12 @@ import { SessionGroupingPage } from "./features/grouping/SessionGroupingPage";
 import { PeerReviewPage } from "./features/peer-review/PeerReviewPage";
 import { PeerReviewMonitor } from "./features/peer-review/PeerReviewMonitor";
 import { peerReviewApi, type PeerReviewApi } from "./services/peerReviewApi";
+import { RemoteSessionPage } from "./features/remote-session/RemoteSessionPage";
 
-type Page = "home" | "classrooms" | "students" | "courses" | "lessons" | "question-bank" | "grouping" | "session-grouping" | "local-session" | "live-quiz" | "session-history" | "session-analysis" | "peer-review" | "peer-monitor";
+type Page = "home" | "classrooms" | "students" | "courses" | "lessons" | "question-bank" | "grouping" | "session-grouping" | "local-session" | "remote-session" | "live-quiz" | "session-history" | "session-analysis" | "peer-review" | "peer-monitor";
 const nav: Array<{ id: Page; label: string }> = [
   { id: "home", label: "首頁" }, { id: "classrooms", label: "班級" }, { id: "students", label: "學生" },
-  { id: "courses", label: "課程" }, { id: "lessons", label: "課程單元" }, { id: "question-bank", label: "題庫" }, { id: "grouping", label: "分組設定" }, { id: "local-session", label: "課堂" }, { id: "live-quiz", label: "即時測驗" }, { id: "session-history", label: "課堂紀錄" },
+  { id: "courses", label: "課程" }, { id: "lessons", label: "課程單元" }, { id: "question-bank", label: "題庫" }, { id: "grouping", label: "分組設定" }, { id: "local-session", label: "課堂" }, { id: "remote-session", label: "遠端課堂" }, { id: "live-quiz", label: "即時測驗" }, { id: "session-history", label: "課堂紀錄" },
 ];
 
 interface AppProps { api?: TeacherApi; reviewApi?: PeerReviewApi }
@@ -96,7 +97,8 @@ export function App({ api = teacherApi, reviewApi = peerReviewApi }: AppProps) {
         {status === "ready" && page === "question-bank" && <QuestionBankPage api={api} onDraftStateChange={setHasQuestionDraft} onError={setError} />}
         {status === "ready" && page === "grouping" && <GroupPresetPage api={api as Required<Pick<TeacherApi, "listGroupPresets" | "getGroupPreset" | "createGroupPreset" | "updateGroupPreset" | "deleteGroupPreset" | "listStudents">>} classrooms={classrooms} initialClassroomId={groupingClassroomId} onBack={() => navigate("classrooms")} onDirtyChange={setHasPresetDraft} />}
         {status === "ready" && page === "session-grouping" && sessionGroupingId && <SessionGroupingPage api={api as Required<Pick<TeacherApi, "getSessionGrouping" | "listGroupPresets" | "createGroupingDraftFromPreset" | "createRandomGroupingDraft" | "createManualGroupingDraft" | "cloneCurrentGroupingDraft" | "updateSessionGroupingDraft" | "openSessionGroupingDraft" | "moveSessionGroupingParticipant" | "cancelSessionGroupingDraft" | "finalizeSessionGroupingDraft">>} sessionId={sessionGroupingId} onBack={() => navigate("local-session")} onDirtyChange={setHasSessionGroupingDraft} onError={setError} />}
-        {status === "ready" && page === "local-session" && <LocalSessionLobbyPage api={api} classrooms={classrooms} onError={setError} onClearError={() => setError("")} onOpenLiveQuiz={() => navigate("live-quiz")} onOpenGrouping={(session) => openSessionGrouping(session.id)} />}
+        {status === "ready" && page === "local-session" && <LocalSessionLobbyPage api={api} classrooms={classrooms} onError={setError} onClearError={() => setError("")} onOpenLiveQuiz={() => navigate("live-quiz")} onOpenRemote={() => navigate("remote-session")} onOpenGrouping={(session) => openSessionGrouping(session.id)} />}
+        {status === "ready" && page === "remote-session" && <RemoteSessionPage classrooms={classrooms} />}
         {status === "ready" && page === "live-quiz" && <LiveQuizPage api={api as Required<Pick<TeacherApi, "getLocalServerStatus" | "getActiveLocalSession" | "listQuestionSets" | "listQuestions" | "startLocalSession" | "publishSessionQuestion" | "listSessionQuestions" | "openSessionQuestion" | "lockSessionQuestion" | "reopenSessionQuestion" | "revealSessionQuestion" | "getSessionQuestionProgress" | "getQuestionStatistics">>} onError={setError} onOpenSessionAnalysis={(session) => openAnalysis(session, "live-quiz")} onOpenSessionGrouping={(session) => openSessionGrouping(session.id)} onOpenPeerReview={(sessionId,questionId)=>{setPeerReviewContext({sessionId,questionId});navigate("peer-review");}} />}
         {status === "ready" && page === "peer-review" && peerReviewContext && <PeerReviewPage api={reviewApi} sessionId={peerReviewContext.sessionId} initialQuestionId={peerReviewContext.questionId} onBack={()=>navigate("live-quiz")} onDirtyChange={setHasPeerReviewDraft} onMonitor={activityId=>{setMonitor({sessionId:peerReviewContext.sessionId,activityId,back:"peer-review"});navigate("peer-monitor");}} />}
         {status === "ready" && page === "peer-monitor" && monitor && <PeerReviewMonitor key={`${monitor.sessionId}:${monitor.activityId}`} sessionId={monitor.sessionId} activityId={monitor.activityId} onBack={()=>navigate(monitor.back)}/>}
