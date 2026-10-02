@@ -225,7 +225,14 @@ fn start_local_session(
     session_id: String,
     sessions: tauri::State<'_, std::sync::Arc<LocalSessionService>>,
     server: tauri::State<'_, LocalServerService>,
+    remote: tauri::State<'_, RemoteControlService>,
 ) -> Result<LocalSessionDto, AppError> {
+    if remote
+        .status()?
+        .is_some_and(|status| status.local_session_id == session_id)
+    {
+        return remote.start_session(session_id);
+    }
     let status = server.status()?;
     let Some(server_instance_id) = status.server_instance_id else {
         return Err(AppError::ServerStartFailed);
@@ -717,15 +724,17 @@ pub fn run() -> Result<(), String> {
             let grouping = GroupingService::initialize(service.database_for_local_session());
             let student_assets =
                 application::StudentAssetLocation::development_or_bundle(app.handle())?;
-            app.manage(LocalServerService::new(
+            let local_server = LocalServerService::new(
                 std::sync::Arc::clone(&sessions),
                 std::sync::Arc::clone(&quiz),
                 grouping.clone(),
                 student_assets,
+            );
+            app.manage(RemoteControlService::initialize(
+                std::sync::Arc::clone(&sessions),
+                local_server.participant_realtime(),
             ));
-            app.manage(RemoteControlService::initialize(std::sync::Arc::clone(
-                &sessions,
-            )));
+            app.manage(local_server);
             app.manage(quiz);
             app.manage(sessions);
             app.manage(statistics);

@@ -18,15 +18,18 @@ use tokio::sync::oneshot;
 use tower_http::limit::RequestBodyLimitLayer;
 use uuid::Uuid;
 
-use super::peer_review_student::{Acknowledgement, PageRequest};
+use super::participant_realtime::{
+    internal_peer_id, parse_client_message, ClientMessage, ParticipantConnection,
+    ParticipantRealtimeService, ServerMessage,
+};
+use super::peer_review_student::PageRequest;
 use crate::application::grouping::GroupingService;
 use crate::application::{
-    LiveQuizService, LocalSessionService, QuestionPublicView, QuestionRevealView, SessionSyncDto,
-    StudentAssetLocation, StudentAssetProvider, SubmissionAckDto,
+    LiveQuizService, LocalSessionService, SessionSyncDto, StudentAssetLocation,
+    StudentAssetProvider,
 };
 use crate::error::AppError;
-use crate::peer_review_domain::{PeerReviewError, SubmitPeerReview};
-use crate::question_domain::StudentAnswer;
+use crate::peer_review_domain::PeerReviewError;
 
 pub const LOCAL_PROTOCOL_VERSION: u8 = 1;
 const MAX_MESSAGE_BYTES: usize = 64 * 1024;
@@ -176,6 +179,15 @@ impl LocalServerService {
         }
     }
 
+    pub(crate) fn participant_realtime(&self) -> ParticipantRealtimeService {
+        ParticipantRealtimeService::new(
+            Arc::clone(&self.session),
+            Arc::clone(&self.quiz),
+            self.grouping.clone(),
+            self.presence.clone(),
+        )
+    }
+
     pub fn is_participant_online(&self, participant_id: &str) -> bool {
         self.presence.is_online(participant_id)
     }
@@ -280,7 +292,7 @@ impl LocalServerService {
             server_instance_id,
             session: Arc::clone(&self.session),
             quiz: Arc::clone(&self.quiz),
-            grouping: Arc::new(self.grouping.clone()),
+            realtime: self.participant_realtime(),
             assets,
             presence: self.presence.clone(),
             limiter: JoinRateLimiter::default(),
@@ -334,7 +346,7 @@ struct TransportState {
     server_instance_id: String,
     session: Arc<LocalSessionService>,
     quiz: Arc<LiveQuizService>,
-    grouping: Arc<GroupingService>,
+    realtime: ParticipantRealtimeService,
     assets: StudentAssetProvider,
     presence: PresenceRegistry,
     limiter: JoinRateLimiter,
@@ -363,13 +375,7 @@ impl PresenceRegistry {
         }
     }
 
-    fn connect(&self, participant_id: &str) -> Uuid {
-        let connection_id = Uuid::now_v7();
-        self.connect_with_id(participant_id, connection_id);
-        connection_id
-    }
-
-    fn connect_with_id(&self, participant_id: &str, connection_id: Uuid) {
+    pub(crate) fn connect_with_id(&self, participant_id: &str, connection_id: Uuid) {
         if let Ok(mut connections) = self.connections.write() {
             connections
                 .entry(participant_id.to_owned())
@@ -378,7 +384,7 @@ impl PresenceRegistry {
         }
     }
 
-    fn heartbeat(&self, participant_id: &str, connection_id: Uuid) {
+    pub(crate) fn heartbeat(&self, participant_id: &str, connection_id: Uuid) {
         if let Ok(mut connections) = self.connections.write() {
             if let Some(last_seen) = connections
                 .get_mut(participant_id)
@@ -389,7 +395,7 @@ impl PresenceRegistry {
         }
     }
 
-    fn disconnect(&self, participant_id: &str, connection_id: Uuid) {
+    pub(crate) fn disconnect(&self, participant_id: &str, connection_id: Uuid) {
         if let Ok(mut connections) = self.connections.write() {
             let should_remove = connections
                 .get_mut(participant_id)
@@ -403,7 +409,7 @@ impl PresenceRegistry {
         }
     }
 
-    fn is_online(&self, participant_id: &str) -> bool {
+    pub(crate) fn is_online(&self, participant_id: &str) -> bool {
         let now = (self.clock)();
         let Ok(mut connections) = self.connections.write() else {
             return false;
@@ -793,35 +799,6 @@ async fn peer_review_read(
     }
 }
 
-fn internal_peer_id(value: &str) -> bool {
-    Uuid::parse_str(value)
-        .is_ok_and(|id| id.get_variant() == uuid::Variant::RFC4122 && id.get_version_num() == 7)
-}
-async fn send_peer_result(
-    socket: &mut WebSocket,
-    request_id: String,
-    result: Result<Result<Acknowledgement, PeerReviewError>, AppError>,
-) -> bool {
-    let message = match result {
-        Ok(Ok(acknowledgement)) => ServerMessage::PeerReviewAcknowledged {
-            protocol_version: LOCAL_PROTOCOL_VERSION,
-            request_id,
-            acknowledgement,
-        },
-        Ok(Err(code)) => ServerMessage::PeerReviewRejected {
-            protocol_version: LOCAL_PROTOCOL_VERSION,
-            request_id,
-            code,
-        },
-        Err(_) => ServerMessage::PeerReviewRejected {
-            protocol_version: LOCAL_PROTOCOL_VERSION,
-            request_id,
-            code: PeerReviewError::Storage,
-        },
-    };
-    send_server_message(socket, &message).await
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct JoinRequest {
@@ -995,10 +972,11 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
     };
     let connection_id = authenticated.connection_id;
     transport_connection_debug(connection_id, "participant_authenticated");
-    let mut events = state.session.subscribe();
-    let mut quiz_events = state.quiz.subscribe();
-    let mut grouping_events = state.grouping.subscribe();
-    let mut peer_events = state.session.peer_review.subscribe();
+    let subscriptions = state.realtime.subscribe();
+    let mut events = subscriptions.session;
+    let mut quiz_events = subscriptions.quiz;
+    let mut grouping_events = subscriptions.grouping;
+    let mut peer_events = subscriptions.peer_review;
     match student_sync(&state, &authenticated).await {
         Ok(sync) => {
             if !send_session_sync(&mut socket, sync).await {
@@ -1020,13 +998,13 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
         tokio::select! {
             next = socket.recv() => {
                 let Some(next) = next else { break "socket_receive_closed"; };
-                if !handle_authenticated_socket_message(&mut socket, next, &state, &authenticated, connection_id).await { break "message_handler_stopped"; }
+                if !handle_authenticated_socket_message(&mut socket, next, &state, &authenticated).await { break "message_handler_stopped"; }
             }
             event = events.recv() => match event {
-                Ok(event) => {
+                Ok(event) if event.session_id == authenticated.session_id => {
                     if !send_server_message(&mut socket, &ServerMessage::SessionStateChanged { protocol_version: LOCAL_PROTOCOL_VERSION, session_id: event.session_id, state: event.state }).await { break "session_event_send_failed"; }
                 }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
                 Err(tokio::sync::broadcast::error::RecvError::Closed) => break "session_event_channel_closed",
             },
             event = quiz_events.recv() => match event {
@@ -1072,11 +1050,7 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<TransportState>) {
     transport_debug("presence lease removed; socket closed");
 }
 
-struct SocketParticipant {
-    participant_id: String,
-    session_id: String,
-    connection_id: Uuid,
-}
+type SocketParticipant = ParticipantConnection;
 enum SocketAuthentication {
     Authenticated(SocketParticipant),
     Rejected(&'static str),
@@ -1104,60 +1078,23 @@ async fn authenticate_socket(
                             return SocketAuthentication::Disconnected;
                         }
                     }
-                    Ok(ClientMessage::ParticipantAuth {
-                        session_id,
-                        participant_id,
-                        credential,
-                        ..
-                    }) => {
+                    Ok(ClientMessage::ParticipantAuth { .. }) => {
                         transport_debug("participant_auth received");
-                        let session = Arc::clone(&state.session);
-                        let server_instance_id = state.server_instance_id.clone();
-                        let authentication_participant_id = participant_id.clone();
-                        match blocking(move || {
-                            session.authenticate(
-                                &session_id,
-                                &authentication_participant_id,
-                                &credential,
-                                &server_instance_id,
-                            )
-                        })
-                        .await
+                        let connection_id = Uuid::now_v7();
+                        match state
+                            .realtime
+                            .authenticate(&state.server_instance_id, &text, connection_id)
+                            .await
                         {
-                            Ok(authenticated) => {
-                                let session_id = authenticated.participant.session_id.clone();
-                                let authenticated_participant_id =
-                                    authenticated.participant.participant_id.clone();
-                                let connection_id =
-                                    state.presence.connect(&authenticated_participant_id);
-                                if !send_server_message(
-                                    socket,
-                                    &ServerMessage::ParticipantAuthenticated {
-                                        protocol_version: LOCAL_PROTOCOL_VERSION,
-                                        participant: authenticated.participant,
-                                        classroom_name: authenticated.classroom_name,
-                                        session_state: authenticated.session_state,
-                                    },
-                                )
-                                .await
-                                {
-                                    state
-                                        .presence
-                                        .disconnect(&authenticated_participant_id, connection_id);
+                            Ok((participant, messages)) => {
+                                if !send_server_messages(socket, messages).await {
+                                    state.realtime.disconnect(&participant);
                                     return SocketAuthentication::Disconnected;
                                 }
                                 transport_debug("participant authentication succeeded");
-                                return SocketAuthentication::Authenticated(SocketParticipant {
-                                    participant_id: authenticated_participant_id,
-                                    session_id,
-                                    connection_id,
-                                });
+                                return SocketAuthentication::Authenticated(participant);
                             }
-                            Err(error) => {
-                                return SocketAuthentication::Rejected(authentication_error_code(
-                                    &error,
-                                ));
-                            }
+                            Err(code) => return SocketAuthentication::Rejected(code),
                         }
                     }
                     Ok(
@@ -1186,142 +1123,12 @@ async fn handle_authenticated_socket_message(
     next: Result<Message, axum::Error>,
     state: &TransportState,
     participant: &SocketParticipant,
-    connection_id: Uuid,
 ) -> bool {
     match next {
         Ok(Message::Text(text)) if text.len() <= MAX_MESSAGE_BYTES => {
-            match parse_client_message(&text) {
-                Ok(ClientMessage::ClaimPeerReview {
-                    request_id,
-                    activity_id,
-                    target_id,
-                    ..
-                }) => {
-                    let service = state.session.peer_review.clone();
-                    let session = participant.session_id.clone();
-                    let participant = participant.participant_id.clone();
-                    let result = blocking(move || {
-                        Ok(service.claim(&session, &participant, &activity_id, &target_id))
-                    })
-                    .await;
-                    send_peer_result(socket, request_id, result).await
-                }
-                Ok(ClientMessage::SubmitPeerReview {
-                    request_id,
-                    review_submission_id,
-                    assignment_id,
-                    expected_base_revision,
-                    body,
-                    ..
-                }) => {
-                    let service = state.session.peer_review.clone();
-                    let session = participant.session_id.clone();
-                    let participant = participant.participant_id.clone();
-                    let result = blocking(move || {
-                        Ok(service.submit(
-                            &session,
-                            &participant,
-                            SubmitPeerReview {
-                                review_submission_id,
-                                assignment_id,
-                                expected_base_revision,
-                                body,
-                                submitted_by_participant_id: participant.clone(),
-                            },
-                        ))
-                    })
-                    .await;
-                    send_peer_result(socket, request_id, result).await
-                }
-                Ok(ClientMessage::Ping { request_id, .. }) => {
-                    transport_connection_debug(connection_id, "ping_received");
-                    state
-                        .presence
-                        .heartbeat(&participant.participant_id, connection_id);
-                    send_server_message(
-                        socket,
-                        &ServerMessage::Pong {
-                            protocol_version: LOCAL_PROTOCOL_VERSION,
-                            request_id,
-                        },
-                    )
-                    .await
-                }
-                Ok(ClientMessage::SubmitAnswer {
-                    submission_id,
-                    session_question_id,
-                    answer,
-                    ..
-                }) => {
-                    transport_connection_debug(connection_id, "SUBMIT_FRAME_RECEIVED");
-                    let quiz = Arc::clone(&state.quiz);
-                    let participant_id = participant.participant_id.clone();
-                    let session_id = participant.session_id.clone();
-                    transport_connection_debug(connection_id, "SUBMIT_SERVICE_ENTERED");
-                    match blocking(move || {
-                        quiz.submit(
-                            participant_id,
-                            session_id,
-                            session_question_id,
-                            submission_id,
-                            answer,
-                        )
-                    })
-                    .await
-                    {
-                        Ok(ack) => {
-                            transport_connection_debug(connection_id, "SUBMIT_PERSISTED");
-                            send_submission_acknowledgement(socket, connection_id, ack).await
-                        }
-                        Err(error) => {
-                            transport_connection_debug(connection_id, "submission_rejected");
-                            let sent =
-                                send_transport_error(socket, submission_error_code(&error)).await;
-                            transport_connection_debug(
-                                connection_id,
-                                if sent {
-                                    "application_error_sent"
-                                } else {
-                                    "application_error_send_failed"
-                                },
-                            );
-                            sent
-                        }
-                    }
-                }
-                Ok(ClientMessage::SelectGroup {
-                    request_id,
-                    draft_id,
-                    group_id,
-                    ..
-                }) => {
-                    let grouping = Arc::clone(&state.grouping);
-                    let participant_id = participant.participant_id.clone();
-                    let session_id = participant.session_id.clone();
-                    match blocking(move || {
-                        grouping.select_group(
-                            &draft_id,
-                            &participant_id,
-                            &session_id,
-                            group_id.as_deref(),
-                        )
-                    })
-                    .await
-                    {
-                        Ok(selection) => {
-                            send_group_selection_acknowledgement(
-                                socket,
-                                request_id,
-                                selection.selected_group_id,
-                            )
-                            .await
-                        }
-                        Err(error) => {
-                            send_transport_error(socket, grouping_error_code(&error)).await
-                        }
-                    }
-                }
-                _ => {
+            match state.realtime.handle(participant, &text).await {
+                Ok(messages) => send_server_messages(socket, messages).await,
+                Err(()) => {
                     let _ = send_protocol_error(socket).await;
                     false
                 }
@@ -1336,52 +1143,17 @@ async fn handle_authenticated_socket_message(
     }
 }
 
-async fn send_quiz_sync(socket: &mut WebSocket, sync: SessionSyncDto) -> bool {
-    let revealed = sync.reveal.is_some();
-    if !send_session_sync(socket, sync.clone()).await {
-        return false;
-    }
-    if let Some(question) = sync.current_question {
-        if !send_server_message(
-            socket,
-            &ServerMessage::QuestionStateChanged {
-                protocol_version: LOCAL_PROTOCOL_VERSION,
-                question,
-            },
-        )
-        .await
-        {
-            return false;
-        }
-    }
-    if let Some(reveal) = sync.reveal {
-        if !send_server_message(
-            socket,
-            &ServerMessage::QuestionRevealed {
-                protocol_version: LOCAL_PROTOCOL_VERSION,
-                reveal,
-            },
-        )
-        .await
-        {
-            return false;
-        }
-    }
-    if let Some(result) = sync.own_latest_submission {
-        if revealed
-            && !send_server_message(
-                socket,
-                &ServerMessage::SubmissionResult {
-                    protocol_version: LOCAL_PROTOCOL_VERSION,
-                    result,
-                },
-            )
-            .await
-        {
+async fn send_server_messages(socket: &mut WebSocket, messages: Vec<ServerMessage>) -> bool {
+    for message in messages {
+        if !send_server_message(socket, &message).await {
             return false;
         }
     }
     true
+}
+
+async fn send_quiz_sync(socket: &mut WebSocket, sync: SessionSyncDto) -> bool {
+    send_server_messages(socket, ParticipantRealtimeService::quiz_messages(sync)).await
 }
 
 async fn send_session_sync(socket: &mut WebSocket, sync: SessionSyncDto) -> bool {
@@ -1399,29 +1171,7 @@ async fn student_sync(
     state: &TransportState,
     participant: &SocketParticipant,
 ) -> Result<SessionSyncDto, AppError> {
-    let quiz = Arc::clone(&state.quiz);
-    let grouping = Arc::clone(&state.grouping);
-    let session = Arc::clone(&state.session);
-    let participant_id = participant.participant_id.clone();
-    let session_id = participant.session_id.clone();
-    blocking(move || {
-        let current_session = session
-            .active()?
-            .filter(|current| current.id == session_id)
-            .ok_or(AppError::SessionEnded)?;
-        let mut sync = quiz.sync(&participant_id, &session_id, &current_session.state)?;
-        sync.grouping = Some(grouping.student_grouping_view(&participant_id, &session_id)?);
-        if current_session.state == "ACTIVE" {
-            sync.peer_review = Some(
-                session
-                    .peer_review
-                    .projection(&session_id, &participant_id)
-                    .map_err(|_| AppError::Storage)?,
-            );
-        }
-        Ok(sync)
-    })
-    .await
+    state.realtime.sync(participant).await
 }
 
 async fn send_protocol_error(socket: &mut WebSocket) -> bool {
@@ -1436,116 +1186,8 @@ async fn send_protocol_error(socket: &mut WebSocket) -> bool {
     .await
 }
 
-fn authentication_error_code(error: &AppError) -> &'static str {
-    match error {
-        AppError::ServerInstanceMismatch => "SERVER_INSTANCE_MISMATCH",
-        AppError::SessionNotOpen => "SESSION_ENDED",
-        _ => "AUTH_FAILED",
-    }
-}
-
-fn submission_error_code(error: &AppError) -> &'static str {
-    match error {
-        AppError::QuestionLocked => "QUESTION_LOCKED",
-        AppError::Conflict(_) => "SUBMISSION_CONFLICT",
-        AppError::Validation(_) => "INVALID_ANSWER",
-        _ => "PROTOCOL_ERROR",
-    }
-}
-
-fn grouping_error_code(error: &AppError) -> &'static str {
-    match error {
-        AppError::GroupFull => "GROUP_FULL",
-        AppError::GroupNotFound => "GROUP_NOT_FOUND",
-        AppError::DraftNotOpen => "SELF_SELECTION_NOT_OPEN",
-        AppError::StaleGroupingDraft
-        | AppError::ParticipantSessionMismatch
-        | AppError::ParticipantNotFound => "STALE_GROUPING_DRAFT",
-        AppError::SessionEnded | AppError::SessionNotOpen => "SESSION_ENDED",
-        _ => "STALE_GROUPING_DRAFT",
-    }
-}
-
 async fn send_transport_error(socket: &mut WebSocket, code: &'static str) -> bool {
-    send_server_message(
-        socket,
-        &ServerMessage::Error {
-            protocol_version: LOCAL_PROTOCOL_VERSION,
-            code,
-            message: transport_error_message(code),
-        },
-    )
-    .await
-}
-
-fn transport_error_message(code: &str) -> &'static str {
-    match code {
-        "GROUP_FULL" => "The selected group is full.",
-        "SELF_SELECTION_NOT_OPEN" => "Student group selection is not open.",
-        "GROUP_NOT_FOUND" => "The selected group was not found.",
-        "STALE_GROUPING_DRAFT" => "The grouping draft has changed. Refresh and try again.",
-        "SESSION_ENDED" => "The classroom session has ended.",
-        "QUESTION_LOCKED" => "The question is no longer accepting answers.",
-        "INVALID_ANSWER" => "The answer is invalid.",
-        "SUBMISSION_CONFLICT" => "The submission conflicts with an existing answer.",
-        "PROTOCOL_ERROR" => "The transport message is invalid.",
-        "AUTH_TIMEOUT" => "Participant authentication timed out.",
-        "SERVER_INSTANCE_MISMATCH" => "The classroom server has changed.",
-        _ => "Participant authentication failed.",
-    }
-}
-
-async fn send_group_selection_acknowledgement(
-    socket: &mut WebSocket,
-    request_id: String,
-    selected_group_id: Option<String>,
-) -> bool {
-    send_server_message(
-        socket,
-        &ServerMessage::GroupSelectionAcknowledged {
-            protocol_version: LOCAL_PROTOCOL_VERSION,
-            acknowledgement: GroupSelectionAcknowledgement {
-                request_id,
-                selected_group_id,
-                accepted: true,
-            },
-        },
-    )
-    .await
-}
-
-async fn send_submission_acknowledgement(
-    socket: &mut WebSocket,
-    connection_id: Uuid,
-    acknowledgement: SubmissionAckDto,
-) -> bool {
-    let message = ServerMessage::SubmissionAcknowledged {
-        protocol_version: LOCAL_PROTOCOL_VERSION,
-        acknowledgement,
-    };
-    let serialized = match serde_json::to_string(&message) {
-        Ok(value) => {
-            transport_connection_debug(connection_id, "submission_acknowledgement_serialized");
-            value
-        }
-        Err(_) => {
-            transport_connection_debug(
-                connection_id,
-                "submission_acknowledgement_serialize_failed",
-            );
-            return false;
-        }
-    };
-    let sent = socket.send(Message::Text(serialized.into())).await.is_ok();
-    transport_connection_debug(
-        connection_id,
-        if sent {
-            "SUBMIT_ACK_SENT"
-        } else {
-            "submission_acknowledgement_send_failed"
-        },
-    );
-    sent
+    send_server_message(socket, &ParticipantRealtimeService::error(code)).await
 }
 
 async fn send_server_message(socket: &mut WebSocket, message: &ServerMessage) -> bool {
@@ -1554,102 +1196,6 @@ async fn send_server_message(socket: &mut WebSocket, message: &ServerMessage) ->
         Err(_) => return false,
     };
     socket.send(Message::Text(serialized.into())).await.is_ok()
-}
-
-fn parse_client_message(text: &str) -> Result<ClientMessage, ()> {
-    let message: ClientMessage = serde_json::from_str(text).map_err(|_| ())?;
-    match &message {
-        ClientMessage::ClaimPeerReview {
-            protocol_version,
-            request_id,
-            activity_id,
-            target_id,
-        } if *protocol_version == LOCAL_PROTOCOL_VERSION
-            && !request_id.trim().is_empty()
-            && request_id.len() <= 120
-            && internal_peer_id(activity_id)
-            && internal_peer_id(target_id) =>
-        {
-            Ok(message)
-        }
-        ClientMessage::SubmitPeerReview {
-            protocol_version,
-            request_id,
-            review_submission_id,
-            assignment_id,
-            expected_base_revision,
-            body,
-        } if *protocol_version == LOCAL_PROTOCOL_VERSION
-            && !request_id.trim().is_empty()
-            && request_id.len() <= 120
-            && internal_peer_id(assignment_id)
-            && Uuid::parse_str(review_submission_id).is_ok_and(|id| {
-                id.get_variant() == uuid::Variant::RFC4122 && matches!(id.get_version_num(), 4 | 7)
-            })
-            && *expected_base_revision >= 0
-            && *expected_base_revision < 9_007_199_254_740_991
-            && crate::peer_review_domain::review_text(body).is_ok() =>
-        {
-            Ok(message)
-        }
-        ClientMessage::Ping {
-            protocol_version,
-            request_id,
-        } if *protocol_version == LOCAL_PROTOCOL_VERSION
-            && !request_id.trim().is_empty()
-            && request_id.len() <= 120 =>
-        {
-            Ok(message)
-        }
-        ClientMessage::ParticipantAuth {
-            protocol_version,
-            request_id,
-            session_id,
-            participant_id,
-            credential,
-        } if *protocol_version == LOCAL_PROTOCOL_VERSION
-            && !request_id.trim().is_empty()
-            && request_id.len() <= 120
-            && Uuid::parse_str(session_id).is_ok()
-            && Uuid::parse_str(participant_id).is_ok()
-            && credential.len() == 43
-            && credential
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_') =>
-        {
-            Ok(message)
-        }
-        ClientMessage::SubmitAnswer {
-            protocol_version,
-            request_id,
-            submission_id,
-            session_question_id,
-            ..
-        } if *protocol_version == LOCAL_PROTOCOL_VERSION
-            && !request_id.trim().is_empty()
-            && request_id.len() <= 120
-            && Uuid::parse_str(submission_id).is_ok()
-            && Uuid::parse_str(session_question_id).is_ok() =>
-        {
-            Ok(message)
-        }
-        ClientMessage::SelectGroup {
-            protocol_version,
-            request_id,
-            draft_id,
-            group_id,
-        } if *protocol_version == LOCAL_PROTOCOL_VERSION
-            && !request_id.trim().is_empty()
-            && request_id.len() <= 120
-            && Uuid::parse_str(draft_id).is_ok()
-            && group_id
-                .as_deref()
-                .map_or(true, |group_id| Uuid::parse_str(group_id).is_ok()) =>
-        {
-            Ok(message)
-        }
-        _ => Err(()),
-    }
 }
 
 fn origin_matches_host(headers: &HeaderMap) -> bool {
@@ -1695,132 +1241,6 @@ struct HealthResponse {
     status: &'static str,
     protocol_version: u8,
     server_instance_id: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(
-    deny_unknown_fields,
-    tag = "type",
-    rename_all = "snake_case",
-    rename_all_fields = "camelCase"
-)]
-enum ClientMessage {
-    ClaimPeerReview {
-        protocol_version: u8,
-        request_id: String,
-        activity_id: String,
-        target_id: String,
-    },
-    SubmitPeerReview {
-        protocol_version: u8,
-        request_id: String,
-        review_submission_id: String,
-        assignment_id: String,
-        expected_base_revision: i64,
-        body: String,
-    },
-    Ping {
-        protocol_version: u8,
-        request_id: String,
-    },
-    ParticipantAuth {
-        protocol_version: u8,
-        request_id: String,
-        session_id: String,
-        participant_id: String,
-        credential: String,
-    },
-    SubmitAnswer {
-        protocol_version: u8,
-        request_id: String,
-        submission_id: String,
-        session_question_id: String,
-        answer: StudentAnswer,
-    },
-    SelectGroup {
-        protocol_version: u8,
-        request_id: String,
-        draft_id: String,
-        group_id: Option<String>,
-    },
-}
-
-#[derive(Serialize)]
-#[serde(
-    tag = "type",
-    rename_all = "snake_case",
-    rename_all_fields = "camelCase"
-)]
-enum ServerMessage {
-    PeerReviewChanged {
-        protocol_version: u8,
-    },
-    PeerReviewAcknowledged {
-        protocol_version: u8,
-        request_id: String,
-        acknowledgement: Acknowledgement,
-    },
-    PeerReviewRejected {
-        protocol_version: u8,
-        request_id: String,
-        code: PeerReviewError,
-    },
-    ServerHello {
-        protocol_version: u8,
-        server_instance_id: String,
-    },
-    Pong {
-        protocol_version: u8,
-        request_id: String,
-    },
-    ParticipantAuthenticated {
-        protocol_version: u8,
-        participant: crate::application::ParticipantSelfView,
-        classroom_name: String,
-        session_state: String,
-    },
-    SessionStateChanged {
-        protocol_version: u8,
-        session_id: String,
-        state: String,
-    },
-    SessionSync {
-        protocol_version: u8,
-        sync: Box<SessionSyncDto>,
-    },
-    QuestionStateChanged {
-        protocol_version: u8,
-        question: QuestionPublicView,
-    },
-    QuestionRevealed {
-        protocol_version: u8,
-        reveal: QuestionRevealView,
-    },
-    SubmissionAcknowledged {
-        protocol_version: u8,
-        acknowledgement: SubmissionAckDto,
-    },
-    SubmissionResult {
-        protocol_version: u8,
-        result: crate::application::OwnSubmissionResultDto,
-    },
-    GroupSelectionAcknowledged {
-        protocol_version: u8,
-        acknowledgement: GroupSelectionAcknowledgement,
-    },
-    Error {
-        protocol_version: u8,
-        code: &'static str,
-        message: &'static str,
-    },
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GroupSelectionAcknowledgement {
-    request_id: String,
-    selected_group_id: Option<String>,
-    accepted: bool,
 }
 
 async fn run_server(
@@ -1931,6 +1351,7 @@ mod tests {
     use tokio_tungstenite::{connect_async, tungstenite::Message as ClientWebSocketMessage};
 
     use super::*;
+    use crate::question_domain::StudentAnswer;
 
     type TestSocket = tokio_tungstenite::WebSocketStream<
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,

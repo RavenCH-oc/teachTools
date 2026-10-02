@@ -7,6 +7,7 @@ import { remoteTeacherApi, type RemoteTeacherApi } from "../../services/remoteTe
 interface Props {
   classrooms: Classroom[];
   api?: RemoteTeacherApi;
+  onOpenLiveQuiz?: () => void;
 }
 
 const stateText = {
@@ -15,7 +16,7 @@ const stateText = {
   TEACHER_OFFLINE: "連線中斷，正在重試",
 };
 
-export function RemoteSessionPage({ classrooms, api = remoteTeacherApi }: Props) {
+export function RemoteSessionPage({ classrooms, api = remoteTeacherApi, onOpenLiveQuiz }: Props) {
   const [status, setStatus] = useState<RemoteTeacherStatus | null>(null);
   const [activationCode, setActivationCode] = useState("");
   const [classroomId, setClassroomId] = useState(classrooms[0]?.id ?? "");
@@ -40,7 +41,7 @@ export function RemoteSessionPage({ classrooms, api = remoteTeacherApi }: Props)
   };
 
   return <>
-    <div className="page-heading compact"><div><p className="eyebrow">遠端課堂</p><h2>Remote Mode</h2><p className="intro">教師端主動連線至 relay；學生加入功能將於後續階段開放。</p></div></div>
+    <div className="page-heading compact"><div><p className="eyebrow">遠端課堂</p><h2>Remote Mode</h2><p className="intro">學生可由遠端網址加入；名冊驗證與課堂操作由此教師端處理。</p></div></div>
     {error && <p className="error-banner" role="alert">{error}</p>}
     {!status && <div className="state-card" role="status">正在取得遠端狀態…</div>}
     {status && !status.configured && <div className="state-card">此安裝版本尚未設定 Remote relay URL。本機課堂仍可使用。</div>}
@@ -62,7 +63,8 @@ export function RemoteSessionPage({ classrooms, api = remoteTeacherApi }: Props)
       <h3>遠端課堂狀態：{stateText[status.session.state]}</h3>
       <p>Teacher generation：{status.session.generation ?? "等待連線"}</p>
       <p>公開入口：<a href={status.session.joinUrl} target="_blank" rel="noreferrer">{status.session.joinUrl}</a></p>
-      <p>此入口目前只顯示 relay 狀態，不接受學生加入。</p>
+      <p>學生需輸入名冊中的座號與姓名。開始課堂後停止新學生加入。</p>
+      {onOpenLiveQuiz && <button className="button primary" disabled={busy} onClick={onOpenLiveQuiz} type="button">前往即時測驗</button>}
       <button className="button ghost" disabled={busy} onClick={() => void run(() => api.close())} type="button">關閉 Remote Session</button>
     </section>}
   </>;

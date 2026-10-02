@@ -1,7 +1,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { APP_NAME } from "@classtools/shared";
-import { remoteBootstrapSchema, type QuestionPublicView, type ServerMessage, type SessionPublicView, type StudentAnswer, type StudentGroupingView } from "@classtools/backend-contract";
-import { clearParticipant, createParticipantTransport, fetchSessionAsset, getJoinInfo, joinClassroom, saveParticipant, secureUuid, storedParticipant, storedParticipantForJoinCode, StudentApiError, type ParticipantTransport, type StoredParticipant, type SubmitAnswerResult } from "./services/studentApi";
+import { type QuestionPublicView, type ServerMessage, type SessionPublicView, type StudentAnswer, type StudentGroupingView } from "@classtools/backend-contract";
+import { clearParticipant, fetchSessionAsset, getJoinInfo, isRemoteParticipant, joinClassroom, REMOTE_DETAIL_UNAVAILABLE, REMOTE_REALTIME_LIMIT_MESSAGE, saveParticipant, secureUuid, storedParticipant, storedParticipantForJoinCode, StudentApiError, type ParticipantTransport, type StoredParticipant, type SubmitAnswerResult } from "./services/studentApi";
+import { createStudentTransport, getRemoteJoinShell, joinRemoteClassroom, remoteSessionIdFromPath } from "./services/remoteStudentApi";
 import type { PeerReviewMutation } from "@classtools/backend-contract";
 import { PeerReviewPanel } from "./features/peer-review/PeerReviewPanel";
 import { createPeerSessionChannel } from "./features/peer-review/sessionChannel";
@@ -19,30 +20,12 @@ function nextSubmissionState(pending: Pending, result: SubmitAnswerResult): { st
 }
 
 export function App() {
-  return import.meta.env.MODE === "remote" ? <RemoteShell /> : <LanApp />;
+  return <ClassroomStudentApp remote={import.meta.env.MODE === "remote"} />;
 }
 
-function RemoteShell() {
-  const remoteSessionId = /^\/join\/([A-Za-z0-9_-]{32})$/.exec(window.location.pathname)?.[1];
-  const [status, setStatus] = useState("正在檢查遠端課堂…");
-  useEffect(() => {
-    if (!remoteSessionId) { setStatus("請使用老師提供的遠端課堂連結。"); return; }
-    let active = true;
-    void fetch(`/v1/sessions/${remoteSessionId}/bootstrap`, { cache: "no-store" })
-      .then(async (response) => response.ok ? remoteBootstrapSchema.parse(await response.json() as unknown) : null)
-      .then((bootstrap) => {
-        if (active) setStatus(bootstrap?.status === "available"
-          ? "遠端課堂已連線。學生加入功能即將開放。"
-          : "遠端課堂目前無法使用。");
-      })
-      .catch(() => { if (active) setStatus("目前無法連線到遠端課堂。"); });
-    return () => { active = false; };
-  }, [remoteSessionId]);
-  return <main className="student-shell"><section className="student-card"><p className="eyebrow">學生端</p><h1>{APP_NAME}</h1><p role="status">{status}</p></section></main>;
-}
-
-function LanApp() {
-  const joinCode = useMemo(() => joinCodeFromPath(window.location.pathname), []);
+export function ClassroomStudentApp({ remote }: { remote: boolean }) {
+  const joinCode = useMemo(() => remote ? remoteSessionIdFromPath(window.location.pathname) : joinCodeFromPath(window.location.pathname), [remote]);
+  const joinAttempt = useRef<{ identity: string; id: string } | null>(null);
   const [manualCode, setManualCode] = useState(""); const [info, setInfo] = useState<SessionPublicView | null>(null);
   const [screen, setScreen] = useState<Screen>(joinCode ? "loading" : "join"); const [seatNumber, setSeatNumber] = useState(""); const [name, setName] = useState("");
   const [participant, setParticipant] = useState<StoredParticipant | null>(null); const [error, setError] = useState(""); const [reconnecting, setReconnecting] = useState(false);
@@ -62,6 +45,10 @@ function LanApp() {
       return;
     }
     let active = true;
+    if (remote) {
+      void getRemoteJoinShell(joinCode).then(() => { if (active) setScreen("join"); }).catch(cause => { if (active) { setError(message(cause)); setScreen("error"); } });
+      return () => { active = false; };
+    }
     void getJoinInfo(joinCode).then((next) => {
       if (!active) return;
       setInfo(next);
@@ -78,7 +65,7 @@ function LanApp() {
       }
     });
     return () => { active = false; };
-  }, [joinCode]);
+  }, [joinCode, remote]);
 
   useEffect(() => {
     if (info && participant && joinCode) saveParticipant(info, participant, joinCode);
@@ -151,7 +138,7 @@ function LanApp() {
       }
       if (event.type === "submission_result") setLatest(event.result as Latest);
     };
-    transport = createParticipantTransport(participant, {
+    transport = createStudentTransport(participant, {
       onAuthenticated: connection => {
         if (cancelled) return;
         peerChannel.emit({ type: "connection", online: true, generation: connection.generation });
@@ -161,9 +148,30 @@ function LanApp() {
         retryPending();
       },
       onEnded: () => { if (!cancelled) { reconnectingNow = false; clearParticipant(info, joinCode); setParticipant(null); setScreen("ended"); } },
+      onUnavailable: connection => {
+        if (cancelled) return;
+        reconnectingNow = true;
+        setReconnecting(true);
+        groupingPendingRef.current = false;
+        setGroupingPending(false);
+        peerChannel.emit({ type: "connection", online: false, generation: connection.generation });
+      },
       onDisconnected: (reason, connection) => {
         if (cancelled) return;
         peerChannel.emit({ type: "connection", online: false, generation: connection.generation });
+        if (reason === "MESSAGE_TOO_LARGE") {
+          reconnectingNow = false;
+          setReconnecting(false);
+          setError(REMOTE_REALTIME_LIMIT_MESSAGE);
+          setScreen("error");
+          return;
+        }
+        if (reason === "PROTOCOL_MISMATCH") {
+          reconnectingNow = false;
+          setError("遠端課堂版本不相容，請更新頁面並確認老師使用相同版本。");
+          setScreen("error");
+          return;
+        }
         if (reason === "AUTH_FAILED" || reason === "SESSION_ENDED" || reason === "SERVER_INSTANCE_MISMATCH") {
           reconnectingNow = false;
           clearParticipant(info, joinCode);
@@ -198,9 +206,26 @@ function LanApp() {
   }, [info, joinCode, participant, peerChannel]);
 
   const submitManual = (event: FormEvent) => { event.preventDefault(); const code = manualCode.trim().toUpperCase(); if (/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/.test(code)) window.location.assign(`/student/join/${code}`); else setError("請輸入 8 碼課堂代碼。"); };
-  const submitJoin = async (event: FormEvent) => { event.preventDefault(); const seat = Number(seatNumber); if (!info || !Number.isInteger(seat) || seat <= 0 || !name.trim()) { setError("請輸入正確的座號與姓名。"); return; } setScreen("joining"); setError(""); try { const joined = await joinClassroom(joinCode, seat, name); saveParticipant(info, joined, joinCode); setParticipant(joined); setScreen("connecting"); } catch (cause) { setError(message(cause)); setScreen("join"); } };
+  const submitJoin = async (event: FormEvent) => {
+    event.preventDefault(); const seat = Number(seatNumber);
+    if ((!remote && !info) || !Number.isInteger(seat) || seat <= 0 || !name.trim()) { setError("請輸入正確的座號與姓名。"); return; }
+    setScreen("joining"); setError("");
+    try {
+      let joined: StoredParticipant; let nextInfo: SessionPublicView;
+      if (remote) {
+        const identity = JSON.stringify([seat, name.trim()]);
+        if (joinAttempt.current?.identity !== identity) joinAttempt.current = { identity, id: secureUuid() };
+        const result = await joinRemoteClassroom(joinCode, joinAttempt.current.id, seat, name.trim());
+        joined = result.participant; nextInfo = result.info;
+      } else {
+        if (!info) return;
+        joined = await joinClassroom(joinCode, seat, name); nextInfo = info;
+      }
+      saveParticipant(nextInfo, joined, joinCode); setInfo(nextInfo); setParticipant(joined); setScreen("connecting");
+    } catch (cause) { setError(message(cause)); setScreen("join"); }
+  };
   const submitAnswer = (answer: StudentAnswer) => {
-    if (!question || question.state !== "OPEN") return;
+    if (!question || question.state !== "OPEN" || reconnecting) return;
     let submissionId: string;
     try { submissionId = secureUuid(); } catch { setError("此瀏覽器無法安全建立作答識別碼，請更新瀏覽器後再試。"); return; }
     const pending = { submissionId, sessionQuestionId: question.sessionQuestionId, answer, maxScore: question.points };
@@ -223,13 +248,14 @@ function LanApp() {
     setError(result === "serialization_failed" ? "無法建立分組請求，請重新選擇。" : "連線暫時中斷，請重新連線後再選組。");
   };
 
+  if (!joinCode && remote) return <State title="請使用老師提供的遠端課堂連結。" />;
   if (!joinCode) return <main className="student-shell"><section className="student-card"><p className="eyebrow">學生端</p><h1>{APP_NAME}</h1><p>請輸入老師提供的課堂代碼。</p><form onSubmit={submitManual}><Field id="manual-code" label="課堂代碼" value={manualCode} onChange={(value) => { setManualCode(value); setError(""); }} invalid={error === "請輸入 8 碼課堂代碼。"} errorId="join-error" /><button className="join-button" type="submit">前往課堂</button></form>{error && <p className="student-error" id="join-error" role="alert">{error}</p>}</section></main>;
-  if (screen === "loading") return <State title="正在讀取課堂…" />; if (screen === "error") return <State title="無法加入課堂" detail={error} />; if (screen === "ended") return <State title="課堂已結束" detail="老師已結束這堂課，無法再送出答案。" />; if (!info) return <State title="正在讀取課堂…" />;
+  if (screen === "loading") return <State title="正在讀取課堂…" />; if (screen === "error") return <State title={error === REMOTE_REALTIME_LIMIT_MESSAGE ? "遠端課堂內容暫時無法顯示" : "無法加入課堂"} detail={error} />; if (screen === "ended") return <State title="課堂已結束" detail="老師已結束這堂課，無法再送出答案。" />;
   if (screen === "resuming") return <State title="正在恢復課堂…" detail={reconnecting ? "網路中斷，正在重新連線…" : undefined} />;
   if (screen === "connecting") return <State title="正在驗證登入狀態…" detail={reconnecting ? "網路中斷，正在重新連線…" : undefined} />;
-  if (screen === "lobby") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>已加入課堂</h1><p>座號：{participant?.participant.seatNumber}</p><p>姓名：{participant?.participant.displayName}</p><p className="student-status" role="status">{reconnecting ? "連線中斷，正在重新連線…" : "等待老師開始課堂…"}</p>{error && <p className="student-error" role="alert">{error}</p>}<StudentGrouping grouping={grouping} pending={groupingPending} onSelect={selectGroup} /></section></main>;
-  if (screen === "live") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>{question ? "目前題目" : "課堂已開始"}</h1><p className="student-status" role="status">{reconnecting ? "連線中斷，正在重新連線…" : "已連線"}</p>{error && <p className="student-error" role="alert">{error}</p>}<StudentGrouping grouping={grouping} pending={groupingPending} onSelect={selectGroup} />{participant && <PeerReviewPanel participant={participant} channel={peerChannel} send={sendPeerReview} />}{question ? <LiveQuestion participant={participant} question={question} latest={latest} pending={submission.status !== "idle"} reveal={reveal} onSubmit={submitAnswer} /> : <p>等待老師發布題目…</p>}</section></main>;
-  return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info.classroomName}</p><h1>加入課堂</h1><form onSubmit={submitJoin}><Field id="seat-number" label="座號" value={seatNumber} onChange={(value) => { setSeatNumber(value); setError(""); }} numeric invalid={error === "請輸入正確的座號與姓名。" && (!Number.isInteger(Number(seatNumber)) || Number(seatNumber) <= 0)} errorId="join-error" /><Field id="student-name" label="姓名" value={name} onChange={(value) => { setName(value); setError(""); }} invalid={error === "請輸入正確的座號與姓名。" && !name.trim()} errorId="join-error" /><button className="join-button" disabled={screen === "joining"} type="submit">{screen === "joining" ? "加入中…" : "加入課堂"}</button></form>{error && <p className="student-error" id="join-error" role="alert">{error}</p>}</section></main>;
+  if (screen === "lobby") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info?.classroomName}</p><h1>已加入課堂</h1><p>座號：{participant?.participant.seatNumber}</p><p>姓名：{participant?.participant.displayName}</p><p className="student-status" role="status">{reconnecting ? "連線中斷，正在重新連線…" : "等待老師開始課堂…"}</p>{error && <p className="student-error" role="alert">{error}</p>}<StudentGrouping grouping={grouping} pending={groupingPending || reconnecting} onSelect={selectGroup} /></section></main>;
+  if (screen === "live") return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info?.classroomName}</p><h1>{question ? "目前題目" : "課堂已開始"}</h1><p className="student-status" role="status">{reconnecting ? "連線中斷，正在重新連線…" : "已連線"}</p>{error && <p className="student-error" role="alert">{error}</p>}<StudentGrouping grouping={grouping} pending={groupingPending || reconnecting} onSelect={selectGroup} />{participant && <PeerReviewPanel participant={participant} channel={peerChannel} send={sendPeerReview} />}{question ? <LiveQuestion participant={participant} question={question} latest={latest} pending={submission.status !== "idle"} unavailable={reconnecting} reveal={reveal} onSubmit={submitAnswer} /> : <p>等待老師發布題目…</p>}</section></main>;
+  return <main className="student-shell"><section className="student-card"><p className="eyebrow">{info?.classroomName ?? "遠端課堂"}</p><h1>加入課堂</h1><form onSubmit={submitJoin}><Field id="seat-number" label="座號" value={seatNumber} onChange={(value) => { setSeatNumber(value); setError(""); }} numeric invalid={error === "請輸入正確的座號與姓名。" && (!Number.isInteger(Number(seatNumber)) || Number(seatNumber) <= 0)} errorId="join-error" /><Field id="student-name" label="姓名" value={name} onChange={(value) => { setName(value); setError(""); }} invalid={error === "請輸入正確的座號與姓名。" && !name.trim()} errorId="join-error" /><button className="join-button" disabled={screen === "joining"} type="submit">{screen === "joining" ? "加入中…" : "加入課堂"}</button></form>{error && <p className="student-error" id="join-error" role="alert">{error}</p>}</section></main>;
 }
 
 function StudentGrouping({ grouping, pending, onSelect }: { grouping: StudentGroupingView | null; pending: boolean; onSelect: (draftId: string, groupId: string | null) => void }) {
@@ -251,10 +277,10 @@ function MemberList({ members }: { members: StudentGroupingView["availableGroups
   return <ul className="student-grouping-members">{members.map((member, index) => <li key={`${member.seatNumber}-${member.displayName}-${index}`}>{member.isSelf ? "你" : member.displayName}{member.isSelf ? `（${member.displayName}）` : ""}</li>)}</ul>;
 }
 
-function LiveQuestion({ participant, question, latest, pending, reveal, onSubmit }: { participant: StoredParticipant | null; question: QuestionPublicView; latest: Latest | null; pending: boolean; reveal: RevealedQuestion | null; onSubmit: (answer: StudentAnswer) => void }) {
+function LiveQuestion({ participant, question, latest, pending, unavailable, reveal, onSubmit }: { participant: StoredParticipant | null; question: QuestionPublicView; latest: Latest | null; pending: boolean; unavailable: boolean; reveal: RevealedQuestion | null; onSubmit: (answer: StudentAnswer) => void }) {
   const [trueFalse, setTrueFalse] = useState<boolean | null>(null); const [single, setSingle] = useState(""); const [multiple, setMultiple] = useState<string[]>([]); const [blanks, setBlanks] = useState<Record<string, string>>({}); const [essay, setEssay] = useState("");
   useEffect(() => { const value = latest?.answer; setTrueFalse(value?.type === "true_false" ? value.value : null); setSingle(value?.type === "single_choice" ? value.optionId : ""); setMultiple(value?.type === "multiple_choice" ? value.optionIds : []); setBlanks(value?.type === "fill_blank" ? value.values : {}); setEssay(value?.type === "essay" ? value.text : ""); }, [question.sessionQuestionId, latest?.revision]);
-  const editable = question.state === "OPEN" && !pending;
+  const editable = question.state === "OPEN" && !pending && !unavailable;
   const answer: StudentAnswer | null = question.type === "true_false" ? (trueFalse === null ? null : { type: "true_false", value: trueFalse }) : question.type === "single_choice" ? (single ? { type: "single_choice", optionId: single } : null) : question.type === "multiple_choice" ? { type: "multiple_choice", optionIds: multiple } : question.type === "fill_blank" ? { type: "fill_blank", values: blanks } : { type: "essay", text: essay };
   return <div className="live-question"><p className="question-prompt">{question.prompt}</p><SessionAssets assets={question.assets} participant={participant} />
     {question.type === "true_false" && <div aria-label="答案選項" className="answer-controls" role="group"><button aria-pressed={trueFalse === true} className={trueFalse === true ? "selected" : ""} disabled={!editable} onClick={() => setTrueFalse(true)} type="button">{"\u6b63\u78ba"}</button><button aria-pressed={trueFalse === false} className={trueFalse === false ? "selected" : ""} disabled={!editable} onClick={() => setTrueFalse(false)} type="button">{"\u932f\u8aa4"}</button></div>}
@@ -289,6 +315,7 @@ function answerText(question: QuestionPublicView, answer: StudentAnswer): string
 }
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null; }
 function SessionAssets({ assets, participant }: { assets: QuestionPublicView["assets"]; participant: StoredParticipant | null }) {
+  if (assets.length > 0 && participant && isRemoteParticipant(participant)) return <p role="status">{REMOTE_DETAIL_UNAVAILABLE}</p>;
   return <div className="live-question-media" aria-label="題目附件">
     {assets.map((asset) => asset.assetType === "image" ? <ProtectedImage assetId={asset.id} displayName={asset.displayName} key={asset.id} participant={participant} /> : <ProtectedPdf assetId={asset.id} displayName={asset.displayName} key={asset.id} participant={participant} />)}
   </div>;

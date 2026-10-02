@@ -66,6 +66,17 @@ describe("LiveQuizPage", () => {
     expect(api.listSessionQuestions).toHaveBeenCalledWith(baseSession.id);
   });
 
+  it.each(["LOBBY", "ACTIVE"] as const)("uses a Remote %s session while the LAN server is stopped", async (state) => {
+    const api = apiFixture({ ...baseSession, state, serverInstanceId: `remote:${"a".repeat(32)}` });
+    vi.mocked(api.getLocalServerStatus).mockResolvedValue({ ...server, running: false, serverInstanceId: null });
+    render(<LiveQuizPage api={api} onError={vi.fn()} />);
+    expect(await screen.findByRole(state === "LOBBY" ? "button" : "heading", {
+      name: state === "LOBBY" ? "開始課堂" : "發布題目",
+    })).toBeInTheDocument();
+    expect(api.listSessionQuestions).toHaveBeenCalledWith(baseSession.id);
+    expect(screen.queryByText("請先開啟伺服器並建立課堂。")).not.toBeInTheDocument();
+  });
+
   it("keeps LOBBY semantics until the teacher starts the session", async () => {
     const api = apiFixture({ ...baseSession, state: "LOBBY" });
     render(<LiveQuizPage api={api} onError={vi.fn()} />);

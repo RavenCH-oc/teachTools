@@ -14,7 +14,8 @@ export function LiveQuizPage({ api, onError, onOpenSessionAnalysis, onOpenSessio
       const [nextServer, active] = await Promise.all([api.getLocalServerStatus(), api.getActiveLocalSession()]);
       setServer(nextServer);
       setSession(active);
-      if (!active || active.state === "ENDED" || !nextServer.running || active.serverInstanceId !== nextServer.serverInstanceId) {
+      const remoteSession = active?.serverInstanceId.startsWith("remote:");
+      if (!active || active.state === "ENDED" || (!remoteSession && (!nextServer.running || active.serverInstanceId !== nextServer.serverInstanceId))) {
         setSets([]);
         setPublished([]);
         return;
@@ -33,8 +34,9 @@ export function LiveQuizPage({ api, onError, onOpenSessionAnalysis, onOpenSessio
   useEffect(() => { if (!session) return; const timer = window.setInterval(() => { const current = published.find((question) => question.state === "OPEN" || question.state === "LOCKED"); if (!current) return; void api.getSessionQuestionProgress(current.id, session.id).then((value) => setProgress((items) => ({ ...items, [current.id]: value }))).catch(() => undefined); }, 2000); return () => window.clearInterval(timer); }, [session, published]);
   const run = async (operation: () => Promise<void>) => { setWorking(true); try { await operation(); await refresh(); } catch (cause) { onError(cause instanceof Error ? cause.message : "無法完成題目操作。"); } finally { setWorking(false); } };
   if (loading) return <section className="state-card"><span className="spinner" />正在載入課堂…</section>;
-  if (!server?.running || !session || session.state === "ENDED") return <section className="state-card"><h2>{"\u5373\u6642\u6e2c\u9a57"}</h2><p>{"\u8acb\u5148\u958b\u555f\u4f3a\u670d\u5668\u4e26\u5efa\u7acb\u8ab2\u5802\u3002"}</p></section>;
-  if (session.serverInstanceId !== server.serverInstanceId) return <section className="state-card"><h2>課堂伺服器狀態已變更</h2><p>這個未結束課堂不屬於目前的伺服器執行個體。請到「課堂」頁結束舊課堂後，再建立新的課堂。</p></section>;
+  const remoteSession = session?.serverInstanceId.startsWith("remote:");
+  if ((!remoteSession && !server?.running) || !session || session.state === "ENDED") return <section className="state-card"><h2>{"\u5373\u6642\u6e2c\u9a57"}</h2><p>{"\u8acb\u5148\u958b\u555f\u4f3a\u670d\u5668\u4e26\u5efa\u7acb\u8ab2\u5802\u3002"}</p></section>;
+  if (!remoteSession && session.serverInstanceId !== server?.serverInstanceId) return <section className="state-card"><h2>課堂伺服器狀態已變更</h2><p>這個未結束課堂不屬於目前的伺服器執行個體。請到「課堂」頁結束舊課堂後，再建立新的課堂。</p></section>;
   if (session.state === "CREATED") return <section className="state-card"><h2>{"\u5373\u6642\u6e2c\u9a57"}</h2><p>請先在本機課堂頁開放等候大廳。</p></section>;
   const activeQuestion = currentQuestion(published);
   const hasOpenQuestion = published.some((question) => question.state === "OPEN" || question.state === "LOCKED");

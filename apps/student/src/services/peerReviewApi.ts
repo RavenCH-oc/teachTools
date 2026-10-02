@@ -1,8 +1,9 @@
 import { peerReviewActivitiesPageSchema, peerReviewCandidatesPageSchema, peerReviewFeedbackPageSchema, peerReviewEssaysPageSchema, peerReviewFeedbackDetailSchema, peerReviewFeedbackQuerySchema, publicErrorSchema } from "@classtools/backend-contract";
-import { StudentApiError, type StoredParticipant } from "./studentApi";
+import { assertLocalDetailAvailable, StudentApiError, type StoredParticipant } from "./studentApi";
 
 type PageOptions = { limit?: number; cursor?: string; activityId?: string; signal?: AbortSignal };
 async function read<T>(participant: StoredParticipant, path: string, parse: (value: unknown) => T, options: PageOptions = {}): Promise<T> {
+  assertLocalDetailAvailable(participant);
   const query = new URLSearchParams();
   peerReviewFeedbackQuerySchema.parse({ limit: options.limit, cursor: options.cursor, activityId: options.activityId });
   if (options.activityId !== undefined) query.set("activityId", options.activityId);

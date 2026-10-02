@@ -9,13 +9,15 @@ export const LOCAL_PROTOCOL_VERSION = 1 as const;
 const requestIdSchema = z.string().trim().min(1).max(120);
 const protocolVersionSchema = z.literal(LOCAL_PROTOCOL_VERSION);
 const uuidSchema = z.string().uuid();
+// Transport instance identity: LAN UUID or a public Remote relay locator.
+const serverInstanceIdSchema = z.union([uuidSchema, z.string().regex(/^remote:[A-Za-z0-9_-]{32}$/)]);
 
 export const sessionPublicViewSchema = z.object({
   sessionId: uuidSchema,
   classroomName: z.string().trim().min(1).max(200),
   state: z.enum(["CREATED", "LOBBY", "ACTIVE", "ENDED"]),
   joinMode: z.literal("roster_match"),
-  serverInstanceId: uuidSchema,
+  serverInstanceId: serverInstanceIdSchema,
   protocolVersion: protocolVersionSchema,
 }).strict();
 
@@ -31,7 +33,7 @@ export const joinSuccessSchema = z.object({
   participantId: uuidSchema,
   credential: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   participant: participantSelfViewSchema,
-  serverInstanceId: uuidSchema,
+  serverInstanceId: serverInstanceIdSchema,
 }).strict();
 
 export const publicErrorSchema = z.object({ code: z.string().trim().min(1), message: z.string().trim().min(1) }).strict();

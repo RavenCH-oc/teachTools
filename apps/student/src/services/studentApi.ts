@@ -10,6 +10,7 @@ import {
   type ServerMessage,
   type StudentAnswer,
   type PeerReviewMutation,
+  type ClientMessage,
 } from "@classtools/backend-contract";
 
 export class StudentApiError extends Error {
@@ -35,6 +36,7 @@ export async function joinClassroom(joinCode: string, seatNumber: number, name: 
 }
 
 export async function fetchSessionAsset(assetId: string, participant: StoredParticipant): Promise<Blob> {
+  assertLocalDetailAvailable(participant);
   const response = await fetch(`/api/v1/session-assets/${encodeURIComponent(assetId)}`, { headers: { authorization: `Bearer ${participant.credential}`, "x-classroom-session": participant.sessionId, "x-classroom-participant": participant.participantId } });
   if (!response.ok) throw new StudentApiError("Unable to load session media.", "ASSET_UNAVAILABLE");
   return response.blob();
@@ -87,7 +89,18 @@ export function clearParticipant(info: SessionPublicView, joinCode?: string): vo
 }
 
 function storageKey(info: SessionPublicView): string { return `classroom.participant.${info.serverInstanceId}.${info.sessionId}`; }
-function resumeKey(joinCode: string): string { return `classroom.resume.v1.${joinCode.trim().toUpperCase()}`; }
+function resumeKey(joinCode: string): string {
+  return /^[A-Za-z0-9_-]{32}$/.test(joinCode)
+    ? `classroom.resume.remote.v1.${joinCode}`
+    : `classroom.resume.v1.${joinCode.trim().toUpperCase()}`;
+}
+
+export const REMOTE_DETAIL_UNAVAILABLE = "遠端課堂目前不支援作品詳情、互評詳情與媒體附件；此功能將於後續階段提供。";
+export const REMOTE_REALTIME_LIMIT_MESSAGE = "此內容超過遠端即時傳輸上限，詳細內容需後續階段支援。";
+export function isRemoteParticipant(participant: StoredParticipant): boolean { return participant.serverInstanceId.startsWith("remote:"); }
+export function assertLocalDetailAvailable(participant: StoredParticipant): void {
+  if (isRemoteParticipant(participant)) throw new StudentApiError(REMOTE_DETAIL_UNAVAILABLE, "REMOTE_DETAIL_UNAVAILABLE");
+}
 function storedResumeInfo(joinCode: string): SessionPublicView | null {
   const key = resumeKey(joinCode);
   try {
@@ -102,7 +115,7 @@ function storedResumeInfo(joinCode: string): SessionPublicView | null {
   return null;
 }
 
-export type ParticipantDisconnectReason = "transient" | "AUTH_FAILED" | "SESSION_ENDED" | "SERVER_INSTANCE_MISMATCH";
+export type ParticipantDisconnectReason = "transient" | "AUTH_FAILED" | "SESSION_ENDED" | "SERVER_INSTANCE_MISMATCH" | "PROTOCOL_MISMATCH" | "MESSAGE_TOO_LARGE";
 export type SubmitAnswerResult = "sent" | "transport_unavailable" | "serialization_failed" | "send_failed";
 export type SelectGroupResult = "sent" | "transport_unavailable" | "serialization_failed" | "send_failed";
 export type ParticipantConnectionState = {
@@ -128,6 +141,23 @@ export type ParticipantTransportCallbacks = {
   onDisconnected: (reason: ParticipantDisconnectReason, connection: ParticipantConnectionState) => void;
   onMessage?: (message: ServerMessage, connection: ParticipantConnectionState) => void;
   onMessageError?: () => void;
+  onUnavailable?: (connection: ParticipantConnectionState) => void;
+};
+
+export type ParticipantWireEvent = { kind: "message"; message: ServerMessage }
+  | { kind: "unavailable" | "reauth" }
+  | { kind: "failure"; reason: ParticipantDisconnectReason };
+export type ParticipantWire = {
+  url: () => string;
+  authOnOpen: boolean;
+  syncBeforeResume: boolean;
+  encode: (message: ClientMessage) => string;
+  decode: (raw: string) => ParticipantWireEvent;
+};
+const localWire: ParticipantWire = {
+  url: webSocketUrl, authOnOpen: false, syncBeforeResume: false,
+  encode: message => JSON.stringify(message),
+  decode: raw => ({ kind: "message", message: serverMessageSchema.parse(JSON.parse(raw) as unknown) }),
 };
 
 type SocketConnection = {
@@ -137,6 +167,7 @@ type SocketConnection = {
   closedByClient: boolean;
   disconnectReason: ParticipantDisconnectReason;
   heartbeatTimer: number | undefined;
+  authValidated: boolean;
 };
 
 export function webSocketUrl(location: Pick<Location, "protocol" | "host"> = window.location): string {
@@ -157,7 +188,7 @@ export function secureUuid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export function createParticipantTransport(participant: StoredParticipant, callbacks: ParticipantTransportCallbacks): ParticipantTransport {
+export function createParticipantTransport(participant: StoredParticipant, callbacks: ParticipantTransportCallbacks, wire: ParticipantWire = localWire): ParticipantTransport {
   let current: SocketConnection | null = null;
   let closed = false;
   let nextGeneration = 0;
@@ -187,7 +218,7 @@ export function createParticipantTransport(participant: StoredParticipant, callb
   const sendHeartbeat = (connection: SocketConnection) => {
     if (!isCurrent(connection) || !connection.authenticated || connection.socket.readyState !== WebSocket.OPEN) return;
     try {
-      connection.socket.send(JSON.stringify(clientMessageSchema.parse({ protocolVersion: LOCAL_PROTOCOL_VERSION, type: "ping", requestId: secureUuid() })));
+      connection.socket.send(wire.encode(clientMessageSchema.parse({ protocolVersion: LOCAL_PROTOCOL_VERSION, type: "ping", requestId: secureUuid() })));
     } catch {
       debug("HEARTBEAT_SEND_FAILED", connection);
       closeSocket(connection);
@@ -206,27 +237,58 @@ export function createParticipantTransport(participant: StoredParticipant, callb
       try { callbacks.onMessageError?.(); } catch { debug("MESSAGE_ERROR_HANDLER_FAILED", connection); }
     }
   };
+  const sendAuth = (connection: SocketConnection) => {
+    try {
+      connection.socket.send(wire.encode(clientMessageSchema.parse({ protocolVersion: LOCAL_PROTOCOL_VERSION, type: "participant_auth", requestId: secureUuid(), sessionId: participant.sessionId, participantId: participant.participantId, credential: participant.credential })));
+      debug("PARTICIPANT_AUTH_SENT", connection);
+    } catch { closeSocket(connection); }
+  };
+  const resume = (connection: SocketConnection) => {
+    connection.authenticated = true;
+    startHeartbeat(connection);
+    callbacks.onAuthenticated(snapshot(connection));
+  };
 
   const start = () => {
     if (closed || current) return;
     const connection: SocketConnection = {
-      socket: new WebSocket(webSocketUrl()),
+      socket: new WebSocket(wire.url()),
       generation: ++nextGeneration,
       authenticated: false,
       closedByClient: false,
       disconnectReason: "transient",
       heartbeatTimer: undefined,
+      authValidated: false,
     };
     current = connection;
     debug("CONNECTION_CREATED", connection);
-    connection.socket.onopen = () => { if (isCurrent(connection)) debug("SOCKET_OPEN", connection); };
+    connection.socket.onopen = () => {
+      if (!isCurrent(connection)) return;
+      debug("SOCKET_OPEN", connection);
+      if (wire.authOnOpen) sendAuth(connection);
+    };
     connection.socket.onmessage = (event) => {
       if (!isCurrent(connection)) { debug("STALE_INBOUND_IGNORED", connection); return; }
-      let payload: unknown;
-      try { payload = JSON.parse(String(event.data)); } catch { debug("INVALID_JSON", connection); closeSocket(connection); return; }
-      const parsed = serverMessageSchema.safeParse(payload);
-      if (!parsed.success) { debug("INVALID_SERVER_MESSAGE", connection); closeSocket(connection); return; }
-      const message = parsed.data;
+      let decoded: ParticipantWireEvent;
+      try { decoded = wire.decode(String(event.data)); } catch { debug("INVALID_SERVER_MESSAGE", connection); closeSocket(connection); return; }
+      if (decoded.kind === "failure") { connection.disconnectReason = decoded.reason; closeSocket(connection); return; }
+      if (decoded.kind === "unavailable" || decoded.kind === "reauth") {
+        connection.authenticated = false;
+        connection.authValidated = false;
+        connection.generation = ++nextGeneration;
+        stopHeartbeat(connection);
+        callbacks.onUnavailable?.(snapshot(connection));
+        if (decoded.kind === "reauth") sendAuth(connection);
+        return;
+      }
+      if (decoded.kind !== "message") return;
+      const message = decoded.message;
+      if (wire.syncBeforeResume && !connection.authValidated && message.type !== "participant_authenticated" && message.type !== "error") return;
+      if (message.type === "participant_authenticated" && (message.participant.participantId !== participant.participantId || message.participant.sessionId !== participant.sessionId)) {
+        connection.disconnectReason = "AUTH_FAILED";
+        closeSocket(connection);
+        return;
+      }
       debug(`RECEIVED_${message.type.toUpperCase()}`, connection);
       if (message.type === "submission_acknowledged") debug("SUBMIT_ACK_RECEIVED", connection);
       notifyMessage(message, connection);
@@ -239,18 +301,13 @@ export function createParticipantTransport(participant: StoredParticipant, callb
           closeSocket(connection);
           return;
         }
-        try {
-          connection.socket.send(JSON.stringify(clientMessageSchema.parse({ protocolVersion: LOCAL_PROTOCOL_VERSION, type: "participant_auth", requestId: secureUuid(), sessionId: participant.sessionId, participantId: participant.participantId, credential: participant.credential })));
-          debug("PARTICIPANT_AUTH_SENT", connection);
-        } catch {
-          debug("PARTICIPANT_AUTH_SEND_FAILED", connection);
-          closeSocket(connection);
-        }
+        sendAuth(connection);
       } else if (message.type === "participant_authenticated") {
-        connection.authenticated = true;
-        startHeartbeat(connection);
+        connection.authValidated = true;
         debug("PARTICIPANT_AUTHENTICATED", connection);
-        callbacks.onAuthenticated(snapshot(connection));
+        if (!wire.syncBeforeResume) resume(connection);
+      } else if (message.type === "session_sync" && wire.syncBeforeResume && connection.authValidated && !connection.authenticated) {
+        resume(connection);
       } else if (message.type === "session_state_changed" && message.state === "ENDED") {
         connection.disconnectReason = "SESSION_ENDED";
         connection.closedByClient = true;
@@ -303,7 +360,7 @@ export function createParticipantTransport(participant: StoredParticipant, callb
       const connection = current;
       if (!connection || !connection.authenticated || connection.socket.readyState !== WebSocket.OPEN) return "transport_unavailable";
       let serialized: string;
-      try { serialized = JSON.stringify(clientMessageSchema.parse(message)); } catch { return "serialization_failed"; }
+      try { serialized = wire.encode(clientMessageSchema.parse(message)); } catch { return "serialization_failed"; }
       try { connection.socket.send(serialized); return "sent"; } catch { closeSocket(connection); return "send_failed"; }
     },
     retryReconnectNow,
@@ -329,7 +386,7 @@ export function createParticipantTransport(participant: StoredParticipant, callb
       }
       let serialized: string;
       try {
-        serialized = JSON.stringify(clientMessageSchema.parse({ protocolVersion: LOCAL_PROTOCOL_VERSION, type: "submit_answer", requestId: secureUuid(), submissionId, sessionQuestionId, answer }));
+        serialized = wire.encode(clientMessageSchema.parse({ protocolVersion: LOCAL_PROTOCOL_VERSION, type: "submit_answer", requestId: secureUuid(), submissionId, sessionQuestionId, answer }));
       } catch {
         debug("SUBMIT_BUILD_FAILED", connection);
         return "serialization_failed";
@@ -351,7 +408,7 @@ export function createParticipantTransport(participant: StoredParticipant, callb
       }
       let serialized: string;
       try {
-        serialized = JSON.stringify(clientMessageSchema.parse({ protocolVersion: LOCAL_PROTOCOL_VERSION, type: "select_group", requestId: secureUuid(), draftId, groupId }));
+        serialized = wire.encode(clientMessageSchema.parse({ protocolVersion: LOCAL_PROTOCOL_VERSION, type: "select_group", requestId: secureUuid(), draftId, groupId }));
       } catch {
         return "serialization_failed";
       }

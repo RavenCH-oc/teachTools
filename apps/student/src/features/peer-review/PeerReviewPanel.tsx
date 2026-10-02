@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PeerReviewActivity, PeerReviewMutation, PeerReviewPending } from "@classtools/backend-contract";
 import { getPeerReviewActivities, getPeerReviewActivity } from "../../services/peerReviewApi";
-import { secureUuid, type StoredParticipant, type SubmitAnswerResult } from "../../services/studentApi";
+import { isRemoteParticipant, secureUuid, type StoredParticipant, type SubmitAnswerResult } from "../../services/studentApi";
 import type { PeerSessionChannel } from "./sessionChannel";
 import { peerStorage } from "./storage";
 import { usePage } from "./usePage";
@@ -42,8 +42,11 @@ export function PeerReviewPanel({ participant, channel, send }: { participant: S
   const readPending = useCallback(() => { try { const records = storage.pending(); setPending(records); return records; } catch { setError("無法保存評論草稿，請確認瀏覽器儲存空間。"); return []; } }, [storage]);
   const retry = useCallback(() => {
     if (!channel.snapshot().online) return;
+    // Remote detail/revision retrieval is unavailable in 16D; do not replay a
+    // stored review until that authoritative read can be performed in 16E.
+    if (isRemoteParticipant(participant)) return;
     for (const record of readPending()) send({ protocolVersion: 1, type: "submit_peer_review", requestId: record.reviewSubmissionId, ...recordToMessage(record) });
-  }, [channel, readPending, send]);
+  }, [channel, participant, readPending, send]);
   useEffect(() => {
     readPending();
     const unsubscribe = channel.subscribe(event => {

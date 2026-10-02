@@ -52,4 +52,14 @@ describe("RemoteSessionPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "關閉 Remote Session" }));
     await waitFor(() => expect(api.close).toHaveBeenCalledOnce());
   });
+
+  it("opens the existing Quiz workspace from a Remote Session", async () => {
+    const api = fixture({ configured: true, enrolled: true, session: null });
+    const openQuiz = vi.fn();
+    render(<RemoteSessionPage classrooms={[classroom]} api={api} onOpenLiveQuiz={openQuiz} />);
+    fireEvent.click(await screen.findByRole("button", { name: "建立 Remote Session" }));
+    fireEvent.click(await screen.findByRole("button", { name: "前往即時測驗" }));
+    expect(openQuiz).toHaveBeenCalledOnce();
+    expect(screen.queryByText(/不接受學生加入/)).not.toBeInTheDocument();
+  });
 });
