@@ -1,3 +1,4 @@
+import { studentHttpRead, studentHttpError } from "./studentHttpApi";
 import {
   LOCAL_PROTOCOL_VERSION,
   clientMessageSchema,
@@ -35,11 +36,17 @@ export async function joinClassroom(joinCode: string, seatNumber: number, name: 
   }, joinSuccessSchema.parse);
 }
 
-export async function fetchSessionAsset(assetId: string, participant: StoredParticipant): Promise<Blob> {
-  assertLocalDetailAvailable(participant);
-  const response = await fetch(`/api/v1/session-assets/${encodeURIComponent(assetId)}`, { headers: { authorization: `Bearer ${participant.credential}`, "x-classroom-session": participant.sessionId, "x-classroom-participant": participant.participantId } });
-  if (!response.ok) throw new StudentApiError("Unable to load session media.", "ASSET_UNAVAILABLE");
-  return response.blob();
+export async function fetchSessionAsset(assetId: string, participant: StoredParticipant, signal?: AbortSignal): Promise<Blob> {
+  const response = await studentHttpRead(participant, { operation: "SESSION_ASSET_GET", arguments: { assetId } }, signal);
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    const error = publicErrorSchema.safeParse(body);
+    throw studentHttpError(error.success ? error.data.code : "ASSET_UNAVAILABLE", "檔案讀取失敗，請稍後重試。");
+  }
+  try { return await response.blob(); } catch (cause) {
+    if (typeof cause === "object" && cause !== null && "name" in cause && cause.name === "AbortError") throw cause;
+    throw new StudentApiError("檔案讀取失敗，請稍後重試。", "RESPONSE_INTERRUPTED");
+  }
 }
 
 async function request<T>(path: string, init: RequestInit, parse: (value: unknown) => T): Promise<T> {
@@ -95,12 +102,8 @@ function resumeKey(joinCode: string): string {
     : `classroom.resume.v1.${joinCode.trim().toUpperCase()}`;
 }
 
-export const REMOTE_DETAIL_UNAVAILABLE = "遠端課堂目前不支援作品詳情、互評詳情與媒體附件；此功能將於後續階段提供。";
 export const REMOTE_REALTIME_LIMIT_MESSAGE = "此內容超過遠端即時傳輸上限，詳細內容需後續階段支援。";
 export function isRemoteParticipant(participant: StoredParticipant): boolean { return participant.serverInstanceId.startsWith("remote:"); }
-export function assertLocalDetailAvailable(participant: StoredParticipant): void {
-  if (isRemoteParticipant(participant)) throw new StudentApiError(REMOTE_DETAIL_UNAVAILABLE, "REMOTE_DETAIL_UNAVAILABLE");
-}
 function storedResumeInfo(joinCode: string): SessionPublicView | null {
   const key = resumeKey(joinCode);
   try {

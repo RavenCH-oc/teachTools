@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { APP_NAME } from "@classtools/shared";
 import { type QuestionPublicView, type ServerMessage, type SessionPublicView, type StudentAnswer, type StudentGroupingView } from "@classtools/backend-contract";
-import { clearParticipant, fetchSessionAsset, getJoinInfo, isRemoteParticipant, joinClassroom, REMOTE_DETAIL_UNAVAILABLE, REMOTE_REALTIME_LIMIT_MESSAGE, saveParticipant, secureUuid, storedParticipant, storedParticipantForJoinCode, StudentApiError, type ParticipantTransport, type StoredParticipant, type SubmitAnswerResult } from "./services/studentApi";
+import { clearParticipant, fetchSessionAsset, getJoinInfo, joinClassroom, REMOTE_REALTIME_LIMIT_MESSAGE, saveParticipant, secureUuid, storedParticipant, storedParticipantForJoinCode, StudentApiError, type ParticipantTransport, type StoredParticipant, type SubmitAnswerResult } from "./services/studentApi";
 import { createStudentTransport, getRemoteJoinShell, joinRemoteClassroom, remoteSessionIdFromPath } from "./services/remoteStudentApi";
 import type { PeerReviewMutation } from "@classtools/backend-contract";
 import { PeerReviewPanel } from "./features/peer-review/PeerReviewPanel";
@@ -315,7 +315,6 @@ function answerText(question: QuestionPublicView, answer: StudentAnswer): string
 }
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null; }
 function SessionAssets({ assets, participant }: { assets: QuestionPublicView["assets"]; participant: StoredParticipant | null }) {
-  if (assets.length > 0 && participant && isRemoteParticipant(participant)) return <p role="status">{REMOTE_DETAIL_UNAVAILABLE}</p>;
   return <div className="live-question-media" aria-label="題目附件">
     {assets.map((asset) => asset.assetType === "image" ? <ProtectedImage assetId={asset.id} displayName={asset.displayName} key={asset.id} participant={participant} /> : <ProtectedPdf assetId={asset.id} displayName={asset.displayName} key={asset.id} participant={participant} />)}
   </div>;
@@ -331,9 +330,10 @@ function ProtectedImage({ assetId, displayName, participant }: { assetId: string
     if (!participant) { setState("error"); return; }
     let active = true;
     let objectUrl = "";
+    const controller = new AbortController();
     setState("loading");
     setUrl("");
-    void fetchSessionAsset(assetId, participant)
+    void fetchSessionAsset(assetId, participant, controller.signal)
       .then((blob) => {
         objectUrl = URL.createObjectURL(blob);
         if (!active) { URL.revokeObjectURL(objectUrl); return; }
@@ -343,6 +343,7 @@ function ProtectedImage({ assetId, displayName, participant }: { assetId: string
       .catch(() => { if (active) setState("error"); });
     return () => {
       active = false;
+      controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [assetId, attempt, participant]);
@@ -378,12 +379,17 @@ function ImageViewer({ displayName, onClose, onOpenOriginal, url, returnFocus }:
 }
 
 function ProtectedPdf({ assetId, displayName, participant }: { assetId: string; displayName: string; participant: StoredParticipant | null }) {
+  const requestRef = useRef<AbortController | null>(null);
+  useEffect(() => () => { requestRef.current?.abort(); }, [assetId, participant]);
   const [state, setState] = useState<"idle" | "loading" | "error">("idle");
   const openPdf = async () => {
     if (!participant) return;
     setState("loading");
     try {
-      const url = URL.createObjectURL(await fetchSessionAsset(assetId, participant));
+      requestRef.current?.abort();
+      const controller = new AbortController(); requestRef.current = controller;
+      const url = URL.createObjectURL(await fetchSessionAsset(assetId, participant, controller.signal));
+      if (controller.signal.aborted) { URL.revokeObjectURL(url); return; }
       window.open(url, "_blank", "noopener,noreferrer");
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
       setState("idle");

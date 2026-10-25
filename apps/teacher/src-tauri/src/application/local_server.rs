@@ -18,6 +18,9 @@ use tokio::sync::oneshot;
 use tower_http::limit::RequestBodyLimitLayer;
 use uuid::Uuid;
 
+use super::participant_http::{
+    HttpIdentity, HttpOperation, HttpReadResponse, ParticipantHttpService,
+};
 use super::participant_realtime::{
     internal_peer_id, parse_client_message, ClientMessage, ParticipantConnection,
     ParticipantRealtimeService, ServerMessage,
@@ -623,41 +626,34 @@ async fn session_asset(
             (StatusCode::UNAUTHORIZED, "Authentication required.").into_response(),
         );
     };
-    let session = Arc::clone(&state.session);
-    let server_instance_id = state.server_instance_id.clone();
-    let authentication_session_id = session_id.clone();
-    let authenticated = blocking(move || {
-        session.authenticate(
-            &authentication_session_id,
-            &participant_id,
-            &credential,
-            &server_instance_id,
-        )
-    })
-    .await;
-    if authenticated.is_err() {
-        return with_static_security(
-            (StatusCode::UNAUTHORIZED, "Authentication required.").into_response(),
-        );
+    participant_http_read(
+        state,
+        HttpIdentity {
+            session_id,
+            participant_id,
+            credential,
+        },
+        HttpOperation::SessionAssetGet { asset_id },
+    )
+    .await
+}
+
+async fn participant_http_read(
+    state: Arc<TransportState>,
+    identity: HttpIdentity,
+    operation: HttpOperation,
+) -> Response {
+    let service = ParticipantHttpService::new(state.session.clone(), state.quiz.clone());
+    let instance = state.server_instance_id.clone();
+    let response = blocking(move || Ok(service.read(identity, &instance, None, operation)))
+        .await
+        .unwrap_or_else(|_| HttpReadResponse::error(500, "REQUEST_FAILED", "無法讀取課堂資料。"));
+    let status = StatusCode::from_u16(response.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let mut result = (status, response.bytes).into_response();
+    if let Ok(value) = HeaderValue::from_str(&response.content_type) {
+        result.headers_mut().insert(header::CONTENT_TYPE, value);
     }
-    let quiz = Arc::clone(&state.quiz);
-    match blocking(move || quiz.read_asset_for_session(&asset_id, &session_id)).await {
-        Ok((bytes, mime_type)) => {
-            let mut response = bytes.into_response();
-            if let Ok(value) = HeaderValue::from_str(&mime_type) {
-                response.headers_mut().insert(header::CONTENT_TYPE, value);
-            }
-            response.headers_mut().insert(
-                "x-content-type-options",
-                HeaderValue::from_static("nosniff"),
-            );
-            response
-                .headers_mut()
-                .insert("cache-control", HeaderValue::from_static("no-store"));
-            response
-        }
-        Err(_) => with_static_security((StatusCode::NOT_FOUND, "Not found.").into_response()),
-    }
+    with_static_security(result)
 }
 
 fn asset_credentials(headers: &HeaderMap) -> Option<(String, String, String)> {
@@ -737,66 +733,40 @@ async fn peer_review_read(
     let Some((session_id, participant_id, credential)) = asset_credentials(&headers) else {
         return public_error(StatusCode::UNAUTHORIZED, "AUTH_FAILED", "請重新連線課堂。");
     };
-    let session = Arc::clone(&state.session);
-    let instance = state.server_instance_id.clone();
-    let result = blocking(move || {
-        session.authenticate(&session_id, &participant_id, &credential, &instance)?;
-        let service = &session.peer_review;
-        let read = || -> Result<serde_json::Value, PeerReviewError> {
-            let (query, activity_id) = peer_page_query(raw)?;
-            if activity_id.is_some() && (collection != "feedback" || id.is_some()) {
-                return Err(PeerReviewError::InvalidInput);
-            }
-            let value = match (collection.as_str(), id.as_deref()) {
-                ("activities", Some(id)) if internal_peer_id(id) => serde_json::to_value(
-                    service.activity_metadata(&session_id, &participant_id, id)?,
-                ),
-                ("activities", None) => serde_json::to_value(service.activities(
-                    &session_id,
-                    &participant_id,
-                    &query,
-                )?),
-                ("feedback", None) => serde_json::to_value(match activity_id.as_deref() {
-                    Some(id) => {
-                        service.feedback_scoped(&session_id, &participant_id, &query, Some(id))?
-                    }
-                    None => service.feedback(&session_id, &participant_id, &query)?,
-                }),
-                ("candidates", Some(id)) => serde_json::to_value(service.candidates(
-                    &session_id,
-                    &participant_id,
-                    id,
-                    &query,
-                )?),
-                ("essays", Some(id)) => serde_json::to_value(service.essays(
-                    &session_id,
-                    &participant_id,
-                    id,
-                    &query,
-                )?),
-                ("feedback", Some(id)) => serde_json::to_value(service.feedback_detail(
-                    &session_id,
-                    &participant_id,
-                    id,
-                )?),
-                ("own-review", Some(id)) => {
-                    serde_json::to_value(service.own_review(&session_id, &participant_id, id)?)
-                }
-                _ => return Err(PeerReviewError::InvalidInput),
-            };
-            value.map_err(|_| PeerReviewError::Storage)
-        };
-        Ok(read())
-    })
-    .await;
-    match result {
-        Ok(Ok(value)) => with_static_security(Json(value).into_response()),
-        Ok(Err(PeerReviewError::InvalidInput)) => {
-            public_error(StatusCode::BAD_REQUEST, "INVALID_INPUT", "分頁參數無效。")
-        }
-        Ok(Err(_)) => public_error(StatusCode::NOT_FOUND, "NOT_FOUND", "無法讀取互評資料。"),
-        Err(_) => public_error(StatusCode::UNAUTHORIZED, "AUTH_FAILED", "請重新連線課堂。"),
+    let (page, activity_id) = match peer_page_query(raw) {
+        Ok(query) => query,
+        Err(_) => return public_error(StatusCode::BAD_REQUEST, "INVALID_INPUT", "分頁參數無效。"),
+    };
+    if activity_id.is_some() && (collection != "feedback" || id.is_some()) {
+        return public_error(StatusCode::BAD_REQUEST, "INVALID_INPUT", "分頁參數無效。");
     }
+    let operation = match (collection.as_str(), id) {
+        ("activities", None) => HttpOperation::PeerReviewActivitiesList { page },
+        ("activities", Some(activity_id)) => HttpOperation::PeerReviewActivityGet { activity_id },
+        ("candidates", Some(activity_id)) => {
+            HttpOperation::PeerReviewCandidatesList { activity_id, page }
+        }
+        ("essays", Some(assignment_id)) => HttpOperation::PeerReviewEssaysList {
+            assignment_id,
+            page,
+        },
+        ("feedback", None) => HttpOperation::PeerReviewFeedbackList { activity_id, page },
+        ("feedback", Some(assignment_id)) => HttpOperation::PeerReviewFeedbackGet { assignment_id },
+        ("own-review", Some(assignment_id)) => {
+            HttpOperation::PeerReviewOwnReviewGet { assignment_id }
+        }
+        _ => return public_error(StatusCode::BAD_REQUEST, "INVALID_INPUT", "分頁參數無效。"),
+    };
+    participant_http_read(
+        state,
+        HttpIdentity {
+            session_id,
+            participant_id,
+            credential,
+        },
+        operation,
+    )
+    .await
 }
 
 #[derive(Deserialize)]

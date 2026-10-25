@@ -182,3 +182,43 @@ async fn peer_review_authenticated_http_and_lost_ack_closed_replay() {
 async fn peer_get(port: u16, path: &str, p: &JoinResponse) -> String {
     http_raw_request(port,format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {}\r\nx-classroom-session: {}\r\nx-classroom-participant: {}\r\nConnection: close\r\n\r\n",p.credential,p.session_id,p.participant_id)).await
 }
+
+#[tokio::test]
+async fn lan_authenticated_media_uses_shared_http_boundary_and_preserves_integrity() {
+    use crate::infrastructure::persistence::repositories::*;
+    use crate::application::{PersistenceService, ImportQuestionAssetRequest};
+    use base64::Engine;
+    let dir=tempfile::tempdir().expect("isolated LAN fixture");
+    let db=Database::open_in_app_data(dir.path()).expect("db");db.initialize().expect("schema");
+    std::fs::create_dir(dir.path().join("student")).expect("student");
+    std::fs::write(dir.path().join("student/index.html"),"student").expect("static");
+    let class=ClassroomRepository::create(&db,NewClassroom{name:"LAN media".to_owned(),academic_year:None}).expect("class");
+    StudentRepository::create(&db,NewStudent{class_id:class.id.clone(),seat_number:1,name:"Student".to_owned()}).expect("roster");
+    let set=QuestionSetRepository::create(&db,NewQuestionSet{lesson_id:None,title:"Media".to_owned(),description:None}).expect("set");
+    let source=QuestionRepository::create(&db,NewQuestion{question_set_id:set.id,question_type:"true_false".to_owned(),prompt:"Media".to_owned(),points:1,
+        position:0,answer_config:serde_json::json!({"correctAnswer":true}),grading_config:serde_json::json!({}),metadata:serde_json::json!({})}).expect("question");
+    let bytes=base64::engine::general_purpose::STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==").expect("PNG");
+    let input=dir.path().join("input.png");std::fs::write(&input,&bytes).expect("input");
+    PersistenceService::initialize(dir.path()).expect("persistence").import_question_asset(ImportQuestionAssetRequest {
+        question_id:source.id.clone(),source_path:input.to_string_lossy().into_owned()}).expect("import");
+    let sessions=LocalSessionService::initialize(db.clone()).expect("sessions");
+    let quiz=LiveQuizService::initialize(db.clone(),dir.path()).expect("quiz");
+    let server=LocalServerService::new(sessions,quiz,GroupingService::initialize(db),StudentAssetLocation::from_root(dir.path().join("student")));
+    let status=server.start_on(SocketAddr::from((Ipv4Addr::LOCALHOST,0)),false).await.expect("LAN server");
+    let port=status.port.expect("port");let instance=status.server_instance_id.expect("instance");
+    let session=server.session.create(class.id,instance.clone()).expect("session");
+    let lobby=server.session.open_lobby(session.id,instance.clone()).expect("lobby");
+    let participant=http_join(port,&lobby.join_code,1,"Student").await;
+    server.session.start(lobby.id.clone(),instance).expect("start");
+    let question=server.quiz.publish(lobby.id,source.id).expect("publish");
+    let url=format!("http://127.0.0.1:{port}/api/v1/session-assets/{}",question.assets[0].id);
+    let client=reqwest::Client::new();
+    assert_eq!(client.get(&url).send().await.expect("unauthenticated").status(),401);
+    let request=||client.get(&url).bearer_auth(&participant.credential).header("x-classroom-session",&participant.session_id).header("x-classroom-participant",&participant.participant_id);
+    assert_eq!(request().send().await.expect("hidden media").status(),404);
+    server.quiz.open(question.id).expect("open");
+    let response=request().send().await.expect("authorized media");assert_eq!(response.status(),200);assert_eq!(response.headers()["content-type"],"image/png");
+    assert_eq!(response.bytes().await.expect("media bytes").as_ref(),bytes.as_slice());
+    assert!(input.exists(),"import never deletes source");
+    server.session.end(participant.session_id,"test").expect("end");server.stop().await.expect("stop");
+}

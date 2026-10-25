@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "node --test src/*.test.js",
-    "test:restart": "node src/restart-smoke.js"
+    "test": "node --test src/*.test.js scripts/*.test.js",
+    "test:restart": "node src/restart-smoke.js",
+    "activation:create:prod": "node scripts/activation-create-prod.js",
+    "test:activation": "node --test scripts/activation-create-prod.test.js"
   },
   "devDependencies": {
     "wrangler": "^4.140.0",

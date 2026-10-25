@@ -1,29 +1,29 @@
-import { peerReviewActivitiesPageSchema, peerReviewCandidatesPageSchema, peerReviewFeedbackPageSchema, peerReviewEssaysPageSchema, peerReviewFeedbackDetailSchema, peerReviewFeedbackQuerySchema, publicErrorSchema } from "@classtools/backend-contract";
-import { assertLocalDetailAvailable, StudentApiError, type StoredParticipant } from "./studentApi";
+import { peerReviewActivitiesPageSchema, peerReviewCandidatesPageSchema, peerReviewFeedbackPageSchema, peerReviewEssaysPageSchema, peerReviewFeedbackDetailSchema, publicErrorSchema, type RemoteHttpOperation } from "@classtools/backend-contract";
+import { StudentApiError, type StoredParticipant } from "./studentApi";
+import { studentHttpRead, studentHttpError } from "./studentHttpApi";
 
 type PageOptions = { limit?: number; cursor?: string; activityId?: string; signal?: AbortSignal };
-async function read<T>(participant: StoredParticipant, path: string, parse: (value: unknown) => T, options: PageOptions = {}): Promise<T> {
-  assertLocalDetailAvailable(participant);
-  const query = new URLSearchParams();
-  peerReviewFeedbackQuerySchema.parse({ limit: options.limit, cursor: options.cursor, activityId: options.activityId });
-  if (options.activityId !== undefined) query.set("activityId", options.activityId);
-  if (options.limit !== undefined) query.set("limit", String(options.limit));
-  if (options.cursor !== undefined) query.set("cursor", options.cursor);
-  const response = await fetch(`/api/v1/peer-review/${path}?${query}`, { signal: options.signal, cache: "no-store", headers: { authorization: `Bearer ${participant.credential}`, "x-classroom-session": participant.sessionId, "x-classroom-participant": participant.participantId } });
-  const body: unknown = await response.json();
+const page = (options?: PageOptions) => ({ ...(options?.limit !== undefined ? { limit: options.limit } : {}), ...(options?.cursor !== undefined ? { cursor: options.cursor } : {}) });
+async function read<T>(participant: StoredParticipant, operation: RemoteHttpOperation, parse: (value: unknown) => T, options?: PageOptions): Promise<T> {
+  const response = await studentHttpRead(participant, operation, options?.signal);
+  let body: unknown;
+  try { body = await response.json(); } catch (cause) {
+    if (typeof cause === "object" && cause !== null && "name" in cause && cause.name === "AbortError") throw cause;
+    throw new StudentApiError("遠端服務暫時無法使用，請稍後重試。", "RESPONSE_INTERRUPTED");
+  }
   if (!response.ok) {
     const error = publicErrorSchema.safeParse(body);
-    throw new StudentApiError(error.success ? error.data.message : "無法讀取互評資料。", error.success ? error.data.code : "REQUEST_FAILED");
+    throw studentHttpError(error.success ? error.data.code : "REQUEST_FAILED", error.success ? error.data.message : "無法讀取互評資料。");
   }
-  return parse(body);
+  try { return parse(body); } catch { throw new StudentApiError("課堂伺服器回應無法使用。", "INVALID_RESPONSE"); }
 }
-export const getPeerReviewActivities = (p: StoredParticipant, options?: PageOptions) => read(p, "activities", peerReviewActivitiesPageSchema.parse, options);
-export const getPeerReviewActivity = (p: StoredParticipant, id: string, options?: PageOptions) => read(p, `activities/${encodeURIComponent(id)}`, peerReviewActivitiesPageSchema.parse, options);
-export const getPeerReviewCandidates = (p: StoredParticipant, id: string, options?: PageOptions) => read(p, `candidates/${encodeURIComponent(id)}`, peerReviewCandidatesPageSchema.parse, options);
-export const getPeerReviewFeedback = (p: StoredParticipant, options?: PageOptions) => read(p, "feedback", peerReviewFeedbackPageSchema.parse, options);
-export const getPeerReviewEssays = (p: StoredParticipant, id: string, options?: PageOptions) => read(p, `essays/${encodeURIComponent(id)}`, peerReviewEssaysPageSchema.parse, options);
-export const getPeerReviewFeedbackDetail = (p: StoredParticipant, id: string, options?: PageOptions) => read(p, `feedback/${encodeURIComponent(id)}`, peerReviewFeedbackDetailSchema.parse, options);
-export const getOwnPeerReview = (p: StoredParticipant, id: string, options?: PageOptions) => read(p, `own-review/${encodeURIComponent(id)}`, peerReviewFeedbackDetailSchema.nullable().parse, options);
+export const getPeerReviewActivities = (p: StoredParticipant, options?: PageOptions) => read(p, { operation: "PEER_REVIEW_ACTIVITIES_LIST", arguments: { page: page(options) } }, peerReviewActivitiesPageSchema.parse, options);
+export const getPeerReviewActivity = (p: StoredParticipant, id: string, options?: PageOptions) => read(p, { operation: "PEER_REVIEW_ACTIVITY_GET", arguments: { activityId: id } }, peerReviewActivitiesPageSchema.parse, options);
+export const getPeerReviewCandidates = (p: StoredParticipant, id: string, options?: PageOptions) => read(p, { operation: "PEER_REVIEW_CANDIDATES_LIST", arguments: { activityId: id, page: page(options) } }, peerReviewCandidatesPageSchema.parse, options);
+export const getPeerReviewFeedback = (p: StoredParticipant, options?: PageOptions) => read(p, { operation: "PEER_REVIEW_FEEDBACK_LIST", arguments: { ...(options?.activityId !== undefined ? { activityId: options.activityId } : {}), page: page(options) } }, peerReviewFeedbackPageSchema.parse, options);
+export const getPeerReviewEssays = (p: StoredParticipant, id: string, options?: PageOptions) => read(p, { operation: "PEER_REVIEW_ESSAYS_LIST", arguments: { assignmentId: id, page: page(options) } }, peerReviewEssaysPageSchema.parse, options);
+export const getPeerReviewFeedbackDetail = (p: StoredParticipant, id: string, options?: PageOptions) => read(p, { operation: "PEER_REVIEW_FEEDBACK_GET", arguments: { assignmentId: id } }, peerReviewFeedbackDetailSchema.parse, options);
+export const getOwnPeerReview = (p: StoredParticipant, id: string, options?: PageOptions) => read(p, { operation: "PEER_REVIEW_OWN_REVIEW_GET", arguments: { assignmentId: id } }, peerReviewFeedbackDetailSchema.nullable().parse, options);
 
 /** A view may retain this gate across navigation; stale HTTP completions never replace a newer refresh. */
 export function createPeerReviewRefreshGate() {

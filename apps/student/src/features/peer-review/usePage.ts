@@ -17,7 +17,7 @@ export function usePage<T>(read: (cursor: string | undefined, signal: AbortSigna
     setLoading(true); setError("");
     void read(cursor, controller.signal).then(page => {
       if (!controller.signal.aborted && sequence.current === serial && generation() === connection) setResult(page);
-    }).catch(cause => { if (!controller.signal.aborted && sequence.current === serial && generation() === connection) setError(cause instanceof StudentApiError && cause.code === "REMOTE_DETAIL_UNAVAILABLE" ? cause.message : "無法讀取互評資料，請重新整理。"); })
+    }).catch(cause => { if (!controller.signal.aborted && sequence.current === serial && generation() === connection) setError(cause instanceof StudentApiError ? cause.message : "無法讀取互評資料，請重新整理。"); })
       .finally(() => { if (!controller.signal.aborted && sequence.current === serial && generation() === connection) setLoading(false); });
     return () => { controller.abort(); sequence.current++; };
   }, [read, cursor, refresh, generation]);

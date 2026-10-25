@@ -127,12 +127,13 @@ describe("Remote Student transport", () => {
     expect(callbacks.onDisconnected).toHaveBeenCalledWith("MESSAGE_TOO_LARGE", expect.anything());
     expect(callbacks.onAuthenticated).not.toHaveBeenCalled(); transport.close();
   });
-  it("blocks all unavailable detail/media HTTP before fetch rather than falling back to LAN", async () => {
-    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
-    for (const request of [fetchSessionAsset(sessionId, participant), getPeerReviewActivities(participant), getPeerReviewEssays(participant, sessionId), getPeerReviewFeedbackDetail(participant, sessionId)]) {
-      await expect(request).rejects.toMatchObject({ code: "REMOTE_DETAIL_UNAVAILABLE" });
+  it("routes detail/media HTTP to the authenticated Remote allowlist without a LAN fallback", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ code: "TEACHER_UNAVAILABLE", message: "教師端暫時離線" }), { status: 503 })));
+    vi.stubGlobal("fetch", fetchMock);
+    for (const make of [() => fetchSessionAsset(sessionId, participant), () => getPeerReviewActivities(participant), () => getPeerReviewEssays(participant, sessionId), () => getPeerReviewFeedbackDetail(participant, sessionId)]) {
+      await expect(make()).rejects.toMatchObject({ code: "TEACHER_UNAVAILABLE" });
     }
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.every(([path]) => String(path).startsWith(`/v1/sessions/${locator}/http/`) && !String(path).includes(participant.credential))).toBe(true);
   });
   it("F2/F3 handles proactive Teacher controls while the Student is idle without a mutation or polling", () => {
     vi.useFakeTimers(); const { transport, callbacks } = start(); accept();

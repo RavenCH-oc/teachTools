@@ -185,3 +185,42 @@ export function parseRemoteControlPlaneEnvelope(raw: string): RemoteControlPlane
   }
   return remoteControlPlaneEnvelopeSchema.parse(JSON.parse(raw) as unknown);
 }
+
+const httpPageSchema = z.object({ limit: z.number().int().min(1).max(100).optional(),
+  cursor: z.string().regex(/^[A-Za-z0-9_-]{1,1024}$/).optional() }).strict();
+const httpIdSchema = z.string().uuid();
+export const remoteHttpOperationSchema = z.discriminatedUnion("operation", [
+  z.object({ operation: z.literal("PEER_REVIEW_ACTIVITIES_LIST"), arguments: z.object({ page: httpPageSchema }).strict() }).strict(),
+  z.object({ operation: z.literal("PEER_REVIEW_ACTIVITY_GET"), arguments: z.object({ activityId: httpIdSchema }).strict() }).strict(),
+  z.object({ operation: z.literal("PEER_REVIEW_CANDIDATES_LIST"), arguments: z.object({ activityId: httpIdSchema, page: httpPageSchema }).strict() }).strict(),
+  z.object({ operation: z.literal("PEER_REVIEW_ESSAYS_LIST"), arguments: z.object({ assignmentId: httpIdSchema, page: httpPageSchema }).strict() }).strict(),
+  z.object({ operation: z.literal("PEER_REVIEW_FEEDBACK_LIST"), arguments: z.object({ activityId: httpIdSchema.optional(), page: httpPageSchema }).strict() }).strict(),
+  z.object({ operation: z.literal("PEER_REVIEW_FEEDBACK_GET"), arguments: z.object({ assignmentId: httpIdSchema }).strict() }).strict(),
+  z.object({ operation: z.literal("PEER_REVIEW_OWN_REVIEW_GET"), arguments: z.object({ assignmentId: httpIdSchema }).strict() }).strict(),
+  z.object({ operation: z.literal("SESSION_ASSET_GET"), arguments: z.object({ assetId: httpIdSchema }).strict() }).strict(),
+]);
+export type RemoteHttpOperation = z.infer<typeof remoteHttpOperationSchema>;
+export const REMOTE_HTTP_CHUNK_BYTES = 32 * 1024;
+export const REMOTE_HTTP_WINDOW = 4;
+export const remoteHttpRelayEnvelopeSchema = z.object({ ...envelope, type: z.literal("HTTP_RELAY"),
+  payload: z.discriminatedUnion("op", [
+    z.object({ op: z.literal("HTTP_REQUEST"), generation: generationSchema,
+      identity: z.object({ sessionId: httpIdSchema, participantId: httpIdSchema,
+        credential: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict(), request: remoteHttpOperationSchema }).strict(),
+    z.object({ op: z.literal("HTTP_RESPONSE_START"), generation: generationSchema,
+      status: z.number().int().refine(v => [200,400,401,404,500].includes(v)), contentType: z.enum(["application/json","application/pdf","image/png","image/jpeg","image/webp"]),
+      contentLength: z.number().int().min(0).max(100 * 1024 * 1024) }).strict(),
+    z.object({ op: z.literal("HTTP_RESPONSE_CHUNK"), generation: generationSchema,
+      sequence: z.number().int().nonnegative(), data: z.string().min(4).max(Math.ceil(REMOTE_HTTP_CHUNK_BYTES / 3) * 4)
+        .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/) }).strict(),
+    z.object({ op: z.literal("HTTP_RESPONSE_END"), generation: generationSchema,
+      chunks: z.number().int().nonnegative(), bytes: z.number().int().nonnegative() }).strict(),
+    z.object({ op: z.literal("HTTP_CANCEL"), generation: generationSchema }).strict(),
+    z.object({ op: z.literal("HTTP_CREDIT"), generation: generationSchema, credits: z.number().int().min(1).max(REMOTE_HTTP_WINDOW) }).strict(),
+    z.object({ op: z.literal("HTTP_ERROR"), generation: generationSchema,
+      code: z.enum(["REQUEST_TIMEOUT","REMOTE_SERVICE_UNAVAILABLE","RESPONSE_INVALID"]) }).strict(),
+  ]) }).strict();
+export function parseRemoteHttpEnvelope(raw: string) {
+  if (new TextEncoder().encode(raw).byteLength > REMOTE_MAX_ENVELOPE_BYTES) throw new Error("Remote envelope exceeds 64 KiB");
+  return remoteHttpRelayEnvelopeSchema.parse(JSON.parse(raw) as unknown);
+}

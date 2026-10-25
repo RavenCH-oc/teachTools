@@ -607,3 +607,166 @@ async fn shared_remote_peer_review_ack_retry_revision_conflict_and_reauth_keep_s
         .to_string()
         .contains("First participant essay"));
 }
+
+#[test]
+fn shared_http_reads_keep_assignment_revision_cursor_and_participant_authority() {
+    use super::super::participant_http::{HttpIdentity, HttpOperation};
+    let fixture = Fixture::new();
+    let question = fixture.question("essay");
+    for (joined, text) in [
+        (&fixture.first, "First frozen essay"),
+        (&fixture.second, "Second frozen essay"),
+    ] {
+        fixture
+            .realtime
+            .quiz
+            .submit(
+                joined.participant_id.clone(),
+                fixture.session_id.clone(),
+                question.clone(),
+                Uuid::now_v7().to_string(),
+                StudentAnswer::Essay {
+                    text: text.to_owned(),
+                },
+            )
+            .expect("essay");
+    }
+    fixture.realtime.quiz.lock(question.clone()).expect("lock");
+    let mut activities = Vec::new();
+    for _ in 0..2 {
+        let activity = PeerReviewRepository::create(
+            &fixture.database,
+            CreatePeerReviewActivity {
+                session_id: fixture.session_id.clone(),
+                session_question_id: question.clone(),
+                mode: PeerReviewMode::StudentSelect,
+                session_group_set_id: None,
+                max_reviews_per_target: Some(3),
+            },
+        )
+        .expect("activity");
+        PeerReviewRepository::open(&fixture.database, &activity.id).expect("open");
+        activities.push(activity);
+    }
+    let read = |joined: &JoinSuccess, operation: serde_json::Value| {
+        let op: HttpOperation = serde_json::from_value(operation).expect("typed operation");
+        fixture.realtime.http().read(
+            HttpIdentity {
+                session_id: fixture.session_id.clone(),
+                participant_id: joined.participant_id.clone(),
+                credential: joined.credential.clone(),
+            },
+            &fixture.server_instance_id,
+            Some(&fixture.session_id),
+            op,
+        )
+    };
+    let value = |response: super::super::participant_http::HttpReadResponse| {
+        assert_eq!(response.status, 200);
+        serde_json::from_slice::<serde_json::Value>(&response.bytes).expect("JSON")
+    };
+    let first = value(read(
+        &fixture.first,
+        serde_json::json!({"operation":"PEER_REVIEW_ACTIVITIES_LIST","arguments":{"page":{"limit":1}}}),
+    ));
+    let cursor = first["nextCursor"].as_str().expect("next cursor");
+    assert_eq!(read(&fixture.second,serde_json::json!({"operation":"PEER_REVIEW_ACTIVITIES_LIST","arguments":{"page":{"limit":1,"cursor":cursor}}})).status,400);
+    let activity = &activities[0];
+    assert_eq!(
+        value(read(
+            &fixture.first,
+            serde_json::json!({"operation":"PEER_REVIEW_ACTIVITY_GET","arguments":{"activityId":activity.id}})
+        ))["items"][0]["activityId"],
+        activity.id
+    );
+    let candidates = value(read(
+        &fixture.first,
+        serde_json::json!({"operation":"PEER_REVIEW_CANDIDATES_LIST","arguments":{"activityId":activity.id,"page":{}}}),
+    ));
+    let target = candidates["items"][0]["peerReviewTargetId"]
+        .as_str()
+        .expect("target");
+    let claim = fixture
+        .realtime
+        .session
+        .peer_review
+        .claim(
+            &fixture.session_id,
+            &fixture.first.participant_id,
+            &activity.id,
+            target,
+        )
+        .expect("claim");
+    let assignment = &claim.assignment_id;
+    let essays = value(read(
+        &fixture.first,
+        serde_json::json!({"operation":"PEER_REVIEW_ESSAYS_LIST","arguments":{"assignmentId":assignment,"page":{}}}),
+    ));
+    assert_eq!(essays["items"][0]["essay"], "Second frozen essay");
+    assert_eq!(read(&fixture.second,serde_json::json!({"operation":"PEER_REVIEW_ESSAYS_LIST","arguments":{"assignmentId":assignment,"page":{}}})).status,404);
+    fixture
+        .realtime
+        .session
+        .peer_review
+        .submit(
+            &fixture.session_id,
+            &fixture.first.participant_id,
+            SubmitPeerReview {
+                assignment_id: assignment.clone(),
+                review_submission_id: Uuid::now_v7().to_string(),
+                expected_base_revision: 0,
+                body: "Anonymous feedback".to_owned(),
+                submitted_by_participant_id: fixture.first.participant_id.clone(),
+            },
+        )
+        .expect("review");
+    assert_eq!(
+        value(read(
+            &fixture.first,
+            serde_json::json!({"operation":"PEER_REVIEW_OWN_REVIEW_GET","arguments":{"assignmentId":assignment}})
+        ))["revision"],
+        1
+    );
+    assert_eq!(
+        value(read(
+            &fixture.second,
+            serde_json::json!({"operation":"PEER_REVIEW_FEEDBACK_LIST","arguments":{"activityId":activity.id,"page":{}}})
+        ))["items"][0]["assignmentId"],
+        *assignment
+    );
+    let feedback = value(read(
+        &fixture.second,
+        serde_json::json!({"operation":"PEER_REVIEW_FEEDBACK_GET","arguments":{"assignmentId":assignment}}),
+    ));
+    assert_eq!(feedback["body"], "Anonymous feedback");
+    assert!(feedback.get("participantId").is_none());
+    assert_eq!(read(&fixture.first,serde_json::json!({"operation":"PEER_REVIEW_FEEDBACK_GET","arguments":{"assignmentId":assignment}})).status,404);
+    let wrong = fixture.realtime.http().read(
+        HttpIdentity {
+            session_id: fixture.session_id.clone(),
+            participant_id: fixture.first.participant_id.clone(),
+            credential: "A".repeat(43),
+        },
+        &fixture.server_instance_id,
+        Some(&fixture.session_id),
+        serde_json::from_value(
+            serde_json::json!({"operation":"PEER_REVIEW_ACTIVITIES_LIST","arguments":{"page":{}}}),
+        )
+        .expect("typed"),
+    );
+    assert_eq!(wrong.status, 401);
+    let response = fixture.realtime.http().read(
+        HttpIdentity {
+            session_id: Uuid::now_v7().to_string(),
+            participant_id: fixture.first.participant_id.clone(),
+            credential: fixture.first.credential.clone(),
+        },
+        &fixture.server_instance_id,
+        Some(&fixture.session_id),
+        serde_json::from_value(
+            serde_json::json!({"operation":"PEER_REVIEW_ACTIVITIES_LIST","arguments":{"page":{}}}),
+        )
+        .expect("typed"),
+    );
+    assert_eq!(response.status, 401);
+}

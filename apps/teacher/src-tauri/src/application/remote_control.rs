@@ -565,6 +565,7 @@ async fn connection_loop(
     let mut participants =
         RemoteParticipants::new(sessions, realtime.clone(), local_id.clone(), &id);
     let mut attempt = 0u32;
+    let http_budget = super::remote_http::HttpReadBudget::default();
     loop {
         if *stop.borrow() {
             return;
@@ -574,6 +575,14 @@ async fn connection_loop(
                 // Every fresh Teacher ticket creates a new authority generation.
                 participants.disconnect_all();
                 let mut events = realtime.subscribe();
+                let mut http = super::remote_http::RemoteHttp::new(
+                    realtime.http(),
+                    local_id.clone(),
+                    &id,
+                    generation,
+                    http_budget.clone(),
+                );
+                let mut http_deadline = interval(Duration::from_millis(100));
                 update_status(&active, &id, RemoteConnectionState::Open, Some(generation));
                 attempt = 0;
                 let mut heartbeat = interval(Duration::from_secs(if cfg!(test) { 2 } else { 20 }));
@@ -593,7 +602,9 @@ async fn connection_loop(
                         message = socket.next() => {
                             match message {
                                 Some(Ok(Message::Text(text))) if text.len() <= MAX_ENVELOPE_BYTES => {
-                                    match participants.handle(&text, generation).await {
+                                    let is_http = serde_json::from_str::<serde_json::Value>(&text).is_ok_and(|value| value["type"] == "HTTP_RELAY");
+                                    let response = if is_http { http.handle(&text).await } else { participants.handle(&text, generation).await };
+                                    match response {
                                         Ok(frames) => if !send_frames(&mut socket, frames).await { break; },
                                         Err(_) => break,
                                     }
@@ -601,6 +612,14 @@ async fn connection_loop(
                                 Some(Ok(Message::Ping(_))) | Some(Ok(Message::Pong(_))) => {},
                                 _ => break,
                             }
+                        }
+                        prepared = http.prepared() => {
+                            if let Some(prepared) = prepared {
+                                if !send_frames(&mut socket, http.ready(prepared)).await { break; }
+                            }
+                        }
+                        _ = http_deadline.tick() => {
+                            if !send_frames(&mut socket, http.expire()).await { break; }
                         }
                         event = events.session.recv() => {
                             match event {
@@ -686,7 +705,8 @@ mod tests {
     use uuid::Uuid;
 
     #[cfg(windows)]
-    static TEST_CREDENTIAL_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    pub(super) static TEST_CREDENTIAL_LOCK: tokio::sync::Mutex<()> =
+        tokio::sync::Mutex::const_new(());
 
     #[cfg(windows)]
     struct TestInstallationRestore {
@@ -1268,3 +1288,7 @@ mod tests {
         assert!(!service.enrolled().expect("credential removed"));
     }
 }
+
+#[cfg(all(test, windows))]
+#[path = "remote_http_smoke.rs"]
+mod http_smoke;

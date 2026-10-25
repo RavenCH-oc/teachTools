@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PeerReviewActivity, PeerReviewMutation, PeerReviewPending } from "@classtools/backend-contract";
-import { getPeerReviewActivities, getPeerReviewActivity } from "../../services/peerReviewApi";
-import { isRemoteParticipant, secureUuid, type StoredParticipant, type SubmitAnswerResult } from "../../services/studentApi";
+import { getPeerReviewActivities, getPeerReviewActivity, getOwnPeerReview } from "../../services/peerReviewApi";
+import { secureUuid, type StoredParticipant, type SubmitAnswerResult } from "../../services/studentApi";
 import type { PeerSessionChannel } from "./sessionChannel";
 import { peerStorage } from "./storage";
 import { usePage } from "./usePage";
@@ -42,10 +42,14 @@ export function PeerReviewPanel({ participant, channel, send }: { participant: S
   const readPending = useCallback(() => { try { const records = storage.pending(); setPending(records); return records; } catch { setError("無法保存評論草稿，請確認瀏覽器儲存空間。"); return []; } }, [storage]);
   const retry = useCallback(() => {
     if (!channel.snapshot().online) return;
-    // Remote detail/revision retrieval is unavailable in 16D; do not replay a
-    // stored review until that authoritative read can be performed in 16E.
-    if (isRemoteParticipant(participant)) return;
-    for (const record of readPending()) send({ protocolVersion: 1, type: "submit_peer_review", requestId: record.reviewSubmissionId, ...recordToMessage(record) });
+    const epoch = channel.snapshot().epoch;
+    for (const record of readPending()) {
+      // Confirm current assignment access before replaying the exact idempotent
+      // attempt. Rust settles ACK loss and stale revisions, preserving drafts.
+      void getOwnPeerReview(participant, record.assignmentId).then(() => {
+        if (channel.snapshot().online && channel.snapshot().epoch === epoch) send({ protocolVersion: 1, type: "submit_peer_review", requestId: record.reviewSubmissionId, ...recordToMessage(record) });
+      }).catch(() => { if (channel.snapshot().epoch === epoch) setError("無法確認上一筆評論，草稿仍保留；請稍後重試。"); });
+    }
   }, [channel, participant, readPending, send]);
   useEffect(() => {
     readPending();

@@ -63,6 +63,13 @@ impl ParticipantRealtimeService {
         }
     }
 
+    pub(crate) fn http(&self) -> super::participant_http::ParticipantHttpService {
+        super::participant_http::ParticipantHttpService::new(
+            self.session.clone(),
+            self.quiz.clone(),
+        )
+    }
+
     pub(crate) async fn authenticate(
         &self,
         server_instance_id: &str,

@@ -1,3 +1,4 @@
+import { HttpRelay, publicHttpRequest, httpError } from "./http_relay.js";
 import { DurableObject } from "cloudflare:workers";
 import {
   MAX_ENVELOPE_BYTES, REMOTE_PROTOCOL_VERSION, SECRET_PATTERN,
@@ -241,6 +242,14 @@ async function studentSocket(request, env, remoteSessionId) {
     { upgrade: "websocket" }));
 }
 
+async function studentHttp(request, env, remoteSessionId, operation) {
+  if (!bearer(request) || !SECRET_PATTERN.test(bearer(request))) return httpError("AUTH_REQUIRED", 401);
+  const body = publicHttpRequest(new URL(request.url), request.headers, operation);
+  if (!body) return httpError("MALFORMED_MESSAGE", 400);
+  const forwarded = new Request(internal("/http-read", "POST", body), { signal: request.signal });
+  return staticHeaders(await stubFor(env, remoteSessionId).fetch(forwarded), request);
+}
+
 function staticHeaders(response, request) {
   const headers = new Headers(response.headers);
   const url = new URL(request.url);
@@ -283,6 +292,8 @@ export default {
           return closeSession(request, env, remoteSessionId);
         }
       }
+      const httpRead = /^\/v1\/sessions\/([A-Za-z0-9_-]{32})\/http\/([A-Z_]+)$/.exec(path);
+      if (httpRead && request.method === "GET") return await studentHttp(request, env, httpRead[1], httpRead[2]);
       const student = /^\/v1\/sessions\/([^/]+)\/(bootstrap|join|ws)$/.exec(path);
       if (student) {
         if (!SESSION_ID_PATTERN.test(student[1])) return error("MALFORMED_MESSAGE", 400);
@@ -306,6 +317,8 @@ export class ClassroomSession extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.pendingJoins = new Map();
+    this.http = new HttpRelay((teacher, raw) => this.sendToTeacher(teacher, raw),
+      () => this.ctx.waitUntil(this.scheduleAlarm()), Date.now, promise => this.ctx.waitUntil(promise));
     // Determine liveness before a wake-up re-auth broadcast, so a silent dead
     // Teacher cannot cause an AUTH attempt toward its obsolete connection.
     const before = this.meta();
@@ -346,6 +359,7 @@ export class ClassroomSession extends DurableObject {
     if (next !== meta) {
       this.put(next);
       if (next.status === "EXPIRED") {
+        this.failPendingJoins("SESSION_EXPIRED");
         for (const socket of this.ctx.getWebSockets()) socket.close(1008, "Session expired");
       } else {
         this.failPendingJoins("TEACHER_UNAVAILABLE");
@@ -369,7 +383,7 @@ export class ClassroomSession extends DurableObject {
   async scheduleAlarm() {
     const meta = this.meta();
     if (!meta || ["CLOSED", "EXPIRED"].includes(meta.status)) return;
-    const deadlines = [meta.expiresAt];
+    const deadlines = [meta.expiresAt, ...this.http.deadlines()];
     if (meta.status === "OPEN" && Number.isFinite(meta.teacherHeartbeatDeadline)) {
       deadlines.push(meta.teacherHeartbeatDeadline);
     }
@@ -382,6 +396,7 @@ export class ClassroomSession extends DurableObject {
   }
 
   failPendingJoins(code) {
+    this.http.failAll(code);
     for (const pending of this.pendingJoins.values()) pending.resolve(error(code, 503));
     this.pendingJoins.clear();
   }
@@ -437,6 +452,12 @@ export class ClassroomSession extends DurableObject {
       if (!meta) return error("SESSION_CLOSED", 404);
       return json({ reachable: true, remoteProtocolVersion: meta.remoteProtocolVersion,
         status: meta.status === "OPEN" ? "available" : "unavailable" });
+    }
+    if (path === "/http-read" && request.method === "POST") {
+      const meta = this.checkedMeta();
+      const teacher = this.teacher(meta);
+      if (!teacher) return httpError("TEACHER_UNAVAILABLE");
+      return this.http.open(request, await request.json(), meta.teacherGeneration, teacher);
     }
     if (path === "/join" && request.method === "POST") {
       const meta = this.checkedMeta();
@@ -554,6 +575,7 @@ export class ClassroomSession extends DurableObject {
       return;
     }
     const now = Date.now();
+    this.http.expire();
     for (const socket of this.ctx.getWebSockets("student")) {
       const attachment = socket.deserializeAttachment();
       if (attachment?.authDeadline && attachment.authDeadline <= now) {
@@ -633,6 +655,11 @@ export class ClassroomSession extends DurableObject {
       return;
     }
     const payload = value.payload;
+    if (value.type === "HTTP_RELAY") {
+      if (payload.generation !== meta.teacherGeneration) return;
+      this.http.handle(value, socket);
+      return;
+    }
     if (value.type === "CONTROL") {
       if (hasKeys(payload, ["op"]) && payload.op === "ping") {
         meta.teacherHeartbeatDeadline = Date.now() + TEACHER_HEARTBEAT_TIMEOUT_MS;

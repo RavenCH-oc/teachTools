@@ -60,13 +60,13 @@ describe("Remote Student application", () => {
   });
   it("resumes stored Remote identity, pauses UI offline and restores the same Quiz on reauth", async () => {
     window.history.pushState({}, "", `/join/${locator}`); saveParticipant(info, participant, locator);
-    vi.stubGlobal("WebSocket", RemoteSocket); const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock); render(<ClassroomStudentApp remote />);
+    vi.stubGlobal("WebSocket", RemoteSocket); const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ items: [], nextCursor: null })))); vi.stubGlobal("fetch", fetchMock); render(<ClassroomStudentApp remote />);
     await waitFor(() => expect(RemoteSocket.instances).toHaveLength(1));
     const auth = { accepted: true, message: { protocolVersion: 1, type: "participant_authenticated", participant: participant.participant, classroomName: info.classroomName, sessionState: "ACTIVE" } };
     const sync = { message: { protocolVersion: 1, type: "session_sync", sync: { sessionState: "ACTIVE", currentQuestion: { sessionQuestionId: id, type: "true_false", prompt: "測試題目", points: 1, state: "OPEN", options: [], blanks: [], assets: [] }, ownLatestSubmission: null, reveal: null, peerReview: { available: true, visibleActivityCount: 1, receivedFeedbackCount: 0 } } } };
     act(() => { socket().onopen?.(); socket().message("AUTH", auth); socket().message("REALTIME", sync); });
     expect(await screen.findByText("測試題目")).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.every(([path]) => String(path).includes("/http/PEER_REVIEW_ACTIVITIES_LIST"))).toBe(true);
     act(() => socket().message("CONTROL", { op: "teacher_offline", generation: 1 }));
     expect(screen.getByRole("button", { name: "正確" })).toBeDisabled();
     act(() => socket().message("CONTROL", { op: "REAUTH_REQUIRED", generation: 2 }));
@@ -74,9 +74,9 @@ describe("Remote Student application", () => {
     act(() => { socket().message("AUTH", auth); socket().message("REALTIME", sync); });
     expect(screen.getByRole("button", { name: "正確" })).not.toBeDisabled();
     expect(RemoteSocket.instances).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "同儕互評" }));
-    expect(await screen.findByText("遠端課堂目前不支援作品詳情、互評詳情與媒體附件；此功能將於後續階段提供。")).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(screen.queryByText("遠端課堂目前不支援作品詳情、互評詳情與媒體附件；此功能將於後續階段提供。")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.every(([path]) => String(path).includes("/http/PEER_REVIEW_ACTIVITIES_LIST"))).toBe(true);
   });
   it("retries an unacknowledged Quiz with the original submissionId only after reauth sync", async () => {
     window.history.pushState({}, "", `/join/${locator}`); saveParticipant(info, participant, locator); vi.stubGlobal("WebSocket", RemoteSocket);
