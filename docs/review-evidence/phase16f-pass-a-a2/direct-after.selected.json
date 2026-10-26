@@ -1,0 +1,506 @@
+{
+  "exportType": "Selected-field derivative; not original report bytes",
+  "originalFile": "direct-after.json",
+  "originalSha256": "8fea3e483c858ff626bda031134ef80f9bd7c5ba5a73c36e67feab5784ef788c",
+  "omittedPaths": [
+    "observations.1.transportEvents",
+    "observations.1.native.requests",
+    "observations.1.native.timeline"
+  ],
+  "observations": [
+    {
+      "label": "thresholds",
+      "textAckP95Ms": 2000,
+      "mediaAckP95Ms": 3000,
+      "image95PercentMs": 30000,
+      "imageAllMs": 60000,
+      "algorithm": "nearest-rank ceil(p*n)-1; monotonic per process",
+      "clientPolicy": "actual bundled studentHttpRead",
+      "network": "same Windows PC, loopback; not mobile render"
+    },
+    {
+      "label": "C4_stream_probe",
+      "students": 40,
+      "streams": 4,
+      "trigger": "after all active streams first body bytes",
+      "presenceSamples": [
+        {
+          "atMs": 4901.8982000000005,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 5908.0197,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 6908.081000000001,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 7917.860600000001,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 8917.487299999999,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 9917.383699999998,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 10917.496099999998,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 11918.3678,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 12919.1135,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 13919.704699999998,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 14919.3265,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 15919.7845,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 16928.754100000002,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 17930.5769,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 18930.927900000002,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 19930.9232,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 20937.7091,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 21937.224000000002,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 22937.844500000003,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 23938.135400000003,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 24937.949800000002,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 25938.0163,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 26937.8874,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 27937.1574,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 28937.175000000003,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 29940.9111,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 30941.5949,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 31941.606,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 32699.594600000004,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        }
+      ],
+      "lockReveal": {
+        "status": "PASS",
+        "clients": 40,
+        "lockMs": 442.69940000000133,
+        "revealMs": 521.0902000000006,
+        "activeAtLock": 4,
+        "activeAtReveal": 4
+      },
+      "pdfs": [
+        {
+          "client": 1,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1833.6058000000003,
+          "firstByteMs": 1836.3832000000002,
+          "totalMs": 27747.3774,
+          "bodyMs": 25913.7716,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 2,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1815.1570999999994,
+          "firstByteMs": 1819.0037999999995,
+          "totalMs": 27703.811,
+          "bodyMs": 25888.6539,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 3,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1888.1834999999992,
+          "firstByteMs": 1891.3654999999999,
+          "totalMs": 27794.5427,
+          "bodyMs": 25906.359200000003,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 4,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1868.5553999999993,
+          "firstByteMs": 1871.1463999999996,
+          "totalMs": 27781.3758,
+          "bodyMs": 25912.820400000004,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        }
+      ],
+      "eventLoopDelay": {
+        "n": 271,
+        "p50": 0.5869999999995343,
+        "p95": 10.622299999999996,
+        "max": 14.838200000001962
+      },
+      "rawAcks": [
+        {
+          "ms": 50.60449999999946,
+          "accepted": true
+        },
+        {
+          "ms": 59.46930000000066,
+          "accepted": true
+        },
+        {
+          "ms": 77.06390000000101,
+          "accepted": true
+        },
+        {
+          "ms": 68.38040000000001,
+          "accepted": true
+        },
+        {
+          "ms": 103.35590000000047,
+          "accepted": true
+        },
+        {
+          "ms": 85.89320000000043,
+          "accepted": true
+        },
+        {
+          "ms": 94.47329999999965,
+          "accepted": true
+        },
+        {
+          "ms": 130.0066999999999,
+          "accepted": true
+        },
+        {
+          "ms": 111.61410000000069,
+          "accepted": true
+        },
+        {
+          "ms": 120.96770000000106,
+          "accepted": true
+        },
+        {
+          "ms": 139.72459999999955,
+          "accepted": true
+        },
+        {
+          "ms": 149.08619999999974,
+          "accepted": true
+        },
+        {
+          "ms": 157.55539999999928,
+          "accepted": true
+        },
+        {
+          "ms": 192.7453999999998,
+          "accepted": true
+        },
+        {
+          "ms": 166.58549999999923,
+          "accepted": true
+        },
+        {
+          "ms": 219.90990000000056,
+          "accepted": true
+        },
+        {
+          "ms": 175.07409999999982,
+          "accepted": true
+        },
+        {
+          "ms": 183.8672000000006,
+          "accepted": true
+        },
+        {
+          "ms": 201.89799999999923,
+          "accepted": true
+        },
+        {
+          "ms": 210.48220000000038,
+          "accepted": true
+        },
+        {
+          "ms": 227.96390000000065,
+          "accepted": true
+        },
+        {
+          "ms": 245.62710000000152,
+          "accepted": true
+        },
+        {
+          "ms": 236.85449999999946,
+          "accepted": true
+        },
+        {
+          "ms": 254.34889999999905,
+          "accepted": true
+        },
+        {
+          "ms": 263.21340000000055,
+          "accepted": true
+        },
+        {
+          "ms": 288.5033999999996,
+          "accepted": true
+        },
+        {
+          "ms": 271.2620000000006,
+          "accepted": true
+        },
+        {
+          "ms": 279.73099999999977,
+          "accepted": true
+        },
+        {
+          "ms": 305.8163999999997,
+          "accepted": true
+        },
+        {
+          "ms": 296.65859999999884,
+          "accepted": true
+        },
+        {
+          "ms": 314.2546999999995,
+          "accepted": true
+        },
+        {
+          "ms": 323.02649999999994,
+          "accepted": true
+        },
+        {
+          "ms": 331.7330000000002,
+          "accepted": true
+        },
+        {
+          "ms": 340.52839999999924,
+          "accepted": true
+        },
+        {
+          "ms": 349.0523000000012,
+          "accepted": true
+        },
+        {
+          "ms": 375.76830000000155,
+          "accepted": true
+        },
+        {
+          "ms": 358.03219999999965,
+          "accepted": true
+        },
+        {
+          "ms": 366.64600000000064,
+          "accepted": true
+        },
+        {
+          "ms": 393.85419999999976,
+          "accepted": true
+        },
+        {
+          "ms": 384.5550000000003,
+          "accepted": true
+        }
+      ],
+      "ack": {
+        "n": 40,
+        "p50": 219.90990000000056,
+        "p95": 375.76830000000155,
+        "max": 393.85419999999976
+      },
+      "detail": {
+        "client": 40,
+        "status": 200,
+        "bytes": 348,
+        "headersMs": 28.403200000000652,
+        "firstByteMs": 52.65430000000015,
+        "totalMs": 52.68469999999979,
+        "bodyMs": 24.28149999999914,
+        "hashOk": true,
+        "mime": "application/json",
+        "attempts": [
+          200
+        ]
+      },
+      "progress": 40,
+      "elapsedAfterFirstMs": 26208.2255,
+      "pingLatency": {
+        "n": 400,
+        "p50": 33.02329999999711,
+        "p95": 314.8167000000003,
+        "max": 966.3872000000001
+      },
+      "counters": {
+        "http": 45,
+        "studentWsFrames": 480,
+        "studentWsUtf8Bytes": 99000,
+        "receivedFrames": 1276,
+        "offline": 0,
+        "unexpectedOffline": 0,
+        "reauth": 0,
+        "auth": 40,
+        "sync": 280,
+        "pongs": 400,
+        "wsErrors": 0
+      },
+      "native": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 419430748,
+        "pendingHigh": 5,
+        "sendWaitMaxMs": 22.3473,
+        "sendWaitMs": 449.3364000000026,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 2,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 12801,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 5,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 5,
+          "REALTIME:pong": 400,
+          "REALTIME:question_revealed": 118,
+          "REALTIME:question_state_changed": 240,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 280,
+          "REALTIME:submission_acknowledged": 40,
+          "REALTIME:submission_result": 118
+        },
+        "teacherWsUtf8BytesReserved": 561903950
+      },
+      "status": "PASS"
+    }
+  ]
+}

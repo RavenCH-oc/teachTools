@@ -1,0 +1,3462 @@
+{
+  "exportType": "Selected-field derivative; not original report bytes",
+  "originalFile": "a2-images.json",
+  "originalSha256": "cd1c187242dd899900b5cc01376ae4df36e92ec1930b3fc7a1bf721f487d6e2f",
+  "omittedPaths": [
+    "observations.1.native.requests",
+    "observations.1.native.timeline",
+    "observations.2.nativeBefore.requests",
+    "observations.2.nativeBefore.timeline",
+    "observations.2.nativeAfter.requests",
+    "observations.2.nativeAfter.timeline",
+    "observations.3.nativeBefore.requests",
+    "observations.3.nativeBefore.timeline",
+    "observations.3.nativeAfter.requests",
+    "observations.3.nativeAfter.timeline",
+    "observations.4.nativeBefore.requests",
+    "observations.4.nativeBefore.timeline",
+    "observations.4.nativeAfter.requests",
+    "observations.4.nativeAfter.timeline",
+    "observations.5.nativeBefore.requests",
+    "observations.5.nativeBefore.timeline",
+    "observations.5.nativeAfter.requests",
+    "observations.5.nativeAfter.timeline",
+    "observations.6.nativeBefore.requests",
+    "observations.6.nativeBefore.timeline",
+    "observations.6.nativeAfter.requests",
+    "observations.6.nativeAfter.timeline",
+    "observations.7.nativeBefore.requests",
+    "observations.7.nativeBefore.timeline",
+    "observations.7.nativeAfter.requests",
+    "observations.7.nativeAfter.timeline",
+    "observations.9.native.requests",
+    "observations.9.native.timeline"
+  ],
+  "observations": [
+    {
+      "label": "thresholds",
+      "textAckP95Ms": 2000,
+      "mediaAckP95Ms": 3000,
+      "image95PercentMs": 30000,
+      "imageAllMs": 60000,
+      "algorithm": "nearest-rank ceil(p*n)-1; monotonic per process",
+      "clientPolicy": "actual bundled studentHttpRead",
+      "network": "same Windows PC, loopback; not mobile render"
+    },
+    {
+      "label": "C1",
+      "samples": [
+        {
+          "sample": 1,
+          "ack": {
+            "ms": 482.46369999999933,
+            "accepted": true
+          },
+          "detail": {
+            "client": 1,
+            "status": 200,
+            "bytes": 348,
+            "headersMs": 38.28399999999965,
+            "firstByteMs": 44.23880000000008,
+            "totalMs": 44.314800000000105,
+            "bodyMs": 6.030800000000454,
+            "hashOk": true,
+            "mime": "application/json",
+            "attempts": [
+              200
+            ]
+          },
+          "media": {
+            "client": 1,
+            "status": 200,
+            "bytes": 2094909,
+            "headersMs": 48.96339999999964,
+            "firstByteMs": 50.91229999999996,
+            "totalMs": 460.4366999999993,
+            "bodyMs": 411.47329999999965,
+            "hashOk": true,
+            "mime": "image/png",
+            "attempts": [
+              200
+            ]
+          }
+        },
+        {
+          "sample": 2,
+          "ack": {
+            "ms": 19.54410000000007,
+            "accepted": true
+          },
+          "detail": {
+            "client": 1,
+            "status": 200,
+            "bytes": 348,
+            "headersMs": 24.09569999999985,
+            "firstByteMs": 29.535899999999856,
+            "totalMs": 29.564900000000307,
+            "bodyMs": 5.4692000000004555,
+            "hashOk": true,
+            "mime": "application/json",
+            "attempts": [
+              200
+            ]
+          },
+          "media": {
+            "client": 1,
+            "status": 200,
+            "bytes": 2094909,
+            "headersMs": 48.101699999999255,
+            "firstByteMs": 49.58859999999913,
+            "totalMs": 481.52869999999893,
+            "bodyMs": 433.4269999999997,
+            "hashOk": true,
+            "mime": "image/png",
+            "attempts": [
+              200
+            ]
+          }
+        },
+        {
+          "sample": 3,
+          "ack": {
+            "ms": 26.079499999999825,
+            "accepted": true
+          },
+          "detail": {
+            "client": 1,
+            "status": 200,
+            "bytes": 348,
+            "headersMs": 16.06500000000051,
+            "firstByteMs": 22.137400000001435,
+            "totalMs": 22.16530000000057,
+            "bodyMs": 6.100300000000061,
+            "hashOk": true,
+            "mime": "application/json",
+            "attempts": [
+              200
+            ]
+          },
+          "media": {
+            "client": 1,
+            "status": 200,
+            "bytes": 2094909,
+            "headersMs": 55.568099999998594,
+            "firstByteMs": 56.91749999999956,
+            "totalMs": 451.9282999999996,
+            "bodyMs": 396.360200000001,
+            "hashOk": true,
+            "mime": "image/png",
+            "attempts": [
+              200
+            ]
+          }
+        }
+      ],
+      "native": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 6285771,
+        "pendingHigh": 1,
+        "sendWaitMaxMs": 0.0658,
+        "sendWaitMs": 16.468599999999995,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 1,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 195,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 6,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 6,
+          "REALTIME:pong": 58,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 3,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 8804207
+      }
+    },
+    {
+      "label": "C2_C3_media",
+      "n": 1,
+      "rows": [
+        {
+          "client": 1,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 53,
+          "firstByteMs": 54.480099999998856,
+          "totalMs": 775.750399999999,
+          "bodyMs": 722.750399999999,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        }
+      ],
+      "rawAcks": [
+        {
+          "ms": 121.51850000000013,
+          "accepted": true
+        },
+        {
+          "ms": 121.67879999999968,
+          "accepted": true
+        },
+        {
+          "ms": 126.66009999999915,
+          "accepted": true
+        },
+        {
+          "ms": 122.75929999999971,
+          "accepted": true
+        },
+        {
+          "ms": 130.60379999999896,
+          "accepted": true
+        },
+        {
+          "ms": 124.57610000000022,
+          "accepted": true
+        },
+        {
+          "ms": 128.58280000000013,
+          "accepted": true
+        },
+        {
+          "ms": 132.49169999999867,
+          "accepted": true
+        },
+        {
+          "ms": 136.32320000000072,
+          "accepted": true
+        },
+        {
+          "ms": 134.34780000000137,
+          "accepted": true
+        },
+        {
+          "ms": 138.32090000000062,
+          "accepted": true
+        },
+        {
+          "ms": 140.29020000000128,
+          "accepted": true
+        },
+        {
+          "ms": 142.26959999999963,
+          "accepted": true
+        },
+        {
+          "ms": 147.14970000000176,
+          "accepted": true
+        },
+        {
+          "ms": 170.6833999999999,
+          "accepted": true
+        },
+        {
+          "ms": 161.6957999999995,
+          "accepted": true
+        },
+        {
+          "ms": 153.3693999999996,
+          "accepted": true
+        },
+        {
+          "ms": 179.77070000000094,
+          "accepted": true
+        },
+        {
+          "ms": 189.0041000000001,
+          "accepted": true
+        },
+        {
+          "ms": 197.28189999999995,
+          "accepted": true
+        },
+        {
+          "ms": 205.59310000000005,
+          "accepted": true
+        },
+        {
+          "ms": 214.20719999999892,
+          "accepted": true
+        },
+        {
+          "ms": 225.0739999999987,
+          "accepted": true
+        },
+        {
+          "ms": 232.10769999999866,
+          "accepted": true
+        },
+        {
+          "ms": 249.76909999999953,
+          "accepted": true
+        },
+        {
+          "ms": 241.01220000000103,
+          "accepted": true
+        },
+        {
+          "ms": 258.4339,
+          "accepted": true
+        },
+        {
+          "ms": 266.9321,
+          "accepted": true
+        },
+        {
+          "ms": 275.97659999999996,
+          "accepted": true
+        },
+        {
+          "ms": 284.7412999999997,
+          "accepted": true
+        },
+        {
+          "ms": 293.0082999999995,
+          "accepted": true
+        },
+        {
+          "ms": 302.5133000000005,
+          "accepted": true
+        },
+        {
+          "ms": 310.23439999999937,
+          "accepted": true
+        },
+        {
+          "ms": 319.989599999999,
+          "accepted": true
+        },
+        {
+          "ms": 328.1414999999997,
+          "accepted": true
+        },
+        {
+          "ms": 336.70230000000083,
+          "accepted": true
+        },
+        {
+          "ms": 345.6474999999991,
+          "accepted": true
+        },
+        {
+          "ms": 354.259399999999,
+          "accepted": true
+        },
+        {
+          "ms": 362.6751000000004,
+          "accepted": true
+        },
+        {
+          "ms": 371.42109999999957,
+          "accepted": true
+        }
+      ],
+      "ack": {
+        "n": 40,
+        "p50": 197.28189999999995,
+        "p95": 354.259399999999,
+        "max": 371.42109999999957
+      },
+      "firstAttemptSuccess": 1,
+      "eventualSuccess": 1,
+      "wallMs": 835.150599999999,
+      "nativeBefore": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 6285771,
+        "pendingHigh": 1,
+        "sendWaitMaxMs": 0.0658,
+        "sendWaitMs": 16.500999999999994,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 1,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 195,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 6,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 6,
+          "REALTIME:pong": 59,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 3,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 8804454
+      },
+      "nativeAfter": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 8380680,
+        "pendingHigh": 1,
+        "sendWaitMaxMs": 0.0987,
+        "sendWaitMs": 20.59609999999999,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 1,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 259,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 7,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 7,
+          "REALTIME:pong": 70,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 43,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 11628204
+      }
+    },
+    {
+      "label": "C2_C3_media",
+      "n": 4,
+      "rows": [
+        {
+          "client": 1,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 46.10200000000077,
+          "firstByteMs": 48.979300000000876,
+          "totalMs": 1361.0025000000005,
+          "bodyMs": 1314.9004999999997,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 2,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 184.3202000000001,
+          "firstByteMs": 429.21949999999924,
+          "totalMs": 1439.4282000000003,
+          "bodyMs": 1255.1080000000002,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 3,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 225.6342999999997,
+          "firstByteMs": 442.22069999999985,
+          "totalMs": 1460.8859000000011,
+          "bodyMs": 1235.2516000000014,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 4,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 66.14069999999992,
+          "firstByteMs": 69.86130000000048,
+          "totalMs": 1414.5162,
+          "bodyMs": 1348.3755,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        }
+      ],
+      "rawAcks": [
+        {
+          "ms": 137.45169999999962,
+          "accepted": true
+        },
+        {
+          "ms": 140.59329999999864,
+          "accepted": true
+        },
+        {
+          "ms": 147.48519999999917,
+          "accepted": true
+        },
+        {
+          "ms": 141.85609999999906,
+          "accepted": true
+        },
+        {
+          "ms": 144.28659999999945,
+          "accepted": true
+        },
+        {
+          "ms": 154.21919999999955,
+          "accepted": true
+        },
+        {
+          "ms": 151.09419999999955,
+          "accepted": true
+        },
+        {
+          "ms": 148.77899999999863,
+          "accepted": true
+        },
+        {
+          "ms": 169.17230000000018,
+          "accepted": true
+        },
+        {
+          "ms": 164.96619999999893,
+          "accepted": true
+        },
+        {
+          "ms": 172.45509999999922,
+          "accepted": true
+        },
+        {
+          "ms": 174.45719999999892,
+          "accepted": true
+        },
+        {
+          "ms": 176.26469999999972,
+          "accepted": true
+        },
+        {
+          "ms": 180.01879999999983,
+          "accepted": true
+        },
+        {
+          "ms": 177.53600000000006,
+          "accepted": true
+        },
+        {
+          "ms": 188.1851000000006,
+          "accepted": true
+        },
+        {
+          "ms": 184.46399999999994,
+          "accepted": true
+        },
+        {
+          "ms": 186.77800000000025,
+          "accepted": true
+        },
+        {
+          "ms": 192.67319999999927,
+          "accepted": true
+        },
+        {
+          "ms": 199.55459999999948,
+          "accepted": true
+        },
+        {
+          "ms": 205.79579999999987,
+          "accepted": true
+        },
+        {
+          "ms": 214.79629999999997,
+          "accepted": true
+        },
+        {
+          "ms": 224.21520000000055,
+          "accepted": true
+        },
+        {
+          "ms": 232.6164000000008,
+          "accepted": true
+        },
+        {
+          "ms": 249.57279999999992,
+          "accepted": true
+        },
+        {
+          "ms": 241.20830000000024,
+          "accepted": true
+        },
+        {
+          "ms": 257.78420000000006,
+          "accepted": true
+        },
+        {
+          "ms": 267.1180000000004,
+          "accepted": true
+        },
+        {
+          "ms": 284.4509999999991,
+          "accepted": true
+        },
+        {
+          "ms": 275.6059000000005,
+          "accepted": true
+        },
+        {
+          "ms": 292.8871999999992,
+          "accepted": true
+        },
+        {
+          "ms": 302.40070000000014,
+          "accepted": true
+        },
+        {
+          "ms": 311.1118999999999,
+          "accepted": true
+        },
+        {
+          "ms": 319.8680000000004,
+          "accepted": true
+        },
+        {
+          "ms": 329.0781999999999,
+          "accepted": true
+        },
+        {
+          "ms": 337.7615999999998,
+          "accepted": true
+        },
+        {
+          "ms": 355.6304999999993,
+          "accepted": true
+        },
+        {
+          "ms": 346.95360000000073,
+          "accepted": true
+        },
+        {
+          "ms": 365.1116999999995,
+          "accepted": true
+        },
+        {
+          "ms": 373.83309999999983,
+          "accepted": true
+        }
+      ],
+      "ack": {
+        "n": 40,
+        "p50": 199.55459999999948,
+        "p95": 355.6304999999993,
+        "max": 373.83309999999983
+      },
+      "firstAttemptSuccess": 4,
+      "eventualSuccess": 4,
+      "wallMs": 1528.1826999999994,
+      "nativeBefore": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 8380680,
+        "pendingHigh": 1,
+        "sendWaitMaxMs": 0.1021,
+        "sendWaitMs": 20.77559999999999,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 1,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 259,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 7,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 7,
+          "REALTIME:pong": 73,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 43,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 11628945
+      },
+      "nativeAfter": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 16760316,
+        "pendingHigh": 4,
+        "sendWaitMaxMs": 0.1021,
+        "sendWaitMs": 30.759099999999997,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 1,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 515,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 11,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 11,
+          "REALTIME:pong": 93,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 83,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 22864398
+      }
+    },
+    {
+      "label": "C2_C3_media",
+      "n": 5,
+      "rows": [
+        {
+          "client": 1,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 47.43709999999919,
+          "firstByteMs": 49.569799999999304,
+          "totalMs": 1311.5823,
+          "bodyMs": 1264.1452000000008,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 2,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 170.1929999999993,
+          "firstByteMs": 425.83950000000004,
+          "totalMs": 1402.2088999999996,
+          "bodyMs": 1232.0159000000003,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 3,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 64.69310000000041,
+          "firstByteMs": 68.58430000000044,
+          "totalMs": 1371.1638000000003,
+          "bodyMs": 1306.4706999999999,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 4,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 204.10069999999905,
+          "firstByteMs": 439.26770000000033,
+          "totalMs": 1419.5540999999994,
+          "bodyMs": 1215.4534000000003,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 5,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 1431.9048000000003,
+          "firstByteMs": 1433.5712999999996,
+          "totalMs": 1825.1625000000004,
+          "bodyMs": 393.2577000000001,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        }
+      ],
+      "rawAcks": [
+        {
+          "ms": 120.21980000000076,
+          "accepted": true
+        },
+        {
+          "ms": 123.26800000000003,
+          "accepted": true
+        },
+        {
+          "ms": 124.46140000000014,
+          "accepted": true
+        },
+        {
+          "ms": 126.9971000000005,
+          "accepted": true
+        },
+        {
+          "ms": 130.9493999999995,
+          "accepted": true
+        },
+        {
+          "ms": 132.55179999999928,
+          "accepted": true
+        },
+        {
+          "ms": 135.45769999999902,
+          "accepted": true
+        },
+        {
+          "ms": 141.10859999999957,
+          "accepted": true
+        },
+        {
+          "ms": 143.9239000000016,
+          "accepted": true
+        },
+        {
+          "ms": 145.57539999999972,
+          "accepted": true
+        },
+        {
+          "ms": 149.8129000000008,
+          "accepted": true
+        },
+        {
+          "ms": 152.5775999999987,
+          "accepted": true
+        },
+        {
+          "ms": 154.7577999999994,
+          "accepted": true
+        },
+        {
+          "ms": 160.375399999999,
+          "accepted": true
+        },
+        {
+          "ms": 156.7433000000001,
+          "accepted": true
+        },
+        {
+          "ms": 165.48189999999886,
+          "accepted": true
+        },
+        {
+          "ms": 157.9963000000007,
+          "accepted": true
+        },
+        {
+          "ms": 176.8769999999986,
+          "accepted": true
+        },
+        {
+          "ms": 182.1291999999994,
+          "accepted": true
+        },
+        {
+          "ms": 190.6846000000005,
+          "accepted": true
+        },
+        {
+          "ms": 199.69370000000163,
+          "accepted": true
+        },
+        {
+          "ms": 208.54709999999977,
+          "accepted": true
+        },
+        {
+          "ms": 217.41599999999926,
+          "accepted": true
+        },
+        {
+          "ms": 226.20920000000115,
+          "accepted": true
+        },
+        {
+          "ms": 235.47859999999855,
+          "accepted": true
+        },
+        {
+          "ms": 244.27659999999923,
+          "accepted": true
+        },
+        {
+          "ms": 253.14850000000115,
+          "accepted": true
+        },
+        {
+          "ms": 262.51520000000164,
+          "accepted": true
+        },
+        {
+          "ms": 271.35280000000057,
+          "accepted": true
+        },
+        {
+          "ms": 280.395199999999,
+          "accepted": true
+        },
+        {
+          "ms": 289.0539000000008,
+          "accepted": true
+        },
+        {
+          "ms": 297.64949999999953,
+          "accepted": true
+        },
+        {
+          "ms": 306.1867999999995,
+          "accepted": true
+        },
+        {
+          "ms": 323.53629999999976,
+          "accepted": true
+        },
+        {
+          "ms": 314.7669999999998,
+          "accepted": true
+        },
+        {
+          "ms": 332.432499999999,
+          "accepted": true
+        },
+        {
+          "ms": 341.5748000000003,
+          "accepted": true
+        },
+        {
+          "ms": 350.2559999999994,
+          "accepted": true
+        },
+        {
+          "ms": 358.3644999999997,
+          "accepted": true
+        },
+        {
+          "ms": 367.3641000000007,
+          "accepted": true
+        }
+      ],
+      "ack": {
+        "n": 40,
+        "p50": 190.6846000000005,
+        "p95": 350.2559999999994,
+        "max": 367.3641000000007
+      },
+      "firstAttemptSuccess": 4,
+      "eventualSuccess": 5,
+      "wallMs": 1898.5272000000004,
+      "nativeBefore": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 16760316,
+        "pendingHigh": 4,
+        "sendWaitMaxMs": 0.1021,
+        "sendWaitMs": 30.912699999999997,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 1,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 515,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 11,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 11,
+          "REALTIME:pong": 97,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 83,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 22865386
+      },
+      "nativeAfter": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 27234861,
+        "pendingHigh": 4,
+        "sendWaitMaxMs": 0.1021,
+        "sendWaitMs": 43.33559999999996,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 1,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 835,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 16,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 16,
+          "REALTIME:pong": 122,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 123,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 36905243
+      }
+    },
+    {
+      "label": "C2_C3_media",
+      "n": 10,
+      "rows": [
+        {
+          "client": 1,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 47.72180000000117,
+          "firstByteMs": 49.730499999999665,
+          "totalMs": 1330.3366000000005,
+          "bodyMs": 1282.6147999999994,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 2,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 257.6095999999998,
+          "firstByteMs": 475.9278999999988,
+          "totalMs": 1481.7210999999988,
+          "bodyMs": 1224.111499999999,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 3,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 191.78020000000106,
+          "firstByteMs": 430.3112000000001,
+          "totalMs": 1444.050000000001,
+          "bodyMs": 1252.2698,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 4,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 204.3754000000008,
+          "firstByteMs": 445.3618000000006,
+          "totalMs": 1461.2054000000007,
+          "bodyMs": 1256.83,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 5,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 1534.7662,
+          "firstByteMs": 1536.0839000000014,
+          "totalMs": 2437.6705,
+          "bodyMs": 902.9043000000001,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 6,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 1640.6885999999995,
+          "firstByteMs": 1642.2829000000002,
+          "totalMs": 2644.893899999999,
+          "bodyMs": 1004.2052999999996,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 7,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 3762.8932999999997,
+          "firstByteMs": 3764.321899999999,
+          "totalMs": 4140.6299,
+          "bodyMs": 377.7366000000002,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 8,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 1640.7695000000003,
+          "firstByteMs": 1657.8917000000001,
+          "totalMs": 2666.7237999999998,
+          "bodyMs": 1025.9542999999994,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 9,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 1604.7483999999986,
+          "firstByteMs": 1619.3215999999993,
+          "totalMs": 2606.7903000000006,
+          "bodyMs": 1002.041900000002,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 10,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 3074.7061000000012,
+          "firstByteMs": 3076.064400000001,
+          "totalMs": 3516.0032999999985,
+          "bodyMs": 441.29719999999725,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        }
+      ],
+      "rawAcks": [
+        {
+          "ms": 116.6335999999992,
+          "accepted": true
+        },
+        {
+          "ms": 115.4385000000002,
+          "accepted": true
+        },
+        {
+          "ms": 116.87330000000111,
+          "accepted": true
+        },
+        {
+          "ms": 120.96190000000024,
+          "accepted": true
+        },
+        {
+          "ms": 134.73999999999978,
+          "accepted": true
+        },
+        {
+          "ms": 131.65030000000115,
+          "accepted": true
+        },
+        {
+          "ms": 136.04919999999947,
+          "accepted": true
+        },
+        {
+          "ms": 139.95839999999953,
+          "accepted": true
+        },
+        {
+          "ms": 147.48589999999967,
+          "accepted": true
+        },
+        {
+          "ms": 145.16209999999955,
+          "accepted": true
+        },
+        {
+          "ms": 149.20620000000054,
+          "accepted": true
+        },
+        {
+          "ms": 152.49169999999867,
+          "accepted": true
+        },
+        {
+          "ms": 155.42849999999999,
+          "accepted": true
+        },
+        {
+          "ms": 159.90149999999994,
+          "accepted": true
+        },
+        {
+          "ms": 157.70919999999933,
+          "accepted": true
+        },
+        {
+          "ms": 183.73459999999977,
+          "accepted": true
+        },
+        {
+          "ms": 161.32730000000083,
+          "accepted": true
+        },
+        {
+          "ms": 184.1864000000005,
+          "accepted": true
+        },
+        {
+          "ms": 193.48949999999968,
+          "accepted": true
+        },
+        {
+          "ms": 196.48840000000018,
+          "accepted": true
+        },
+        {
+          "ms": 207.15129999999954,
+          "accepted": true
+        },
+        {
+          "ms": 211.7507999999998,
+          "accepted": true
+        },
+        {
+          "ms": 229.11209999999846,
+          "accepted": true
+        },
+        {
+          "ms": 220.29489999999896,
+          "accepted": true
+        },
+        {
+          "ms": 238.88190000000031,
+          "accepted": true
+        },
+        {
+          "ms": 246.8205999999991,
+          "accepted": true
+        },
+        {
+          "ms": 255.67640000000029,
+          "accepted": true
+        },
+        {
+          "ms": 264.16510000000017,
+          "accepted": true
+        },
+        {
+          "ms": 273.1767999999993,
+          "accepted": true
+        },
+        {
+          "ms": 282.28789999999935,
+          "accepted": true
+        },
+        {
+          "ms": 291.66959999999926,
+          "accepted": true
+        },
+        {
+          "ms": 300.0586999999996,
+          "accepted": true
+        },
+        {
+          "ms": 308.8909999999996,
+          "accepted": true
+        },
+        {
+          "ms": 317.7435999999998,
+          "accepted": true
+        },
+        {
+          "ms": 335.8167000000012,
+          "accepted": true
+        },
+        {
+          "ms": 326.59870000000046,
+          "accepted": true
+        },
+        {
+          "ms": 344.64470000000074,
+          "accepted": true
+        },
+        {
+          "ms": 352.6697000000004,
+          "accepted": true
+        },
+        {
+          "ms": 361.8743000000013,
+          "accepted": true
+        },
+        {
+          "ms": 370.65550000000076,
+          "accepted": true
+        }
+      ],
+      "ack": {
+        "n": 40,
+        "p50": 196.48840000000018,
+        "p95": 352.6697000000004,
+        "max": 370.65550000000076
+      },
+      "firstAttemptSuccess": 4,
+      "eventualSuccess": 10,
+      "wallMs": 4223.478400000002,
+      "nativeBefore": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 27234861,
+        "pendingHigh": 4,
+        "sendWaitMaxMs": 0.1021,
+        "sendWaitMs": 43.48349999999996,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 1,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 835,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 16,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 16,
+          "REALTIME:pong": 126,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 123,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 36906231
+      },
+      "nativeAfter": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 48183951,
+        "pendingHigh": 4,
+        "sendWaitMaxMs": 1.4658,
+        "sendWaitMs": 71.49969999999989,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 1,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 1475,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 26,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 26,
+          "REALTIME:pong": 183,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 163,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 64969793
+      }
+    },
+    {
+      "label": "C2_C3_media",
+      "n": 20,
+      "rows": [
+        {
+          "client": 1,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 191.06200000000172,
+          "firstByteMs": 490.6749000000018,
+          "totalMs": 1651.636699999999,
+          "bodyMs": 1460.5746999999974,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 2,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 190.76820000000225,
+          "firstByteMs": 478.76970000000074,
+          "totalMs": 1630.687600000001,
+          "bodyMs": 1439.9193999999989,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 3,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 190.20430000000124,
+          "firstByteMs": 449.08850000000166,
+          "totalMs": 1587.3348000000005,
+          "bodyMs": 1397.1304999999993,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 4,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 190.54809999999998,
+          "firstByteMs": 462.1922000000013,
+          "totalMs": 1608.3155000000006,
+          "bodyMs": 1417.7674000000006,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 5,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 3382.5289999999986,
+          "firstByteMs": 3426.6817999999985,
+          "totalMs": 4269.704900000001,
+          "bodyMs": 887.175900000002,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 6,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 1701.4626000000026,
+          "firstByteMs": 1705.2589000000007,
+          "totalMs": 2603.8437000000013,
+          "bodyMs": 902.3810999999987,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 7,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 2730.507300000001,
+          "firstByteMs": 2745.5632000000005,
+          "totalMs": 3312.3456000000006,
+          "bodyMs": 581.8382999999994,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 8,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 6608.9424,
+          "firstByteMs": 6610.149000000001,
+          "totalMs": 7072.861199999999,
+          "bodyMs": 463.91879999999946,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 9,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 6242.4123,
+          "firstByteMs": 6243.8153999999995,
+          "totalMs": 6635.7600999999995,
+          "bodyMs": 393.34779999999955,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 10,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 3065.228299999999,
+          "firstByteMs": 3084.4076999999997,
+          "totalMs": 4104.205699999999,
+          "bodyMs": 1038.9773999999998,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 11,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 1751.504200000003,
+          "firstByteMs": 1752.9528000000028,
+          "totalMs": 2716.5191000000013,
+          "bodyMs": 965.0148999999983,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 12,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 1851.461800000001,
+          "firstByteMs": 1853.0024999999987,
+          "totalMs": 2790.060099999999,
+          "bodyMs": 938.5982999999978,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 13,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 4919.0610000000015,
+          "firstByteMs": 4920.712200000002,
+          "totalMs": 5659.3246,
+          "bodyMs": 740.2635999999984,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 14,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 3064.739099999999,
+          "firstByteMs": 3066.2207000000017,
+          "totalMs": 4086.2687000000005,
+          "bodyMs": 1021.5296000000017,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 15,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 1719.7415,
+          "firstByteMs": 1721.3257999999987,
+          "totalMs": 2670.6829999999973,
+          "bodyMs": 950.9414999999972,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 16,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 4630.921200000001,
+          "firstByteMs": 4646.210999999999,
+          "totalMs": 5233.714400000001,
+          "bodyMs": 602.7932000000001,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 17,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 3032.9174999999996,
+          "firstByteMs": 3034.1718999999975,
+          "totalMs": 4049.100699999999,
+          "bodyMs": 1016.1831999999995,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 18,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 5174.507400000002,
+          "firstByteMs": 5175.9686,
+          "totalMs": 5907.643800000002,
+          "bodyMs": 733.1363999999994,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 19,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 4404.296599999998,
+          "firstByteMs": 4405.819899999999,
+          "totalMs": 4877.172500000001,
+          "bodyMs": 472.87590000000273,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 20,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 5124.1343000000015,
+          "firstByteMs": 5126.0848000000005,
+          "totalMs": 5884.559499999999,
+          "bodyMs": 760.4251999999979,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        }
+      ],
+      "rawAcks": [
+        {
+          "ms": 135.4402999999984,
+          "accepted": true
+        },
+        {
+          "ms": 135.7377000000015,
+          "accepted": true
+        },
+        {
+          "ms": 143.2476999999999,
+          "accepted": true
+        },
+        {
+          "ms": 136.02000000000044,
+          "accepted": true
+        },
+        {
+          "ms": 146.39180000000124,
+          "accepted": true
+        },
+        {
+          "ms": 148.86119999999937,
+          "accepted": true
+        },
+        {
+          "ms": 146.63070000000153,
+          "accepted": true
+        },
+        {
+          "ms": 152.3288999999968,
+          "accepted": true
+        },
+        {
+          "ms": 155.77820000000065,
+          "accepted": true
+        },
+        {
+          "ms": 153.37900000000081,
+          "accepted": true
+        },
+        {
+          "ms": 158.77869999999893,
+          "accepted": true
+        },
+        {
+          "ms": 160.1854999999996,
+          "accepted": true
+        },
+        {
+          "ms": 162.54839999999967,
+          "accepted": true
+        },
+        {
+          "ms": 165.69859999999971,
+          "accepted": true
+        },
+        {
+          "ms": 195.37330000000293,
+          "accepted": true
+        },
+        {
+          "ms": 194.89819999999963,
+          "accepted": true
+        },
+        {
+          "ms": 197.7415000000001,
+          "accepted": true
+        },
+        {
+          "ms": 199.11160000000018,
+          "accepted": true
+        },
+        {
+          "ms": 212.83920000000217,
+          "accepted": true
+        },
+        {
+          "ms": 224.7639999999992,
+          "accepted": true
+        },
+        {
+          "ms": 225.07440000000133,
+          "accepted": true
+        },
+        {
+          "ms": 234.74169999999867,
+          "accepted": true
+        },
+        {
+          "ms": 242.39549999999872,
+          "accepted": true
+        },
+        {
+          "ms": 261.2927000000018,
+          "accepted": true
+        },
+        {
+          "ms": 261.77490000000034,
+          "accepted": true
+        },
+        {
+          "ms": 287.66530000000057,
+          "accepted": true
+        },
+        {
+          "ms": 287.8702999999987,
+          "accepted": true
+        },
+        {
+          "ms": 290.5655999999981,
+          "accepted": true
+        },
+        {
+          "ms": 295.1589000000022,
+          "accepted": true
+        },
+        {
+          "ms": 302.98809999999867,
+          "accepted": true
+        },
+        {
+          "ms": 311.5059000000001,
+          "accepted": true
+        },
+        {
+          "ms": 320.02430000000095,
+          "accepted": true
+        },
+        {
+          "ms": 328.83190000000104,
+          "accepted": true
+        },
+        {
+          "ms": 337.65040000000226,
+          "accepted": true
+        },
+        {
+          "ms": 345.91809999999896,
+          "accepted": true
+        },
+        {
+          "ms": 354.65209999999934,
+          "accepted": true
+        },
+        {
+          "ms": 363.16010000000097,
+          "accepted": true
+        },
+        {
+          "ms": 372.73519999999917,
+          "accepted": true
+        },
+        {
+          "ms": 389.70880000000034,
+          "accepted": true
+        },
+        {
+          "ms": 381.3217000000004,
+          "accepted": true
+        }
+      ],
+      "ack": {
+        "n": 40,
+        "p50": 224.7639999999992,
+        "p95": 372.73519999999917,
+        "max": 389.70880000000034
+      },
+      "firstAttemptSuccess": 4,
+      "eventualSuccess": 20,
+      "wallMs": 7165.958500000001,
+      "nativeBefore": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 48183951,
+        "pendingHigh": 4,
+        "sendWaitMaxMs": 1.4658,
+        "sendWaitMs": 71.58049999999989,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 1,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 1475,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 26,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 26,
+          "REALTIME:pong": 186,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 163,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 64970534
+      },
+      "nativeAfter": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 90082131,
+        "pendingHigh": 4,
+        "sendWaitMaxMs": 1.4658,
+        "sendWaitMs": 118.74359999999965,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 2,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 2755,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 46,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 46,
+          "REALTIME:pong": 281,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 203,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 121075187
+      }
+    },
+    {
+      "label": "C2_C3_media",
+      "n": 40,
+      "rows": [
+        {
+          "client": 1,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 219.76180000000022,
+          "firstByteMs": 219.8678,
+          "totalMs": 1835.2626000000018,
+          "bodyMs": 1615.5008000000016,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 2,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 221.40799999999945,
+          "firstByteMs": 542.2972000000009,
+          "totalMs": 1926.722099999999,
+          "bodyMs": 1705.3140999999996,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 3,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 220.21789999999964,
+          "firstByteMs": 528.3493000000017,
+          "totalMs": 1905.6414000000004,
+          "bodyMs": 1685.4235000000008,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 4,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 219.9936000000016,
+          "firstByteMs": 510.61209999999846,
+          "totalMs": 1881.9884999999995,
+          "bodyMs": 1661.9948999999979,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 5,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 4338.340100000001,
+          "firstByteMs": 4352.8737,
+          "totalMs": 5373.8603,
+          "bodyMs": 1035.520199999999,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 6,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 4468.316500000001,
+          "firstByteMs": 4511.6767,
+          "totalMs": 5525.157999999999,
+          "bodyMs": 1056.8414999999986,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 7,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 9540.391199999998,
+          "firstByteMs": 9541.7699,
+          "totalMs": 10505.666299999997,
+          "bodyMs": 965.2750999999989,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 8,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 9917.808700000001,
+          "firstByteMs": 9919.281500000005,
+          "totalMs": 10816.975400000003,
+          "bodyMs": 899.1667000000016,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 9,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 2011.3673999999992,
+          "firstByteMs": 2012.9712,
+          "totalMs": 3050.466099999998,
+          "bodyMs": 1039.0986999999986,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 10,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 8661.557099999998,
+          "firstByteMs": 8663.993999999999,
+          "totalMs": 9438.134599999998,
+          "bodyMs": 776.5774999999994,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 11,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 5570.799199999998,
+          "firstByteMs": 5572.264999999999,
+          "totalMs": 6637.823799999998,
+          "bodyMs": 1067.0246000000006,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 12,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 3065.6431999999986,
+          "firstByteMs": 3065.672699999999,
+          "totalMs": 4154.0867,
+          "bodyMs": 1088.4435000000012,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 13,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 4367.696099999997,
+          "firstByteMs": 4369.2035,
+          "totalMs": 5431.800199999998,
+          "bodyMs": 1064.1041000000005,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 14,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 6283.875599999999,
+          "firstByteMs": 6286.306199999999,
+          "totalMs": 7328.950899999996,
+          "bodyMs": 1045.0752999999968,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 15,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 4269.463099999997,
+          "firstByteMs": 4270.841199999999,
+          "totalMs": 5156.798899999998,
+          "bodyMs": 887.3358000000007,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 16,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 11299.2925,
+          "firstByteMs": 11316.235799999999,
+          "totalMs": 11924.3311,
+          "bodyMs": 625.0385999999999,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 17,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 5249.904200000001,
+          "firstByteMs": 5251.5718000000015,
+          "totalMs": 6214.977999999999,
+          "bodyMs": 965.0737999999983,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 18,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 3168.014900000002,
+          "firstByteMs": 3173.6432999999997,
+          "totalMs": 4257.166099999999,
+          "bodyMs": 1089.1511999999966,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 19,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 6716.314200000001,
+          "firstByteMs": 6717.934000000001,
+          "totalMs": 7654.472699999998,
+          "bodyMs": 938.1584999999977,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 20,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 6929.303600000003,
+          "firstByteMs": 6930.934400000002,
+          "totalMs": 7842.2755,
+          "bodyMs": 912.9718999999968,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 21,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 7748.605900000002,
+          "firstByteMs": 7777.0192000000025,
+          "totalMs": 8725.025099999999,
+          "bodyMs": 976.4191999999966,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 22,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 9059.051199999998,
+          "firstByteMs": 9060.427800000001,
+          "totalMs": 9844.643,
+          "bodyMs": 785.591800000002,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 23,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 9677.2352,
+          "firstByteMs": 9678.4774,
+          "totalMs": 10678.0805,
+          "bodyMs": 1000.8453000000009,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 24,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 11280.229900000002,
+          "firstByteMs": 11281.4967,
+          "totalMs": 11879.870700000003,
+          "bodyMs": 599.640800000001,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 25,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 6648.458900000001,
+          "firstByteMs": 6650.232599999999,
+          "totalMs": 7606.313700000002,
+          "bodyMs": 957.854800000001,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 26,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 10746.981000000003,
+          "firstByteMs": 10748.148900000004,
+          "totalMs": 11175.073200000003,
+          "bodyMs": 428.09219999999914,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 27,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 5532.922700000003,
+          "firstByteMs": 5534.286100000001,
+          "totalMs": 6554.6990000000005,
+          "bodyMs": 1021.7762999999977,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 28,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 8833.691200000001,
+          "firstByteMs": 8862.529600000002,
+          "totalMs": 9587.761600000005,
+          "bodyMs": 754.0704000000042,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 29,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 12198.816500000004,
+          "firstByteMs": 12215.113700000005,
+          "totalMs": 12738.7709,
+          "bodyMs": 539.9543999999951,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 30,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 7615.173700000003,
+          "firstByteMs": 7616.617000000002,
+          "totalMs": 8541.231000000003,
+          "bodyMs": 926.0573000000004,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 31,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 12139.684099999999,
+          "firstByteMs": 12141.050600000002,
+          "totalMs": 12645.810400000002,
+          "bodyMs": 506.12630000000354,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 32,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 3069.6882000000005,
+          "firstByteMs": 3075.239600000001,
+          "totalMs": 4172.633900000001,
+          "bodyMs": 1102.9457000000002,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 33,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 8007.207200000001,
+          "firstByteMs": 8008.692899999998,
+          "totalMs": 8961.9581,
+          "bodyMs": 954.7508999999991,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 34,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 5622.160100000001,
+          "firstByteMs": 5623.727299999999,
+          "totalMs": 6706.625100000001,
+          "bodyMs": 1084.4650000000001,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 35,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 1948.527299999998,
+          "firstByteMs": 1948.5550000000003,
+          "totalMs": 2935.4874999999993,
+          "bodyMs": 986.9602000000014,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 36,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 3163.416300000001,
+          "firstByteMs": 3163.4406000000017,
+          "totalMs": 4236.996999999999,
+          "bodyMs": 1073.5806999999986,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 37,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 1948.634900000001,
+          "firstByteMs": 1954.9657000000007,
+          "totalMs": 2953.7353000000003,
+          "bodyMs": 1005.1003999999994,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 38,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 2067.692600000002,
+          "firstByteMs": 2069.312700000002,
+          "totalMs": 3116.3532000000014,
+          "bodyMs": 1048.6605999999992,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 39,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 7791.972800000003,
+          "firstByteMs": 7793.549399999996,
+          "totalMs": 8776.039400000001,
+          "bodyMs": 984.0665999999983,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        },
+        {
+          "client": 40,
+          "status": 200,
+          "bytes": 2094909,
+          "headersMs": 9722.1714,
+          "firstByteMs": 9723.6489,
+          "totalMs": 10717.1797,
+          "bodyMs": 995.0083000000013,
+          "hashOk": true,
+          "mime": "image/png",
+          "attempts": [
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            429,
+            200
+          ]
+        }
+      ],
+      "rawAcks": [
+        {
+          "ms": 163.7739999999976,
+          "accepted": true
+        },
+        {
+          "ms": 176.50350000000253,
+          "accepted": true
+        },
+        {
+          "ms": 180.20010000000184,
+          "accepted": true
+        },
+        {
+          "ms": 181.16510000000198,
+          "accepted": true
+        },
+        {
+          "ms": 186.33230000000185,
+          "accepted": true
+        },
+        {
+          "ms": 183.39589999999953,
+          "accepted": true
+        },
+        {
+          "ms": 442.7488999999987,
+          "accepted": true
+        },
+        {
+          "ms": 187.52209999999832,
+          "accepted": true
+        },
+        {
+          "ms": 190.02470000000176,
+          "accepted": true
+        },
+        {
+          "ms": 193.03440000000046,
+          "accepted": true
+        },
+        {
+          "ms": 194.26740000000063,
+          "accepted": true
+        },
+        {
+          "ms": 196.43019999999888,
+          "accepted": true
+        },
+        {
+          "ms": 202.60259999999835,
+          "accepted": true
+        },
+        {
+          "ms": 199.3008000000009,
+          "accepted": true
+        },
+        {
+          "ms": 200.229000000003,
+          "accepted": true
+        },
+        {
+          "ms": 326.8555000000015,
+          "accepted": true
+        },
+        {
+          "ms": 206.84440000000177,
+          "accepted": true
+        },
+        {
+          "ms": 205.48080000000118,
+          "accepted": true
+        },
+        {
+          "ms": 326.9359999999979,
+          "accepted": true
+        },
+        {
+          "ms": 328.64700000000084,
+          "accepted": true
+        },
+        {
+          "ms": 339.35180000000037,
+          "accepted": true
+        },
+        {
+          "ms": 341.33510000000024,
+          "accepted": true
+        },
+        {
+          "ms": 342.39600000000064,
+          "accepted": true
+        },
+        {
+          "ms": 341.91079999999783,
+          "accepted": true
+        },
+        {
+          "ms": 374.7400999999991,
+          "accepted": true
+        },
+        {
+          "ms": 379.7966000000015,
+          "accepted": true
+        },
+        {
+          "ms": 375.1254000000008,
+          "accepted": true
+        },
+        {
+          "ms": 384.33790000000226,
+          "accepted": true
+        },
+        {
+          "ms": 378.46610000000146,
+          "accepted": true
+        },
+        {
+          "ms": 416.4225000000006,
+          "accepted": true
+        },
+        {
+          "ms": 416.4372000000003,
+          "accepted": true
+        },
+        {
+          "ms": 416.5052999999971,
+          "accepted": true
+        },
+        {
+          "ms": 419.09210000000166,
+          "accepted": true
+        },
+        {
+          "ms": 428.77230000000054,
+          "accepted": true
+        },
+        {
+          "ms": 430.13920000000144,
+          "accepted": true
+        },
+        {
+          "ms": 436.3306999999986,
+          "accepted": true
+        },
+        {
+          "ms": 435.21789999999964,
+          "accepted": true
+        },
+        {
+          "ms": 432.5191999999988,
+          "accepted": true
+        },
+        {
+          "ms": 440.9946999999993,
+          "accepted": true
+        },
+        {
+          "ms": 438.3100999999988,
+          "accepted": true
+        }
+      ],
+      "ack": {
+        "n": 40,
+        "p50": 339.35180000000037,
+        "p95": 438.3100999999988,
+        "max": 442.7488999999987
+      },
+      "firstAttemptSuccess": 4,
+      "eventualSuccess": 40,
+      "wallMs": 12847.076000000001,
+      "nativeBefore": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 90082131,
+        "pendingHigh": 4,
+        "sendWaitMaxMs": 1.4658,
+        "sendWaitMs": 118.90809999999964,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 2,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 2755,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 46,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 46,
+          "REALTIME:pong": 285,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 203,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 121076175
+      },
+      "nativeAfter": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 173878491,
+        "pendingHigh": 4,
+        "sendWaitMaxMs": 1.4658,
+        "sendWaitMs": 210.9797999999995,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 2,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 5315,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 86,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 86,
+          "REALTIME:pong": 456,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 243,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 233262726
+      }
+    },
+    {
+      "label": "text_ack",
+      "students": 40,
+      "raw": [
+        {
+          "ms": 90.86579999999958,
+          "accepted": true
+        },
+        {
+          "ms": 90.53519999999844,
+          "accepted": true
+        },
+        {
+          "ms": 90.35310000000027,
+          "accepted": true
+        },
+        {
+          "ms": 113.90480000000389,
+          "accepted": true
+        },
+        {
+          "ms": 91.04390000000421,
+          "accepted": true
+        },
+        {
+          "ms": 114.0679999999993,
+          "accepted": true
+        },
+        {
+          "ms": 114.3122000000003,
+          "accepted": true
+        },
+        {
+          "ms": 116.76410000000033,
+          "accepted": true
+        },
+        {
+          "ms": 121.2818999999945,
+          "accepted": true
+        },
+        {
+          "ms": 119.90879999999743,
+          "accepted": true
+        },
+        {
+          "ms": 123.79390000000421,
+          "accepted": true
+        },
+        {
+          "ms": 127.02110000000539,
+          "accepted": true
+        },
+        {
+          "ms": 128.4303,
+          "accepted": true
+        },
+        {
+          "ms": 135.54409999999916,
+          "accepted": true
+        },
+        {
+          "ms": 130.99440000000322,
+          "accepted": true
+        },
+        {
+          "ms": 151.91670000000158,
+          "accepted": true
+        },
+        {
+          "ms": 160.93219999999565,
+          "accepted": true
+        },
+        {
+          "ms": 143.55880000000616,
+          "accepted": true
+        },
+        {
+          "ms": 169.1866000000009,
+          "accepted": true
+        },
+        {
+          "ms": 179.3960999999981,
+          "accepted": true
+        },
+        {
+          "ms": 187.94290000000183,
+          "accepted": true
+        },
+        {
+          "ms": 196.7468000000008,
+          "accepted": true
+        },
+        {
+          "ms": 205.1826000000001,
+          "accepted": true
+        },
+        {
+          "ms": 213.78160000000207,
+          "accepted": true
+        },
+        {
+          "ms": 230.9328999999998,
+          "accepted": true
+        },
+        {
+          "ms": 222.38969999999972,
+          "accepted": true
+        },
+        {
+          "ms": 239.80589999999938,
+          "accepted": true
+        },
+        {
+          "ms": 248.91670000000158,
+          "accepted": true
+        },
+        {
+          "ms": 258.33810000000085,
+          "accepted": true
+        },
+        {
+          "ms": 266.9858999999997,
+          "accepted": true
+        },
+        {
+          "ms": 275.6938000000009,
+          "accepted": true
+        },
+        {
+          "ms": 285.6174000000028,
+          "accepted": true
+        },
+        {
+          "ms": 294.70840000000317,
+          "accepted": true
+        },
+        {
+          "ms": 303.4057999999932,
+          "accepted": true
+        },
+        {
+          "ms": 312.27850000000035,
+          "accepted": true
+        },
+        {
+          "ms": 320.9175000000032,
+          "accepted": true
+        },
+        {
+          "ms": 329.8983999999982,
+          "accepted": true
+        },
+        {
+          "ms": 338.44490000000224,
+          "accepted": true
+        },
+        {
+          "ms": 347.32310000000143,
+          "accepted": true
+        },
+        {
+          "ms": 355.8295999999973,
+          "accepted": true
+        }
+      ],
+      "summary": {
+        "n": 40,
+        "p50": 179.3960999999981,
+        "p95": 338.44490000000224,
+        "max": 355.8295999999973
+      },
+      "progress": 40
+    },
+    {
+      "label": "final",
+      "nodeMemory": {
+        "rss": 108945408,
+        "heapTotal": 52080640,
+        "heapUsed": 19935608,
+        "external": 7552281,
+        "arrayBuffers": 3537102
+      },
+      "durationMs": 37971.5707,
+      "counters": {
+        "http": 441,
+        "studentWsFrames": 790,
+        "studentWsUtf8Bytes": 194518,
+        "receivedFrames": 1348,
+        "offline": 0,
+        "unexpectedOffline": 0,
+        "reauth": 0,
+        "auth": 40,
+        "sync": 200,
+        "pongs": 467,
+        "wsErrors": 0
+      },
+      "pingLatency": {
+        "n": 464,
+        "p50": 71.4422999999988,
+        "p95": 415.0470000000005,
+        "max": 1403.4271999999992
+      },
+      "pendingPings": 2,
+      "errors": [
+        {
+          "client": 1,
+          "codes": []
+        },
+        {
+          "client": 2,
+          "codes": []
+        },
+        {
+          "client": 3,
+          "codes": []
+        },
+        {
+          "client": 4,
+          "codes": []
+        },
+        {
+          "client": 5,
+          "codes": []
+        },
+        {
+          "client": 6,
+          "codes": []
+        },
+        {
+          "client": 7,
+          "codes": []
+        },
+        {
+          "client": 8,
+          "codes": []
+        },
+        {
+          "client": 9,
+          "codes": []
+        },
+        {
+          "client": 10,
+          "codes": []
+        },
+        {
+          "client": 11,
+          "codes": []
+        },
+        {
+          "client": 12,
+          "codes": []
+        },
+        {
+          "client": 13,
+          "codes": []
+        },
+        {
+          "client": 14,
+          "codes": []
+        },
+        {
+          "client": 15,
+          "codes": []
+        },
+        {
+          "client": 16,
+          "codes": []
+        },
+        {
+          "client": 17,
+          "codes": []
+        },
+        {
+          "client": 18,
+          "codes": []
+        },
+        {
+          "client": 19,
+          "codes": []
+        },
+        {
+          "client": 20,
+          "codes": []
+        },
+        {
+          "client": 21,
+          "codes": []
+        },
+        {
+          "client": 22,
+          "codes": []
+        },
+        {
+          "client": 23,
+          "codes": []
+        },
+        {
+          "client": 24,
+          "codes": []
+        },
+        {
+          "client": 25,
+          "codes": []
+        },
+        {
+          "client": 26,
+          "codes": []
+        },
+        {
+          "client": 27,
+          "codes": []
+        },
+        {
+          "client": 28,
+          "codes": []
+        },
+        {
+          "client": 29,
+          "codes": []
+        },
+        {
+          "client": 30,
+          "codes": []
+        },
+        {
+          "client": 31,
+          "codes": []
+        },
+        {
+          "client": 32,
+          "codes": []
+        },
+        {
+          "client": 33,
+          "codes": []
+        },
+        {
+          "client": 34,
+          "codes": []
+        },
+        {
+          "client": 35,
+          "codes": []
+        },
+        {
+          "client": 36,
+          "codes": []
+        },
+        {
+          "client": 37,
+          "codes": []
+        },
+        {
+          "client": 38,
+          "codes": []
+        },
+        {
+          "client": 39,
+          "codes": []
+        },
+        {
+          "client": 40,
+          "codes": []
+        }
+      ],
+      "native": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 173878491,
+        "pendingHigh": 4,
+        "sendWaitMaxMs": 1.4658,
+        "sendWaitMs": 212.6191999999995,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 2,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 5315,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 86,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 86,
+          "REALTIME:pong": 466,
+          "REALTIME:question_revealed": 79,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 200,
+          "REALTIME:submission_acknowledged": 283,
+          "REALTIME:submission_result": 79
+        },
+        "teacherWsUtf8BytesReserved": 233283068
+      }
+    },
+    {
+      "label": "gates",
+      "gates": [
+        {
+          "name": "C1_text_ack",
+          "status": "PASS"
+        },
+        {
+          "name": "C1_detail_media",
+          "status": "PASS"
+        },
+        {
+          "name": "image_completion_1",
+          "status": "PASS"
+        },
+        {
+          "name": "media_ack_1",
+          "status": "PASS"
+        },
+        {
+          "name": "image_completion_4",
+          "status": "PASS"
+        },
+        {
+          "name": "media_ack_4",
+          "status": "PASS"
+        },
+        {
+          "name": "image_completion_5",
+          "status": "PASS"
+        },
+        {
+          "name": "media_ack_5",
+          "status": "PASS"
+        },
+        {
+          "name": "image_completion_10",
+          "status": "PASS"
+        },
+        {
+          "name": "media_ack_10",
+          "status": "PASS"
+        },
+        {
+          "name": "image_completion_20",
+          "status": "PASS"
+        },
+        {
+          "name": "media_ack_20",
+          "status": "PASS"
+        },
+        {
+          "name": "image_completion_40",
+          "status": "PASS"
+        },
+        {
+          "name": "media_ack_40",
+          "status": "PASS"
+        },
+        {
+          "name": "text_ack",
+          "status": "PASS"
+        },
+        {
+          "name": "authoritative_answered",
+          "status": "PASS"
+        },
+        {
+          "name": "liveness",
+          "status": "PASS"
+        },
+        {
+          "name": "released_resources",
+          "status": "PASS"
+        }
+      ],
+      "scope": "Protocol synthetic WSS clients; actual Student HTTP policy; not physical-device acceptance"
+    }
+  ]
+}

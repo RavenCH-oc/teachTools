@@ -1,0 +1,674 @@
+{
+  "exportType": "Selected-field derivative; not original report bytes",
+  "originalFile": "wrangler-after-four.json",
+  "originalSha256": "1bffdbcf24ee600ebc2b84858cf9be2b8ed9f57f45db226e9445e0afb261fe56",
+  "omittedPaths": [
+    "observations.1.transportEvents",
+    "observations.1.native.requests",
+    "observations.1.native.timeline"
+  ],
+  "observations": [
+    {
+      "label": "thresholds",
+      "textAckP95Ms": 2000,
+      "mediaAckP95Ms": 3000,
+      "image95PercentMs": 30000,
+      "imageAllMs": 60000,
+      "algorithm": "nearest-rank ceil(p*n)-1; monotonic per process",
+      "clientPolicy": "actual bundled studentHttpRead",
+      "network": "same Windows PC, loopback; not mobile render"
+    },
+    {
+      "label": "C4_stream_probe",
+      "students": 40,
+      "streams": 4,
+      "trigger": "after all active streams first body bytes",
+      "presenceSamples": [
+        {
+          "atMs": 5469.154,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 6483.1558,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 7485.701599999999,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 8499.645199999999,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 9501.759600000001,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 10505.703000000001,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 11508.1725,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 12509.1037,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 13508.6741,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 14509.8168,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 15512.123899999999,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 16514.7991,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 17518.5452,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 18519.0236,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 19519.967099999998,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 20520.633599999997,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 21521.143799999998,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 22523.9359,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 23526.4565,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 24527.6671,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 25527.8389,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 26529.0835,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 27532.608399999997,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 28534.2418,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 29534.857799999998,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 30534.639499999997,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 31537.1063,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 32536.822699999997,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 33536.8698,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 34538.3991,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 35539.1347,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 36544.761399999996,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 37545.2164,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 38548.2386,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 39548.562,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 40551.8807,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 41556.4144,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 42559.4778,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 43560.1866,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 44560.2374,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 45563.3991,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 46565.320999999996,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 47567.6587,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 48567.7882,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 49568.9156,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 50569.0826,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 51568.2743,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 52569.2693,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 53573.3482,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 54575.9265,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 55577.1176,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 56583.2958,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 57583.6166,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 58583.9219,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 59587.4975,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 60589.2047,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        },
+        {
+          "atMs": 61575.0581,
+          "generation": 1,
+          "online": 40,
+          "total": 40
+        }
+      ],
+      "lockReveal": {
+        "status": "PASS",
+        "clients": 40,
+        "lockMs": 639.9148999999998,
+        "revealMs": 857.9304999999986,
+        "activeAtLock": 4,
+        "activeAtReveal": 4
+      },
+      "pdfs": [
+        {
+          "client": 1,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1890.2518,
+          "firstByteMs": 1892.7952999999998,
+          "totalMs": 56084.1453,
+          "bodyMs": 54193.8935,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 2,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1838.839,
+          "firstByteMs": 1841.8068999999996,
+          "totalMs": 55980.6411,
+          "bodyMs": 54141.8021,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 3,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1856.694700000001,
+          "firstByteMs": 1859.1866,
+          "totalMs": 56031.7007,
+          "bodyMs": 54175.006,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 4,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1917.5847000000003,
+          "firstByteMs": 1938.2236999999996,
+          "totalMs": 56101.5869,
+          "bodyMs": 54184.0022,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        }
+      ],
+      "eventLoopDelay": {
+        "n": 547,
+        "p50": 1.538700000000972,
+        "p95": 8.624499999999898,
+        "max": 15.383499999996275
+      },
+      "rawAcks": [
+        {
+          "ms": 152.76419999999962,
+          "accepted": true
+        },
+        {
+          "ms": 154.7495999999992,
+          "accepted": true
+        },
+        {
+          "ms": 165.52609999999913,
+          "accepted": true
+        },
+        {
+          "ms": 167.53210000000036,
+          "accepted": true
+        },
+        {
+          "ms": 167.8628000000008,
+          "accepted": true
+        },
+        {
+          "ms": 173.9997999999996,
+          "accepted": true
+        },
+        {
+          "ms": 182.07929999999942,
+          "accepted": true
+        },
+        {
+          "ms": 208.85879999999997,
+          "accepted": true
+        },
+        {
+          "ms": 191.29330000000118,
+          "accepted": true
+        },
+        {
+          "ms": 217.1780000000017,
+          "accepted": true
+        },
+        {
+          "ms": 226.0506000000005,
+          "accepted": true
+        },
+        {
+          "ms": 243.22040000000015,
+          "accepted": true
+        },
+        {
+          "ms": 234.34399999999914,
+          "accepted": true
+        },
+        {
+          "ms": 269.761199999999,
+          "accepted": true
+        },
+        {
+          "ms": 251.8197,
+          "accepted": true
+        },
+        {
+          "ms": 260.58210000000145,
+          "accepted": true
+        },
+        {
+          "ms": 474.1767,
+          "accepted": true
+        },
+        {
+          "ms": 483.51270000000113,
+          "accepted": true
+        },
+        {
+          "ms": 278.76780000000144,
+          "accepted": true
+        },
+        {
+          "ms": 288.0824999999986,
+          "accepted": true
+        },
+        {
+          "ms": 297.71180000000095,
+          "accepted": true
+        },
+        {
+          "ms": 306.5767999999989,
+          "accepted": true
+        },
+        {
+          "ms": 315.1881999999987,
+          "accepted": true
+        },
+        {
+          "ms": 324.41220000000067,
+          "accepted": true
+        },
+        {
+          "ms": 333.83380000000034,
+          "accepted": true
+        },
+        {
+          "ms": 350.9448000000011,
+          "accepted": true
+        },
+        {
+          "ms": 370.0056999999997,
+          "accepted": true
+        },
+        {
+          "ms": 342.35729999999967,
+          "accepted": true
+        },
+        {
+          "ms": 360.5635999999995,
+          "accepted": true
+        },
+        {
+          "ms": 378.8149999999987,
+          "accepted": true
+        },
+        {
+          "ms": 387.8556000000008,
+          "accepted": true
+        },
+        {
+          "ms": 396.2929000000004,
+          "accepted": true
+        },
+        {
+          "ms": 405.60360000000037,
+          "accepted": true
+        },
+        {
+          "ms": 413.88300000000163,
+          "accepted": true
+        },
+        {
+          "ms": 422.584499999999,
+          "accepted": true
+        },
+        {
+          "ms": 430.7624999999989,
+          "accepted": true
+        },
+        {
+          "ms": 439.73659999999836,
+          "accepted": true
+        },
+        {
+          "ms": 448.03519999999844,
+          "accepted": true
+        },
+        {
+          "ms": 465.48279999999977,
+          "accepted": true
+        },
+        {
+          "ms": 456.8554000000004,
+          "accepted": true
+        }
+      ],
+      "ack": {
+        "n": 40,
+        "p50": 306.5767999999989,
+        "p95": 465.48279999999977,
+        "max": 483.51270000000113
+      },
+      "detail": {
+        "client": 40,
+        "status": 200,
+        "bytes": 348,
+        "headersMs": 157.5038000000004,
+        "firstByteMs": 165.98409999999967,
+        "totalMs": 166.01120000000083,
+        "bodyMs": 8.507400000000416,
+        "hashOk": true,
+        "mime": "application/json",
+        "attempts": [
+          200
+        ]
+      },
+      "progress": 40,
+      "elapsedAfterFirstMs": 54480.330700000006,
+      "pingLatency": {
+        "n": 783,
+        "p50": 84.03830000000016,
+        "p95": 512.3531999999996,
+        "max": 1548.8477000000003
+      },
+      "counters": {
+        "http": 45,
+        "studentWsFrames": 864,
+        "studentWsUtf8Bytes": 167352,
+        "receivedFrames": 1688,
+        "offline": 0,
+        "unexpectedOffline": 0,
+        "reauth": 0,
+        "auth": 40,
+        "sync": 280,
+        "pongs": 784,
+        "wsErrors": 0
+      },
+      "native": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 419430748,
+        "pendingHigh": 5,
+        "sendWaitMaxMs": 130.0001,
+        "sendWaitMs": 2079.1432999999297,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 40,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 4,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 12801,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 5,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 5,
+          "REALTIME:pong": 783,
+          "REALTIME:question_revealed": 132,
+          "REALTIME:question_state_changed": 240,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 280,
+          "REALTIME:submission_acknowledged": 40,
+          "REALTIME:submission_result": 132
+        },
+        "teacherWsUtf8BytesReserved": 562014508
+      },
+      "status": "PASS"
+    }
+  ]
+}

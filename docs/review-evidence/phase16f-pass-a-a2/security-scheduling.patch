@@ -1,0 +1,615 @@
+diff --git a/apps/relay/src/admission.js b/apps/relay/src/admission.js
+index e69de29..abcfdeb 100644
+--- a/apps/relay/src/admission.js
++++ b/apps/relay/src/admission.js
+@@ -0,0 +1,116 @@
++// Local admission bounds protect expensive dispatch, not globally distributed DoS.
++// No credentials, participant IDs or Classroom data are retained here.
++const RULES = Object.freeze({
++  enroll: { burst: 8, rate: 0.1, globalBurst: 32, globalRate: 0.2 },
++  operator: { burst: 16, rate: 1, globalBurst: 32, globalRate: 2 },
++  teacher: { burst: 80, rate: 4, globalBurst: 256, globalRate: 16 },
++  bootstrap: { burst: 160, rate: 16, globalBurst: 512, globalRate: 64 },
++  join: { burst: 80, rate: 4, globalBurst: 256, globalRate: 16 },
++  socket: { burst: 128, rate: 8, globalBurst: 512, globalRate: 32 },
++  http: { burst: 256, rate: 64, globalBurst: 1024, globalRate: 256 },
++  unknown: { burst: 32, rate: 2, globalBurst: 128, globalRate: 8 },
++});
++const MAX_IP_RECORDS = 1024;
++const IDLE_RECORD_MS = 10 * 60 * 1000;
++const MAX_PENDING_ISOLATE = 128;
++const MAX_PENDING_IP = 64;
++
++function route(path) {
++  if (!path.startsWith("/v1/")) return null;
++  if (path === "/v1/enroll") return "enroll";
++  if (path.startsWith("/v1/operator/")) return "operator";
++  if (path.startsWith("/v1/teacher/")) return "teacher";
++  if (/^\/v1\/sessions\/[^/]+\/bootstrap$/.test(path)) return "bootstrap";
++  if (/^\/v1\/sessions\/[^/]+\/join$/.test(path)) return "join";
++  if (/^\/v1\/sessions\/[^/]+\/ws$/.test(path)) return "socket";
++  if (/^\/v1\/sessions\/[^/]+\/http\//.test(path)) return "http";
++  return "unknown";
++}
++
++function available(bucket, burst, rate, now) {
++  return Math.min(burst, bucket.tokens + Math.max(0, now - bucket.at) * rate / 1000);
++}
++function take(bucket, tokens, now) {
++  bucket.tokens = tokens - 1;
++  bucket.at = now;
++}
++
++export class PublicAdmission {
++  constructor(now = Date.now) {
++    this.now = now;
++    this.lastNow = 0;
++    this.ips = new Map();
++    this.buckets = new Map();
++    this.pending = 0;
++    this.nextSweep = 0;
++  }
++
++  acquire(request) {
++    const kind = route(new URL(request.url).pathname);
++    if (!kind) return () => {};
++    const now = Math.max(this.lastNow, this.now());
++    this.lastNow = now;
++    const rule = RULES[kind];
++    const global = this.buckets.get(kind) ?? { tokens: rule.globalBurst, at: now };
++    const globalTokens = available(global, rule.globalBurst, rule.globalRate, now);
++    // Rejected traffic must not allocate attacker-chosen keys or fill the map.
++    if (this.pending >= MAX_PENDING_ISOLATE || globalTokens < 1) return null;
++    // Cloudflare replaces this header at the public edge. Never fall back to
++    // X-Forwarded-For, arbitrary participant headers or user-supplied tokens.
++    // Missing/invalid platform metadata shares one conservative local bucket.
++    const address = request.headers.get("cf-connecting-ip");
++    const ip = address && address.length <= 64 && /^[0-9a-fA-F:.]+$/.test(address)
++      ? address : "unknown";
++    let entry = this.ips.get(ip);
++    if (!entry) {
++      if (this.ips.size >= MAX_IP_RECORDS) {
++        if (now >= this.nextSweep) {
++          this.nextSweep = now + 10000;
++          for (const [key, candidate] of this.ips) {
++            // Every bucket fully refills within this idle period. Evicting only
++            // idle, inactive entries prevents key churn from resetting debt.
++            if (!candidate.pending && now - candidate.lastSeen >= IDLE_RECORD_MS) this.ips.delete(key);
++          }
++        }
++        if (this.ips.size >= MAX_IP_RECORDS) return null;
++      }
++      entry = { pending: 0, lastSeen: now, buckets: new Map() };
++      this.ips.set(ip, entry);
++    }
++    entry.lastSeen = now;
++    if (entry.pending >= MAX_PENDING_IP) return null;
++    const local = entry.buckets.get(kind) ?? { tokens: rule.burst, at: now };
++    const localTokens = available(local, rule.burst, rule.rate, now);
++    if (localTokens < 1) return null;
++    take(local, localTokens, now); take(global, globalTokens, now);
++    entry.buckets.set(kind, local); this.buckets.set(kind, global);
++    this.pending += 1; entry.pending += 1;
++    let released = false;
++    return () => {
++      if (released) return;
++      released = true;
++      this.pending -= 1; entry.pending -= 1;
++    };
++  }
++}
++
++export class SessionAdmission {
++  constructor(now = Date.now) {
++    this.now = now;
++    this.lastNow = 0;
++    this.buckets = new Map();
++  }
++
++  allow(path) {
++    const kind = ({ "/join": "join", "/student-ws": "socket", "/http-read": "http" })[path];
++    if (!kind) return true;
++    const now = Math.max(this.lastNow, this.now());
++    this.lastNow = now;
++    const rule = RULES[kind];
++    const bucket = this.buckets.get(kind) ?? { tokens: rule.burst, at: now };
++    const tokens = available(bucket, rule.burst, rule.rate, now);
++    if (tokens < 1) return false;
++    take(bucket, tokens, now); this.buckets.set(kind, bucket);
++    return true;
++  }
++}
+diff --git a/apps/relay/src/http_relay.js b/apps/relay/src/http_relay.js
+index 470e430..2cfce3e 100644
+--- a/apps/relay/src/http_relay.js
++++ b/apps/relay/src/http_relay.js
+@@ -63,19 +63,37 @@ export function httpError(code, status = 503) {
+     headers: { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+ }
+
++function validPrivateRequest(body) {
++  return hasKeys(body, ["identity", "request"]) && hasKeys(body.identity, ["sessionId", "participantId", "credential"])
++    && UUID_PATTERN.test(body.identity.sessionId ?? "") && UUID_PATTERN.test(body.identity.participantId ?? "")
++    && SECRET_PATTERN.test(body.identity.credential ?? "") && validHttpOperation(body.request);
++}
++
++// This is an ephemeral admission key, not proof of identity. A forged participant
++// ID with a different bearer must not reserve the real participant's bucket.
++// Compute before the caller snapshots generation/Teacher; open remains atomic.
++// Rust still authenticates every read. Neither the key nor credential is durable.
++export async function httpQuotaOwner(body) {
++  if (!validPrivateRequest(body)) return null;
++  const { sessionId, participantId, credential } = body.identity;
++  const bytes = new TextEncoder().encode(JSON.stringify([sessionId, participantId, credential]));
++  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
++  return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
++}
++
+ // Nothing in this map is durable. No credential, request body or domain result is
+ // stored in attachments/KV/SQLite. Pending responses keep at most one credit window.
+ export class HttpRelay {
+-  constructor(send, schedule, now = Date.now, keepAlive = () => {}) { this.pending = new Map(); this.send = send; this.schedule = schedule; this.now = now; this.keepAlive = keepAlive; }
++  constructor(send, schedule, now = Date.now, keepAlive = () => {}) {
++    this.pending = new Map(); this.send = send; this.schedule = schedule; this.now = now; this.keepAlive = keepAlive;
++    this.queuedCredits = new Map(); this.creditTimer = null;
++  }
+
+-  open(request, body, generation, teacher) {
+-    if (!hasKeys(body, ["identity", "request"]) || !hasKeys(body.identity, ["sessionId", "participantId", "credential"])
+-      || !UUID_PATTERN.test(body.identity.sessionId ?? "") || !UUID_PATTERN.test(body.identity.participantId ?? "")
+-      || !SECRET_PATTERN.test(body.identity.credential ?? "") || !validHttpOperation(body.request)) {
++  open(request, body, generation, teacher, owner) {
++    if (!validPrivateRequest(body) || !/^[a-f0-9]{64}$/.test(owner ?? "")) {
+       return httpError("MALFORMED_MESSAGE", 400);
+     }
+     const media = body.request.operation === "SESSION_ASSET_GET";
+-    const owner = body.identity.sessionId + ":" + body.identity.participantId;
+     const owned = [...this.pending.values()].filter(p => p.owner === owner);
+     if (this.pending.size >= HTTP_LIMITS.requests || owned.length >= HTTP_LIMITS.participantRequests
+       || (media && (owned.some(p => p.media) || [...this.pending.values()].filter(p => p.media).length >= HTTP_LIMITS.media))) {
+@@ -105,6 +123,23 @@ export class HttpRelay {
+   }
+
+   credit(entry, count) {
++    if (entry.ended || !this.pending.has(entry.id)) return;
++    if (count === HTTP_WINDOW) { this.sendCredit(entry, count); return; }
++    const queued = (this.queuedCredits.get(entry) ?? 0) + count;
++    if (queued > HTTP_WINDOW || entry.credits + queued > HTTP_WINDOW) { this.fail(entry, "RESPONSE_INVALID"); return; }
++    this.queuedCredits.set(entry, queued);
++    if (this.creditTimer !== null) return;
++    // Immediate pull -> CREDIT -> CHUNK callbacks can monopolize event delivery
++    // under concurrent streams. One bounded task boundary lets AUTH/realtime and
++    // independent HTTP requests run before replenishing the same credit window.
++    this.creditTimer = setTimeout(() => {
++      this.creditTimer = null;
++      const credits = [...this.queuedCredits]; this.queuedCredits.clear();
++      for (const [pending, amount] of credits) this.sendCredit(pending, amount);
++    }, 0);
++  }
++
++  sendCredit(entry, count) {
+     if (entry.ended || !this.pending.has(entry.id)) return;
+     entry.credits += count;
+     const raw = encodeEnvelope("HTTP_RELAY", entry.id, { op: "HTTP_CREDIT", generation: entry.generation, credits: count });
+@@ -122,6 +157,10 @@ export class HttpRelay {
+   }
+
+   remove(entry) {
++    this.queuedCredits.delete(entry);
++    if (this.queuedCredits.size === 0 && this.creditTimer !== null) {
++      clearTimeout(this.creditTimer); this.creditTimer = null;
++    }
+     this.pending.delete(entry.id);
+     entry.signal.removeEventListener("abort", entry.abort);
+     entry.queue.length = 0;
+diff --git a/apps/relay/src/lifecycle.js b/apps/relay/src/lifecycle.js
+index 2843d76..e48351f 100644
+--- a/apps/relay/src/lifecycle.js
++++ b/apps/relay/src/lifecycle.js
+@@ -35,8 +35,11 @@ export function invalidateStudents(ctx, meta, now, authTimeoutMs = 5000) {
+       if (!attachment) { student.close(1008, "Invalid connection"); continue; }
+       const online = meta?.status === "OPEN";
+       const generation = meta?.teacherGeneration ?? attachment.generation;
++      // This routing marker grants no authority. It only distinguishes frames
++      // already in flight from a previously validated socket during re-auth.
++      const reauthPending = attachment.authState === "AUTHENTICATED" || attachment.reauthPending === true;
+       student.serializeAttachment({ role: "student", connectionId: attachment.connectionId, generation,
+-        authState: online ? "UNAUTHENTICATED" : "TEACHER_OFFLINE",
++        authState: online ? "UNAUTHENTICATED" : "TEACHER_OFFLINE", reauthPending,
+         authDeadline: online ? now + authTimeoutMs : null, authRequestId: null });
+       student.send(control(online ? "REAUTH_REQUIRED" : "teacher_offline", crypto.randomUUID(), { generation }));
+     } catch {
+diff --git a/apps/relay/src/worker.js b/apps/relay/src/worker.js
+index e4c6bc0..6a36bc1 100644
+--- a/apps/relay/src/worker.js
++++ b/apps/relay/src/worker.js
+@@ -1,4 +1,5 @@
+-import { HttpRelay, publicHttpRequest, httpError } from "./http_relay.js";
++import { HttpRelay, publicHttpRequest, httpError, httpQuotaOwner } from "./http_relay.js";
++import { PublicAdmission, SessionAdmission } from "./admission.js";
+ import { DurableObject } from "cloudflare:workers";
+ import {
+   MAX_ENVELOPE_BYTES, REMOTE_PROTOCOL_VERSION, SECRET_PATTERN,
+@@ -8,6 +9,7 @@ import {
+ import { disconnectTeacher, ensureTeacherDeadline, expireRelay, expireTeacher, invalidateStudents } from "./lifecycle.js";
+
+ const encoder = new TextEncoder();
++const publicAdmission = new PublicAdmission();
+ const REMOTE_SESSION_BYTES = 24;
+ const CREDENTIAL_BYTES = 32;
+ const MAX_CONTROL_BODY_BYTES = 4096;
+@@ -66,23 +68,32 @@ async function bodyJson(request) {
+   if (!reader) return null;
+   const chunks = [];
+   let size = 0;
+-  while (true) {
+-    const next = await reader.read();
+-    if (next.done) break;
+-    size += next.value.byteLength;
+-    if (size > MAX_CONTROL_BODY_BYTES) {
+-      await reader.cancel();
+-      return null;
+-    }
+-    chunks.push(next.value);
+-  }
+-  const bytes = new Uint8Array(size);
+-  let offset = 0;
+-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
++  let timer;
++  const deadlineAt = Date.now() + 5000;
++  const deadline = new Promise(resolve => { timer = setTimeout(() => resolve(null), 5000); });
++  // A slow client must not retain a public admission slot indefinitely. Cancel
++  // is deliberately not awaited: a stalled underlying source may never settle.
++  const cancel = () => { void reader.cancel().catch(() => {}); };
+   try {
++    while (true) {
++      const next = await Promise.race([reader.read(), deadline]);
++      if (next === null || Date.now() >= deadlineAt) { cancel(); return null; }
++      if (next.done) break;
++      size += next.value.byteLength;
++      if (size > MAX_CONTROL_BODY_BYTES) { cancel(); return null; }
++      if (next.value.byteLength) chunks.push(next.value);
++    }
++    const bytes = new Uint8Array(size);
++    let offset = 0;
++    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+     const value = JSON.parse(new TextDecoder().decode(bytes));
+     return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+-  } catch { return null; }
++  } catch {
++    cancel(); return null;
++  } finally {
++    clearTimeout(timer);
++    reader.releaseLock();
++  }
+ }
+
+ async function installation(request, env) {
+@@ -272,7 +283,10 @@ function staticHeaders(response, request) {
+
+ export default {
+   async fetch(request, env) {
++    let release;
+     try {
++      release = publicAdmission.acquire(request);
++      if (!release) return error("REMOTE_SERVICE_UNAVAILABLE", 429);
+       const path = new URL(request.url).pathname;
+       if (path === "/v1/operator/activation-codes" && request.method === "POST") {
+         return await operatorActivation(request, env);
+@@ -314,6 +328,8 @@ export default {
+       return staticHeaders(await env.ASSETS.fetch(request), request);
+     } catch {
+       return error("REMOTE_SERVICE_UNAVAILABLE", 503);
++    } finally {
++      release?.();
+     }
+   },
+ };
+@@ -321,6 +337,7 @@ export default {
+ export class ClassroomSession extends DurableObject {
+   constructor(ctx, env) {
+     super(ctx, env);
++    this.admission = new SessionAdmission();
+     this.pendingJoins = new Map();
+     this.http = new HttpRelay((teacher, raw) => this.sendToTeacher(teacher, raw),
+       () => this.ctx.waitUntil(this.scheduleAlarm()), Date.now, promise => this.ctx.waitUntil(promise));
+@@ -431,12 +448,14 @@ export class ClassroomSession extends DurableObject {
+   }
+
+   rejectSocket(socket, code, id = null) {
+-    socket.send(transportError(code, id));
+-    socket.close(1008, "Invalid transport operation");
++    const raw = transportError(code, id);
++    try { socket.send(raw); } catch { /* peer already closed */ }
++    try { socket.close(1008, "Invalid transport operation"); } catch { /* already closed */ }
+   }
+
+   async fetch(request) {
+     const path = new URL(request.url).pathname;
++    if (!this.admission.allow(path)) return error("REMOTE_SERVICE_UNAVAILABLE", 429);
+     if (path === "/create" && request.method === "POST") {
+       const body = await request.json();
+       if (this.meta() || !SESSION_ID_PATTERN.test(body.remoteSessionId ?? "")
+@@ -460,10 +479,12 @@ export class ClassroomSession extends DurableObject {
+     }
+     if (path === "/http-read" && request.method === "POST") {
+       const body = await request.json();
++      const owner = await httpQuotaOwner(body);
++      if (!owner) return httpError("MALFORMED_MESSAGE", 400);
+       const meta = this.checkedMeta();
+       const teacher = this.teacher(meta);
+       if (!teacher) return httpError("TEACHER_UNAVAILABLE");
+-      return this.http.open(request, body, meta.teacherGeneration, teacher);
++      return this.http.open(request, body, meta.teacherGeneration, teacher, owner);
+     }
+     if (path === "/join" && request.method === "POST") {
+       const body = await request.json();
+@@ -626,6 +647,14 @@ export class ClassroomSession extends DurableObject {
+           this.rejectSocket(socket, "TEACHER_UNAVAILABLE", value.id);
+           return;
+         }
++        // A previously authenticated socket can have old realtime frames in
++        // flight when a wake/generation transition requires fresh Rust AUTH.
++        // Drop only valid old frames during the existing bounded re-auth window;
++        // never forward, acknowledge or queue them before AUTH succeeds.
++        if (attachment.reauthPending === true
++          && ["UNAUTHENTICATED", "PENDING_AUTH"].includes(attachment.authState)
++          && value.type === "REALTIME" && hasKeys(value.payload, ["message"])
++          && clientRealtime(value.payload.message)) return;
+         if (attachment.authState !== "UNAUTHENTICATED") {
+           this.rejectSocket(socket, "AUTH_REJECTED", value.id);
+           return;
+@@ -708,7 +737,7 @@ export class ClassroomSession extends DurableObject {
+       const response = encodeEnvelope("AUTH", value.id, { accepted: payload.accepted, message: payload.message });
+       if (!response) { this.rejectSocket(student, "MESSAGE_TOO_LARGE", value.id); return; }
+       student.serializeAttachment({ ...details, authState: payload.accepted ? "AUTHENTICATED" : "REJECTED",
+-        authRequestId: null, authDeadline: null });
++        authRequestId: null, authDeadline: null, reauthPending: false });
+       student.send(response);
+       if (!payload.accepted) student.close(1008, "Authentication rejected");
+       await this.scheduleAlarm();
+diff --git a/apps/teacher/src-tauri/src/application/remote_participant.rs b/apps/teacher/src-tauri/src/application/remote_participant.rs
+index a22b955..c359a2b 100644
+--- a/apps/teacher/src-tauri/src/application/remote_participant.rs
++++ b/apps/teacher/src-tauri/src/application/remote_participant.rs
+@@ -317,7 +317,20 @@ impl RemoteParticipants {
+             return cached.result.clone();
+         }
+         if self.joins.len() >= MAX_JOIN_ATTEMPTS {
+-            return Err(("REMOTE_SERVICE_UNAVAILABLE", "加入請求過多，請稍後再試。"));
++            // Unauthenticated failures must not reserve the entire recovery cache.
++            // Keep successful credentials until their original expiry; only failed
++            // identity tombstones are best-effort when the bounded cache is full.
++            let oldest_failure = self
++                .joins
++                .iter()
++                .filter(|(_, cached)| cached.result.is_err())
++                .min_by_key(|(_, cached)| cached.expires)
++                .map(|(attempt, _)| *attempt);
++            if let Some(attempt) = oldest_failure {
++                self.joins.remove(&attempt);
++            } else {
++                return Err(("REMOTE_SERVICE_UNAVAILABLE", "加入請求過多，請稍後再試。"));
++            }
+         }
+         let sessions = Arc::clone(&self.sessions);
+         let local_id = self.local_session_id.clone();
+diff --git a/apps/teacher/src-tauri/src/application/remote_http.rs b/apps/teacher/src-tauri/src/application/remote_http.rs
+index d7c29c0..32c38eb 100644
+--- a/apps/teacher/src-tauri/src/application/remote_http.rs
++++ b/apps/teacher/src-tauri/src/application/remote_http.rs
+@@ -6,6 +6,7 @@ use crate::error::AppError;
+ use base64::{engine::general_purpose::STANDARD, Engine};
+ use serde::Deserialize;
+ use serde_json::{json, Value};
++use sha2::{Digest, Sha256};
+ use std::collections::HashMap;
+ use std::sync::Arc;
+ use std::time::{Duration, Instant};
+@@ -66,7 +67,7 @@ struct Pending {
+     media_permit: Option<OwnedSemaphorePermit>,
+     task: Option<JoinHandle<()>>,
+     response: Option<HttpReadResponse>,
+-    participant_id: String,
++    owner: [u8; 32],
+     media: bool,
+     deadline: Instant,
+     progress: Instant,
+@@ -147,10 +148,20 @@ impl RemoteHttp {
+                     return Err(AppError::RemoteProtocolMismatch);
+                 }
+                 let media = matches!(request, HttpOperation::SessionAssetGet { .. });
+-                let owned = self
+-                    .pending
+-                    .values()
+-                    .filter(|p| p.participant_id == identity.participant_id);
++                // Bind provisional quotas to the presented bearer, not its unverified
++                // participant claim. This is not authorization; service.read below
++                // independently authenticates before any asset/domain read.
++                let owner: [u8; 32] = Sha256::digest(
++                    json!([
++                        identity.session_id,
++                        identity.participant_id,
++                        identity.credential
++                    ])
++                    .to_string()
++                    .as_bytes(),
++                )
++                .into();
++                let owned = self.pending.values().filter(|p| p.owner == owner);
+                 if self.pending.len() >= MAX_REQUESTS
+                     || owned.clone().count() >= 4
+                     || (media
+@@ -172,7 +183,6 @@ impl RemoteHttp {
+                 } else {
+                     None
+                 };
+-                let participant_id = identity.participant_id.clone();
+                 let service = self.service.clone();
+                 let instance = self.instance.clone();
+                 let session_id = self.session_id.clone();
+@@ -222,7 +232,7 @@ impl RemoteHttp {
+                         media_permit: None,
+                         task: Some(task),
+                         response: None,
+-                        participant_id,
++                        owner,
+                         media,
+                         deadline: now + if media { MEDIA_TIMEOUT } else { DETAIL_TIMEOUT },
+                         progress: now,
+@@ -410,7 +420,7 @@ mod tests {
+                 media_permit: None,
+                 task: None,
+                 response: None,
+-                participant_id: "fixture".to_owned(),
++                owner: [0; 32],
+                 media: true,
+                 deadline: now + MEDIA_TIMEOUT,
+                 progress: now,
+@@ -560,4 +570,146 @@ mod tests {
+         let prepared = next.prepared().await.expect("authoritative read");
+         assert_eq!(next.ready(prepared)[0]["payload"]["status"], 401);
+     }
++    #[tokio::test]
++    async fn http_native_forged_identity_does_not_reserve_victim_quota() {
++        use crate::infrastructure::persistence::database::Database;
++        use crate::infrastructure::persistence::repositories::{
++            ClassroomRepository, NewClassroom, NewStudent, StudentRepository,
++        };
++        let dir = tempfile::tempdir().expect("isolated application directory");
++        let db = Database::open_in_app_data(dir.path()).expect("database");
++        db.initialize().expect("schema");
++        let classroom = ClassroomRepository::create(
++            &db,
++            NewClassroom {
++                name: "Quota fixture".to_owned(),
++                academic_year: None,
++            },
++        )
++        .expect("classroom");
++        StudentRepository::create(
++            &db,
++            NewStudent {
++                class_id: classroom.id.clone(),
++                seat_number: 1,
++                name: "Synthetic".to_owned(),
++            },
++        )
++        .expect("student");
++        let sessions = super::super::LocalSessionService::initialize(db.clone()).expect("sessions");
++        let quiz = super::super::LiveQuizService::initialize(db, dir.path()).expect("quiz");
++        let remote_id = "a".repeat(32);
++        let instance = format!("remote:{remote_id}");
++        let local = sessions
++            .create(classroom.id, instance.clone())
++            .expect("session");
++        sessions
++            .open_lobby(local.id.clone(), instance.clone())
++            .expect("lobby");
++        let joined = sessions
++            .join(&local.join_code, 1, "Synthetic", &instance)
++            .expect("valid participant");
++        let joined = serde_json::to_value(joined).expect("participant contract");
++        let identity = json!({"sessionId":local.id,"participantId":joined["participantId"],"credential":joined["credential"]});
++        let mut actor = RemoteHttp::new(
++            ParticipantHttpService::new(sessions, quiz),
++            local.id,
++            &remote_id,
++            1,
++            HttpReadBudget::default(),
++        );
++        let request =
++            json!({"operation":"SESSION_ASSET_GET","arguments":{"assetId":Uuid::now_v7()}});
++        let attack = Uuid::now_v7();
++        let victim = Uuid::now_v7();
++        let mut forged = identity.clone();
++        forged["credential"] = json!("B".repeat(43));
++        assert!(actor
++            .handle(&incoming(
++                attack,
++                json!({"op":"HTTP_REQUEST","generation":1,"identity":forged,"request":request})
++            ))
++            .await
++            .expect("bounded attacker read")
++            .is_empty());
++        let admitted = actor
++            .handle(&incoming(
++                victim,
++                json!({"op":"HTTP_REQUEST","generation":1,"identity":identity,"request":request}),
++            ))
++            .await
++            .expect("independent victim admission");
++        assert!(
++            admitted.is_empty(),
++            "claimed ID must not reserve another credential's quota"
++        );
++        assert_eq!(actor.pending.len(), 2);
++        let duplicate = actor
++            .handle(&incoming(
++                Uuid::now_v7(),
++                json!({"op":"HTTP_REQUEST","generation":1,"identity":identity,"request":request}),
++            ))
++            .await
++            .expect("duplicate admission");
++        assert_eq!(
++            duplicate[0]["payload"]["code"],
++            "REMOTE_SERVICE_UNAVAILABLE"
++        );
++        let mut statuses = HashMap::new();
++        for _ in 0..2 {
++            let prepared = actor.prepared().await.expect("authorized response");
++            statuses.insert(prepared.id, prepared.response.status);
++            actor.ready(prepared);
++        }
++        assert_eq!(
++            statuses.get(&attack),
++            Some(&401),
++            "forged credential rejected before asset lookup"
++        );
++        assert_eq!(
++            statuses.get(&victim),
++            Some(&404),
++            "valid identity reaches the missing synthetic asset lookup"
++        );
++        actor.remove(attack);
++        actor.remove(victim);
++        assert!(actor.pending.is_empty());
++        assert_eq!(actor.budget.media.available_permits(), MAX_MEDIA);
++    }
++    #[tokio::test]
++    async fn http_native_rotating_invalid_credentials_cannot_exceed_session_media_budget() {
++        let (mut actor, _dir) = actor();
++        let participant = Uuid::now_v7();
++        let mut ids = Vec::new();
++        for index in 0..=MAX_MEDIA {
++            let id = Uuid::now_v7();
++            let raw = incoming(
++                id,
++                json!({"op":"HTTP_REQUEST","generation":1,
++                "identity":{"sessionId":actor.session_id,"participantId":participant,"credential":format!("{index:043}")},
++                "request":{"operation":"SESSION_ASSET_GET","arguments":{"assetId":Uuid::now_v7()}}}),
++            );
++            let response = actor.handle(&raw).await.expect("bounded admission");
++            if index < MAX_MEDIA {
++                assert!(response.is_empty());
++                ids.push(id);
++            } else {
++                assert_eq!(response[0]["payload"]["code"], "REMOTE_SERVICE_UNAVAILABLE");
++            }
++        }
++        assert_eq!(actor.pending.len(), MAX_MEDIA);
++        for _ in 0..MAX_MEDIA {
++            let response = actor
++                .prepared()
++                .await
++                .expect("Rust rejects forged identities");
++            assert_eq!(response.response.status, 401);
++            actor.ready(response);
++        }
++        for id in ids {
++            actor.remove(id);
++        }
++        assert!(actor.pending.is_empty());
++        assert_eq!(actor.budget.media.available_permits(), MAX_MEDIA);
++    }
+ }

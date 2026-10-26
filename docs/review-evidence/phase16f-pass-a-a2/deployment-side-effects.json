@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-26",
+  "scope": "Read-only inspection; no deployment, build trigger, settings mutation or credential refresh/login",
+  "localGit": {
+    "customHooksPath": false,
+    "activeHooks": [],
+    "coreAutocrlf": "true (unchanged)"
+  },
+  "github": {
+    "repository": "RavenCH-oc/teachTools",
+    "checks": [
+      {
+        "command": "gh api repos/RavenCH-oc/teachTools/actions/workflows",
+        "result": {
+          "total_count": 0
+        }
+      },
+      {
+        "command": "gh api repos/RavenCH-oc/teachTools/actions/runs",
+        "result": {
+          "total_count": 0
+        }
+      },
+      {
+        "command": "gh api repos/RavenCH-oc/teachTools/hooks",
+        "result": []
+      }
+    ],
+    "remoteRefs": {
+      "method": "Connected GitHub read-only Git ref/matching-refs APIs (SSH check failed)",
+      "main": "c5285196a08e412732eb2246efd78e3c9644d15a",
+      "taskBranchExists": false
+    }
+  },
+  "ssh": {
+    "operation": "git ls-remote origin refs/heads/main refs/heads/codex/phase16f-pass-a-a2",
+    "noninteractiveResult": "Permission denied (publickey)",
+    "configurationChanged": false
+  },
+  "cloudflare": {
+    "operation": "GET /accounts using existing Wrangler authentication",
+    "httpStatus": 403,
+    "errorCode": 9109,
+    "error": "Invalid access token",
+    "workersBuildsTriggers": "UNKNOWN",
+    "branchFiltersAndDeployCommands": "UNKNOWN",
+    "pagesGitSourceProductionAndPreview": "UNKNOWN"
+  },
+  "decision": "STOP_BEFORE_PUSH",
+  "reason": "No GitHub workflows/webhooks does not rule out external Cloudflare GitHub App integration; task section 10 requires confirmation before push/PR.",
+  "productionActionsPerformed": []
+}
