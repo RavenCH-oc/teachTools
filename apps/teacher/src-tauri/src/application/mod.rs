@@ -481,3 +481,6 @@ mod tests {
         assert!(service.list_classrooms().expect("list").is_empty());
     }
 }
+
+#[cfg(test)]
+pub(crate) mod remote_capacity_metrics;

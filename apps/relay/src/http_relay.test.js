@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { HttpRelay, HTTP_CHUNK_BYTES, HTTP_WINDOW, HTTP_LIMITS, publicHttpRequest, validHttpOperation } from "./http_relay.js";
 // Runtime-compatible length enforcement for isolated Node transport tests.
@@ -7,6 +8,7 @@ globalThis.FixedLengthStream = class extends TransformStream {
 };
 const uuid = "00000000-0000-4000-8000-000000000001";
 const identity = { sessionId: uuid, participantId: uuid, credential: "A".repeat(43) };
+const quotaOwner = identity => createHash("sha256").update(JSON.stringify([identity.sessionId, identity.participantId, identity.credential])).digest("hex");
 const headers = () => new Headers({ authorization: "Bearer " + identity.credential, "x-classroom-session": uuid, "x-classroom-participant": uuid });
 const operation = { operation: "PEER_REVIEW_ACTIVITIES_LIST", arguments: { page: {} } };
 function fixture(media = false) {
@@ -14,7 +16,7 @@ function fixture(media = false) {
   const relay = new HttpRelay((socket, raw) => { frames.push(JSON.parse(raw)); return true; }, () => {}, () => now);
   const controller = new AbortController();
   const response = relay.open(new Request("http://test/", { signal: controller.signal }), { identity,
-    request: media ? { operation: "SESSION_ASSET_GET", arguments: { assetId: uuid } } : operation }, 1, teacher);
+    request: media ? { operation: "SESSION_ASSET_GET", arguments: { assetId: uuid } } : operation }, 1, teacher, quotaOwner(identity));
   const id = frames[0].id;
   const send = payload => relay.handle({ id, payload: { generation: 1, ...payload } }, teacher);
   return { relay, frames, teacher, controller, response, id, send, advance: ms => { now += ms; relay.expire(); } };
@@ -107,7 +109,7 @@ test("metadata is an allowlist and cannot forward cookies, paths or arbitrary MI
 });
 test("explicit per participant and Session request/media bounds fail retryably", async () => {
   const f=fixture(true);
-  const response=await f.relay.open(new Request("http://test/"),{identity,request:{operation:"SESSION_ASSET_GET",arguments:{assetId:uuid}}},1,f.teacher);
+  const response=await f.relay.open(new Request("http://test/"),{identity,request:{operation:"SESSION_ASSET_GET",arguments:{assetId:uuid}}},1,f.teacher,quotaOwner(identity));
   assert.equal(response.status,429); assert.equal(f.relay.pending.size,1);
   f.relay.failAll(); await f.response;
 });
@@ -124,14 +126,45 @@ test("Session-wide and per-participant request/media limits are bounded", async 
     const responses=[];
     for(let index=0;index<count;index++){
       const owner={...identity,participantId:crypto.randomUUID()};
-      responses.push(relay.open(new Request("http://test/"),{identity:owner,request:media?{operation:"SESSION_ASSET_GET",arguments:{assetId:uuid}}:operation},1,teacher));
+      responses.push(relay.open(new Request("http://test/"),{identity:owner,request:media?{operation:"SESSION_ASSET_GET",arguments:{assetId:uuid}}:operation},1,teacher,quotaOwner(owner)));
     }
-    const rejected=await relay.open(new Request("http://test/"),{identity:{...identity,participantId:crypto.randomUUID()},request:media?{operation:"SESSION_ASSET_GET",arguments:{assetId:uuid}}:operation},1,teacher);
+    const rejectedIdentity={...identity,participantId:crypto.randomUUID()};
+    const rejected=await relay.open(new Request("http://test/"),{identity:rejectedIdentity,request:media?{operation:"SESSION_ASSET_GET",arguments:{assetId:uuid}}:operation},1,teacher,quotaOwner(rejectedIdentity));
     assert.equal(rejected.status,429);assert.equal(relay.pending.size,count);
     relay.failAll();await Promise.all(responses);
   }
   const f=fixture();const responses=[];
-  for(let index=0;index<3;index++)responses.push(f.relay.open(new Request("http://test/"),{identity,request:operation},1,f.teacher));
-  assert.equal((await f.relay.open(new Request("http://test/"),{identity,request:operation},1,f.teacher)).status,429);
+  for(let index=0;index<3;index++)responses.push(f.relay.open(new Request("http://test/"),{identity,request:operation},1,f.teacher,quotaOwner(identity)));
+  assert.equal((await f.relay.open(new Request("http://test/"),{identity,request:operation},1,f.teacher,quotaOwner(identity))).status,429);
   assert.equal(f.relay.pending.size,4);f.relay.failAll();await Promise.all([f.response,...responses]);
+});
+
+
+test("A2 cancellation discards scheduled CREDIT before another Teacher generation can receive it", async () => {
+  const f = fixture(true); start(f, HTTP_CHUNK_BYTES * 4, "application/pdf");
+  const response = await f.response; const reader = response.body.getReader();
+  const first = reader.read(); chunk(f, 0, Buffer.alloc(HTTP_CHUNK_BYTES));
+  await first;
+  assert.equal(f.frames.filter(frame => frame.payload.op === "HTTP_CREDIT").length, 1, "only initial four-credit grant is synchronous");
+  assert.ok(f.relay.queuedCredits.size <= HTTP_LIMITS.requests);
+  for (const credits of f.relay.queuedCredits.values()) assert.ok(credits <= HTTP_WINDOW);
+  f.relay.failAll();
+  await assert.rejects(reader.read(), /interrupted/);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(f.frames.filter(frame => frame.payload.op === "HTTP_CREDIT").length, 1, "canceled generation must not emit replenishment later");
+  assert.equal(f.relay.queuedCredits.size, 0);
+  assert.equal(f.relay.creditTimer, null);
+  assert.equal(f.relay.pending.size, 0);
+});
+
+test("A2 valid stream completion removes any queued CREDIT and timer", async () => {
+  const f = fixture(true); start(f, 1, "application/pdf");
+  const response = await f.response; const body = response.arrayBuffer();
+  chunk(f, 0, Buffer.from([42])); f.send({ op: "HTTP_RESPONSE_END", chunks: 1, bytes: 1 });
+  assert.deepEqual(Buffer.from(await body), Buffer.from([42]));
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(f.frames.filter(frame => frame.payload.op === "HTTP_CREDIT").length, 1);
+  assert.equal(f.relay.queuedCredits.size, 0);
+  assert.equal(f.relay.creditTimer, null);
+  assert.equal(f.relay.pending.size, 0);
 });

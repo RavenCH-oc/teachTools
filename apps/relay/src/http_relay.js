@@ -63,19 +63,37 @@ export function httpError(code, status = 503) {
     headers: { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
 }
 
+function validPrivateRequest(body) {
+  return hasKeys(body, ["identity", "request"]) && hasKeys(body.identity, ["sessionId", "participantId", "credential"])
+    && UUID_PATTERN.test(body.identity.sessionId ?? "") && UUID_PATTERN.test(body.identity.participantId ?? "")
+    && SECRET_PATTERN.test(body.identity.credential ?? "") && validHttpOperation(body.request);
+}
+
+// This is an ephemeral admission key, not proof of identity. A forged participant
+// ID with a different bearer must not reserve the real participant's bucket.
+// Compute before the caller snapshots generation/Teacher; open remains atomic.
+// Rust still authenticates every read. Neither the key nor credential is durable.
+export async function httpQuotaOwner(body) {
+  if (!validPrivateRequest(body)) return null;
+  const { sessionId, participantId, credential } = body.identity;
+  const bytes = new TextEncoder().encode(JSON.stringify([sessionId, participantId, credential]));
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
 // Nothing in this map is durable. No credential, request body or domain result is
 // stored in attachments/KV/SQLite. Pending responses keep at most one credit window.
 export class HttpRelay {
-  constructor(send, schedule, now = Date.now, keepAlive = () => {}) { this.pending = new Map(); this.send = send; this.schedule = schedule; this.now = now; this.keepAlive = keepAlive; }
+  constructor(send, schedule, now = Date.now, keepAlive = () => {}) {
+    this.pending = new Map(); this.send = send; this.schedule = schedule; this.now = now; this.keepAlive = keepAlive;
+    this.queuedCredits = new Map(); this.creditTimer = null;
+  }
 
-  open(request, body, generation, teacher) {
-    if (!hasKeys(body, ["identity", "request"]) || !hasKeys(body.identity, ["sessionId", "participantId", "credential"])
-      || !UUID_PATTERN.test(body.identity.sessionId ?? "") || !UUID_PATTERN.test(body.identity.participantId ?? "")
-      || !SECRET_PATTERN.test(body.identity.credential ?? "") || !validHttpOperation(body.request)) {
+  open(request, body, generation, teacher, owner) {
+    if (!validPrivateRequest(body) || !/^[a-f0-9]{64}$/.test(owner ?? "")) {
       return httpError("MALFORMED_MESSAGE", 400);
     }
     const media = body.request.operation === "SESSION_ASSET_GET";
-    const owner = body.identity.sessionId + ":" + body.identity.participantId;
     const owned = [...this.pending.values()].filter(p => p.owner === owner);
     if (this.pending.size >= HTTP_LIMITS.requests || owned.length >= HTTP_LIMITS.participantRequests
       || (media && (owned.some(p => p.media) || [...this.pending.values()].filter(p => p.media).length >= HTTP_LIMITS.media))) {
@@ -106,6 +124,23 @@ export class HttpRelay {
 
   credit(entry, count) {
     if (entry.ended || !this.pending.has(entry.id)) return;
+    if (count === HTTP_WINDOW) { this.sendCredit(entry, count); return; }
+    const queued = (this.queuedCredits.get(entry) ?? 0) + count;
+    if (queued > HTTP_WINDOW || entry.credits + queued > HTTP_WINDOW) { this.fail(entry, "RESPONSE_INVALID"); return; }
+    this.queuedCredits.set(entry, queued);
+    if (this.creditTimer !== null) return;
+    // Immediate pull -> CREDIT -> CHUNK callbacks can monopolize event delivery
+    // under concurrent streams. One bounded task boundary lets AUTH/realtime and
+    // independent HTTP requests run before replenishing the same credit window.
+    this.creditTimer = setTimeout(() => {
+      this.creditTimer = null;
+      const credits = [...this.queuedCredits]; this.queuedCredits.clear();
+      for (const [pending, amount] of credits) this.sendCredit(pending, amount);
+    }, 0);
+  }
+
+  sendCredit(entry, count) {
+    if (entry.ended || !this.pending.has(entry.id)) return;
     entry.credits += count;
     const raw = encodeEnvelope("HTTP_RELAY", entry.id, { op: "HTTP_CREDIT", generation: entry.generation, credits: count });
     if (!this.send(entry.teacher, raw)) this.fail(entry, "TEACHER_UNAVAILABLE");
@@ -122,6 +157,10 @@ export class HttpRelay {
   }
 
   remove(entry) {
+    this.queuedCredits.delete(entry);
+    if (this.queuedCredits.size === 0 && this.creditTimer !== null) {
+      clearTimeout(this.creditTimer); this.creditTimer = null;
+    }
     this.pending.delete(entry.id);
     entry.signal.removeEventListener("abort", entry.abort);
     entry.queue.length = 0;

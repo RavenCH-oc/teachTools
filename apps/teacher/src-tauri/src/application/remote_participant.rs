@@ -317,7 +317,20 @@ impl RemoteParticipants {
             return cached.result.clone();
         }
         if self.joins.len() >= MAX_JOIN_ATTEMPTS {
-            return Err(("REMOTE_SERVICE_UNAVAILABLE", "加入請求過多，請稍後再試。"));
+            // Unauthenticated failures must not reserve the entire recovery cache.
+            // Keep successful credentials until their original expiry; only failed
+            // identity tombstones are best-effort when the bounded cache is full.
+            let oldest_failure = self
+                .joins
+                .iter()
+                .filter(|(_, cached)| cached.result.is_err())
+                .min_by_key(|(_, cached)| cached.expires)
+                .map(|(attempt, _)| *attempt);
+            if let Some(attempt) = oldest_failure {
+                self.joins.remove(&attempt);
+            } else {
+                return Err(("REMOTE_SERVICE_UNAVAILABLE", "加入請求過多，請稍後再試。"));
+            }
         }
         let sessions = Arc::clone(&self.sessions);
         let local_id = self.local_session_id.clone();

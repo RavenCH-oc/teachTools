@@ -94,6 +94,8 @@ impl ParticipantHttpService {
         expected_session: Option<&str>,
         operation: HttpOperation,
     ) -> HttpReadResponse {
+        #[cfg(test)]
+        let auth_started = std::time::Instant::now();
         if expected_session.is_some_and(|id| id != identity.session_id)
             || self
                 .sessions
@@ -107,6 +109,11 @@ impl ParticipantHttpService {
         {
             return HttpReadResponse::error(401, "AUTH_FAILED", "請重新連線課堂。");
         }
+        #[cfg(test)]
+        super::remote_capacity_metrics::current(
+            "auth_ms",
+            auth_started.elapsed().as_secs_f64() * 1000.0,
+        );
         let s = &identity.session_id;
         let p = &identity.participant_id;
         if let HttpOperation::SessionAssetGet { asset_id } = operation {

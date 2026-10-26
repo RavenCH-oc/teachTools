@@ -35,8 +35,11 @@ export function invalidateStudents(ctx, meta, now, authTimeoutMs = 5000) {
       if (!attachment) { student.close(1008, "Invalid connection"); continue; }
       const online = meta?.status === "OPEN";
       const generation = meta?.teacherGeneration ?? attachment.generation;
+      // This routing marker grants no authority. It only distinguishes frames
+      // already in flight from a previously validated socket during re-auth.
+      const reauthPending = attachment.authState === "AUTHENTICATED" || attachment.reauthPending === true;
       student.serializeAttachment({ role: "student", connectionId: attachment.connectionId, generation,
-        authState: online ? "UNAUTHENTICATED" : "TEACHER_OFFLINE",
+        authState: online ? "UNAUTHENTICATED" : "TEACHER_OFFLINE", reauthPending,
         authDeadline: online ? now + authTimeoutMs : null, authRequestId: null });
       student.send(control(online ? "REAUTH_REQUIRED" : "teacher_offline", crypto.randomUUID(), { generation }));
     } catch {

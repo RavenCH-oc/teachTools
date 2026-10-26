@@ -238,20 +238,52 @@ async fn malformed_domain_message_is_scoped_without_dropping_teacher_transport()
 }
 
 #[tokio::test]
-async fn recovery_is_bounded_and_expiry_does_not_create_duplicate_participants() {
+async fn failed_join_flood_does_not_block_valid_join_or_evict_successful_recovery() {
     let (mut adapter, sessions, _directory) = fixture();
     for _ in 0..MAX_JOIN_ATTEMPTS {
-        join(&mut adapter, Uuid::now_v7(), 99, "invalid").await;
+        assert_eq!(
+            join(&mut adapter, Uuid::now_v7(), 99, "invalid").await["payload"]["error"]["code"],
+            "IDENTITY_MISMATCH"
+        );
     }
+    assert_eq!(adapter.joins.len(), MAX_JOIN_ATTEMPTS);
     let attempt = Uuid::now_v7();
-    assert_eq!(
-        join(&mut adapter, attempt, 12, "王小明").await["payload"]["error"]["code"],
-        "REMOTE_SERVICE_UNAVAILABLE"
+    let first = join(&mut adapter, attempt, 12, "王小明").await;
+    assert!(
+        first["payload"]["result"].is_object(),
+        "failed attempts must not reserve all recovery capacity"
     );
     assert_eq!(adapter.joins.len(), MAX_JOIN_ATTEMPTS);
-    for cached in adapter.joins.values_mut() {
-        cached.expires = Instant::now() - Duration::from_secs(1);
+    for _ in 0..MAX_JOIN_ATTEMPTS {
+        assert_eq!(
+            join(&mut adapter, Uuid::now_v7(), 99, "invalid").await["payload"]["error"]["code"],
+            "IDENTITY_MISMATCH"
+        );
+        assert_eq!(adapter.joins.len(), MAX_JOIN_ATTEMPTS);
     }
+    let local = sessions.active().expect("active").expect("session");
+    sessions
+        .start(local.id.clone(), local.server_instance_id)
+        .expect("start");
+    let recovered = join(&mut adapter, attempt, 12, "王小明").await;
+    assert_eq!(recovered["payload"]["result"], first["payload"]["result"]);
+    assert_eq!(
+        join(&mut adapter, attempt, 12, "wrong").await["payload"]["error"]["code"],
+        "JOIN_ATTEMPT_CONFLICT"
+    );
+    assert_eq!(
+        sessions
+            .list_participants(&local.id)
+            .expect("participants")
+            .len(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn recovery_expiry_does_not_create_duplicate_participants() {
+    let (mut adapter, sessions, _directory) = fixture();
+    let attempt = Uuid::now_v7();
     assert!(join(&mut adapter, attempt, 12, "王小明").await["payload"]["result"].is_object());
     adapter
         .joins
@@ -269,6 +301,33 @@ async fn recovery_is_bounded_and_expiry_does_not_create_duplicate_participants()
             .len(),
         1
     );
+}
+
+#[tokio::test]
+async fn successful_recovery_capacity_stays_bounded_and_fail_closed() {
+    let (mut adapter, sessions, _directory) = fixture();
+    // Exercise admission with a full set of protected successes without creating
+    // 128 unrelated database fixtures. A new attempt must not evict any result.
+    for _ in 0..MAX_JOIN_ATTEMPTS {
+        adapter.joins.insert(
+            Uuid::now_v7(),
+            JoinRecovery {
+                identity_hash: [0; 32],
+                expires: Instant::now() + JOIN_RECOVERY_TTL,
+                result: Ok(json!({"synthetic":true})),
+            },
+        );
+    }
+    assert_eq!(
+        join(&mut adapter, Uuid::now_v7(), 12, "王小明").await["payload"]["error"]["code"],
+        "REMOTE_SERVICE_UNAVAILABLE"
+    );
+    assert_eq!(adapter.joins.len(), MAX_JOIN_ATTEMPTS);
+    assert!(adapter.joins.values().all(|cached| cached.result.is_ok()));
+    assert!(sessions
+        .list_participants(&sessions.active().expect("active").expect("session").id)
+        .expect("participants")
+        .is_empty());
 }
 
 #[tokio::test]

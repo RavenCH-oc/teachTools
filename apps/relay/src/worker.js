@@ -1,4 +1,5 @@
-import { HttpRelay, publicHttpRequest, httpError } from "./http_relay.js";
+import { HttpRelay, publicHttpRequest, httpError, httpQuotaOwner } from "./http_relay.js";
+import { PublicAdmission, SessionAdmission } from "./admission.js";
 import { DurableObject } from "cloudflare:workers";
 import {
   MAX_ENVELOPE_BYTES, REMOTE_PROTOCOL_VERSION, SECRET_PATTERN,
@@ -8,6 +9,7 @@ import {
 import { disconnectTeacher, ensureTeacherDeadline, expireRelay, expireTeacher, invalidateStudents } from "./lifecycle.js";
 
 const encoder = new TextEncoder();
+const publicAdmission = new PublicAdmission();
 const REMOTE_SESSION_BYTES = 24;
 const CREDENTIAL_BYTES = 32;
 const MAX_CONTROL_BODY_BYTES = 4096;
@@ -66,23 +68,32 @@ async function bodyJson(request) {
   if (!reader) return null;
   const chunks = [];
   let size = 0;
-  while (true) {
-    const next = await reader.read();
-    if (next.done) break;
-    size += next.value.byteLength;
-    if (size > MAX_CONTROL_BODY_BYTES) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(next.value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  let timer;
+  const deadlineAt = Date.now() + 5000;
+  const deadline = new Promise(resolve => { timer = setTimeout(() => resolve(null), 5000); });
+  // A slow client must not retain a public admission slot indefinitely. Cancel
+  // is deliberately not awaited: a stalled underlying source may never settle.
+  const cancel = () => { void reader.cancel().catch(() => {}); };
   try {
+    while (true) {
+      const next = await Promise.race([reader.read(), deadline]);
+      if (next === null || Date.now() >= deadlineAt) { cancel(); return null; }
+      if (next.done) break;
+      size += next.value.byteLength;
+      if (size > MAX_CONTROL_BODY_BYTES) { cancel(); return null; }
+      if (next.value.byteLength) chunks.push(next.value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     const value = JSON.parse(new TextDecoder().decode(bytes));
     return value && typeof value === "object" && !Array.isArray(value) ? value : null;
-  } catch { return null; }
+  } catch {
+    cancel(); return null;
+  } finally {
+    clearTimeout(timer);
+    reader.releaseLock();
+  }
 }
 
 async function installation(request, env) {
@@ -148,15 +159,20 @@ async function enroll(request, env) {
     return error("AUTH_REJECTED", 403);
   }
   const now = Date.now();
-  const consumed = await env.INSTALLATIONS.prepare(
-    "UPDATE activation_codes SET consumed_at = ? WHERE code_hash = ? AND consumed_at IS NULL AND expires_at > ? RETURNING code_hash",
-  ).bind(now, await sha256(body.activationCode), now).first();
-  if (!consumed) return error("AUTH_REJECTED", 403);
+  const codeHash = await sha256(body.activationCode);
   const installationId = crypto.randomUUID();
   const installationCredential = randomToken(CREDENTIAL_BYTES);
-  await env.INSTALLATIONS.prepare(
-    "INSERT INTO installations(id, credential_hash, status, created_at, revoked_at) VALUES (?, ?, 'ACTIVE', ?, NULL)",
-  ).bind(installationId, await sha256(installationCredential), now).run();
+  // D1 batch is transactional: a failed insert/consume cannot burn the code or
+  // publish an installation independently of its single-use activation.
+  const results = await env.INSTALLATIONS.batch([
+    env.INSTALLATIONS.prepare(
+      "INSERT INTO installations(id, credential_hash, status, created_at, revoked_at) SELECT ?, ?, 'ACTIVE', ?, NULL FROM activation_codes WHERE code_hash = ? AND consumed_at IS NULL AND expires_at > ?",
+    ).bind(installationId, await sha256(installationCredential), now, codeHash, now),
+    env.INSTALLATIONS.prepare(
+      "UPDATE activation_codes SET consumed_at = ? WHERE code_hash = ? AND consumed_at IS NULL AND EXISTS (SELECT 1 FROM installations WHERE id = ?)",
+    ).bind(now, codeHash, installationId),
+  ]);
+  if (results[0].meta.changes !== 1 || results[1].meta.changes !== 1) return error("AUTH_REJECTED", 403);
   return json({ installationId, installationCredential }, 201);
 }
 
@@ -267,29 +283,32 @@ function staticHeaders(response, request) {
 
 export default {
   async fetch(request, env) {
+    let release;
     try {
+      release = publicAdmission.acquire(request);
+      if (!release) return error("REMOTE_SERVICE_UNAVAILABLE", 429);
       const path = new URL(request.url).pathname;
       if (path === "/v1/operator/activation-codes" && request.method === "POST") {
-        return operatorActivation(request, env);
+        return await operatorActivation(request, env);
       }
       const revoke = /^\/v1\/operator\/installations\/([^/]+)\/revoke$/.exec(path);
-      if (revoke && request.method === "POST") return operatorRevoke(request, env, revoke[1]);
-      if (path === "/v1/enroll" && request.method === "POST") return enroll(request, env);
+      if (revoke && request.method === "POST") return await operatorRevoke(request, env, revoke[1]);
+      if (path === "/v1/enroll" && request.method === "POST") return await enroll(request, env);
       if (path === "/v1/teacher/sessions" && request.method === "POST") {
-        return createSession(request, env);
+        return await createSession(request, env);
       }
       const teacher = /^\/v1\/teacher\/sessions\/([^/]+)(?:\/(tickets|ws))?$/.exec(path);
       if (teacher) {
         const remoteSessionId = teacher[1];
         if (!SESSION_ID_PATTERN.test(remoteSessionId)) return error("MALFORMED_MESSAGE", 400);
         if (teacher[2] === "tickets" && request.method === "POST") {
-          return issueTicket(request, env, remoteSessionId);
+          return await issueTicket(request, env, remoteSessionId);
         }
         if (teacher[2] === "ws" && request.method === "GET") {
-          return teacherSocket(request, env, remoteSessionId);
+          return await teacherSocket(request, env, remoteSessionId);
         }
         if (!teacher[2] && request.method === "DELETE") {
-          return closeSession(request, env, remoteSessionId);
+          return await closeSession(request, env, remoteSessionId);
         }
       }
       const httpRead = /^\/v1\/sessions\/([A-Za-z0-9_-]{32})\/http\/([A-Z_]+)$/.exec(path);
@@ -297,9 +316,9 @@ export default {
       const student = /^\/v1\/sessions\/([^/]+)\/(bootstrap|join|ws)$/.exec(path);
       if (student) {
         if (!SESSION_ID_PATTERN.test(student[1])) return error("MALFORMED_MESSAGE", 400);
-        if (student[2] === "bootstrap" && request.method === "GET") return bootstrap(env, student[1]);
-        if (student[2] === "join" && request.method === "POST") return studentJoin(request, env, student[1]);
-        if (student[2] === "ws" && request.method === "GET") return studentSocket(request, env, student[1]);
+        if (student[2] === "bootstrap" && request.method === "GET") return await bootstrap(env, student[1]);
+        if (student[2] === "join" && request.method === "POST") return await studentJoin(request, env, student[1]);
+        if (student[2] === "ws" && request.method === "GET") return await studentSocket(request, env, student[1]);
       }
       if (path.startsWith("/v1/")) return error("MALFORMED_MESSAGE", 404);
       if (request.method !== "GET" && request.method !== "HEAD") return error("MALFORMED_MESSAGE", 405);
@@ -309,6 +328,8 @@ export default {
       return staticHeaders(await env.ASSETS.fetch(request), request);
     } catch {
       return error("REMOTE_SERVICE_UNAVAILABLE", 503);
+    } finally {
+      release?.();
     }
   },
 };
@@ -316,6 +337,7 @@ export default {
 export class ClassroomSession extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
+    this.admission = new SessionAdmission();
     this.pendingJoins = new Map();
     this.http = new HttpRelay((teacher, raw) => this.sendToTeacher(teacher, raw),
       () => this.ctx.waitUntil(this.scheduleAlarm()), Date.now, promise => this.ctx.waitUntil(promise));
@@ -426,12 +448,14 @@ export class ClassroomSession extends DurableObject {
   }
 
   rejectSocket(socket, code, id = null) {
-    socket.send(transportError(code, id));
-    socket.close(1008, "Invalid transport operation");
+    const raw = transportError(code, id);
+    try { socket.send(raw); } catch { /* peer already closed */ }
+    try { socket.close(1008, "Invalid transport operation"); } catch { /* already closed */ }
   }
 
   async fetch(request) {
     const path = new URL(request.url).pathname;
+    if (!this.admission.allow(path)) return error("REMOTE_SERVICE_UNAVAILABLE", 429);
     if (path === "/create" && request.method === "POST") {
       const body = await request.json();
       if (this.meta() || !SESSION_ID_PATTERN.test(body.remoteSessionId ?? "")
@@ -454,17 +478,20 @@ export class ClassroomSession extends DurableObject {
         status: meta.status === "OPEN" ? "available" : "unavailable" });
     }
     if (path === "/http-read" && request.method === "POST") {
+      const body = await request.json();
+      const owner = await httpQuotaOwner(body);
+      if (!owner) return httpError("MALFORMED_MESSAGE", 400);
       const meta = this.checkedMeta();
       const teacher = this.teacher(meta);
       if (!teacher) return httpError("TEACHER_UNAVAILABLE");
-      return this.http.open(request, await request.json(), meta.teacherGeneration, teacher);
+      return this.http.open(request, body, meta.teacherGeneration, teacher, owner);
     }
     if (path === "/join" && request.method === "POST") {
+      const body = await request.json();
       const meta = this.checkedMeta();
       const teacher = this.teacher(meta);
       if (!teacher) return error("TEACHER_UNAVAILABLE", 503);
       if (this.pendingJoins.size >= MAX_PENDING_JOINS) return error("REMOTE_SERVICE_UNAVAILABLE", 503);
-      const body = await request.json();
       const id = crypto.randomUUID();
       const raw = encodeEnvelope("CONTROL", id, { op: "join", generation: meta.teacherGeneration,
         joinAttemptId: body.joinAttemptId, seatNumber: body.seatNumber, name: body.name });
@@ -561,6 +588,7 @@ export class ClassroomSession extends DurableObject {
         this.put(meta);
         return json({ closed: true });
       });
+      if (!result.ok) return result;
       for (const socket of this.ctx.getWebSockets()) socket.close(1000, "Session closed");
       this.failPendingJoins("SESSION_CLOSED");
       return result;
@@ -619,6 +647,14 @@ export class ClassroomSession extends DurableObject {
           this.rejectSocket(socket, "TEACHER_UNAVAILABLE", value.id);
           return;
         }
+        // A previously authenticated socket can have old realtime frames in
+        // flight when a wake/generation transition requires fresh Rust AUTH.
+        // Drop only valid old frames during the existing bounded re-auth window;
+        // never forward, acknowledge or queue them before AUTH succeeds.
+        if (attachment.reauthPending === true
+          && ["UNAUTHENTICATED", "PENDING_AUTH"].includes(attachment.authState)
+          && value.type === "REALTIME" && hasKeys(value.payload, ["message"])
+          && clientRealtime(value.payload.message)) return;
         if (attachment.authState !== "UNAUTHENTICATED") {
           this.rejectSocket(socket, "AUTH_REJECTED", value.id);
           return;
@@ -701,7 +737,7 @@ export class ClassroomSession extends DurableObject {
       const response = encodeEnvelope("AUTH", value.id, { accepted: payload.accepted, message: payload.message });
       if (!response) { this.rejectSocket(student, "MESSAGE_TOO_LARGE", value.id); return; }
       student.serializeAttachment({ ...details, authState: payload.accepted ? "AUTHENTICATED" : "REJECTED",
-        authRequestId: null, authDeadline: null });
+        authRequestId: null, authDeadline: null, reauthPending: false });
       student.send(response);
       if (!payload.accepted) student.close(1008, "Authentication rejected");
       await this.scheduleAlarm();
