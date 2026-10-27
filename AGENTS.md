@@ -137,6 +137,8 @@ Python dependencies are forbidden.
 
 For implementation phases, run the tests relevant to modified areas.
 
+Follow the task's targeted verification scope; do not automatically expand it into a broad suite. Record previous results separately from checks actually run in the current task.
+
 Unless a task explicitly narrows validation, the expected full verification is:
 
 ```text
@@ -163,7 +165,12 @@ Never claim a test passed if it was not actually run.
 
 * Preserve a clean phase-by-phase Git history.
 * Do not modify previous baseline commits.
-* Do not commit unless the task explicitly instructs you to commit.
+* Use a task branch for authorized repository work; do not push `main` directly.
+* Commit, push the task branch, or create a PR only when the task explicitly authorizes that action.
+* Update root `status.md` when completing a task. Keep it a concise current review entry, not a replacement for source/test review.
+* Bind GPT review to a fixed PR head SHA. A new commit requires rechecking the affected differences against the previous review.
+* The user manually selects **Create a merge commit** after review; do not merge or enable auto-merge on the user's behalf.
+* Git merge does not authorize production deployment or other production operations.
 * Before finalizing implementation work, run:
 
 ```text

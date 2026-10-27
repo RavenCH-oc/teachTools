@@ -1,8 +1,12 @@
 # Classroom
 
-Classroom 是教師主控、學生以瀏覽器加入的課堂互動教學軟體。本倉庫目前處於 Phase 1：Monorepo / Application Skeleton。
+Classroom 是教師主控、學生以瀏覽器加入的課堂互動教學軟體。
 
-## Current implementation phase: Phase 9
+目前任務與審查狀態請見 [status.md](status.md)；Pass A／A2 的報告、量測與 source identity 請見 [審查證據索引](docs/review-evidence/phase16f-pass-a-a2/README.md)。
+
+## Historical implementation snapshot: Phase 9
+
+以下保留 Phase 1 skeleton 與 Phase 9 的歷史實作摘要及當時範圍，不代表目前進度；目前 Phase 16F release 仍為 HOLD，尚待完整 branch review、production verification 與 installed Human QA。
 
 Phase 9 adds the local live-quiz vertical slice. A Teacher starts the session, snapshots a Question Bank question and managed media into session-owned storage, opens/locks/reopens/reveals it, and sees basic answered progress. Authenticated Students receive only public question data, submit typed answers with idempotent UUID submission IDs, recover the current question after reconnect, and see only their own result after reveal. Rust grades automatic question types from the immutable session snapshot; essays remain pending.
 

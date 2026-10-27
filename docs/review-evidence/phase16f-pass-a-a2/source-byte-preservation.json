@@ -1,0 +1,242 @@
+{
+  "canonicalBase": "c5285196a08e412732eb2246efd78e3c9644d15a",
+  "codeSnapshotCommit": "10d67e32f5f5ec355471cf1d285ee6e82d83e51c",
+  "workingFileSourceDigest": "374d69fdb0ebabca7be318d401a371ddb8c5c3091675360a48e24bf195b7e4e3",
+  "committedBlobSourceDigest": "c822369d327be20603971e7256b01c763530a0abe71265384e669d8bd8157185",
+  "algorithm": "SHA-256(UTF-8 JSON.stringify(sorted [{file,sha256}])) exact working bytes; changed/new apps files; docs excluded; unchanged source identified by baseline",
+  "note": "Historical final manifest hashes working-file bytes. One file is CRLF-normalized by existing core.autocrlf=true. No logical source changes were made for packaging.",
+  "coreAutocrlf": "true (unchanged)",
+  "records": [
+    {
+      "file": "apps/relay/scripts/build-capacity-client.js",
+      "workingSha256": "1654134a9927b7432515de96bd3caeb6dbad7793bcaed8948c0bb496b12ffff3",
+      "committedBlobSha256": "1654134a9927b7432515de96bd3caeb6dbad7793bcaed8948c0bb496b12ffff3",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/scripts/capacity-local-server.js",
+      "workingSha256": "f58c8449b5f0c04fb949ae5fac7b45aa247c1a9c1315fc849146e6164a13ecf0",
+      "committedBlobSha256": "f58c8449b5f0c04fb949ae5fac7b45aa247c1a9c1315fc849146e6164a13ecf0",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/scripts/capacity-local-server.test.js",
+      "workingSha256": "56f9041b21cb236b35b00ba5c08f7e38bf8f9d149148f0fcf426023f25087ab1",
+      "committedBlobSha256": "56f9041b21cb236b35b00ba5c08f7e38bf8f9d149148f0fcf426023f25087ab1",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/scripts/capacity-local.js",
+      "workingSha256": "0998752df52704c0ca9a9e46fd4d496afc3c274e130a8f7a28853ea5e8fc3617",
+      "committedBlobSha256": "0998752df52704c0ca9a9e46fd4d496afc3c274e130a8f7a28853ea5e8fc3617",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/scripts/capacity-local.safety.test.js",
+      "workingSha256": "7c5a01432de10baa08c476f6e5595a7c92745b6aefd4d34228d880c5c719c5e6",
+      "committedBlobSha256": "b02c7903b9c129d11a91e9a8ce691764101ffc6e5df0728987c36732a6cbe884",
+      "exactBytes": false,
+      "onlyCrLfToLf": true
+    },
+    {
+      "file": "apps/relay/scripts/generate-capacity-media.js",
+      "workingSha256": "287ca0afd52af5522a0b5972eea2761dde334fbd29b4abc8124d2014925f5467",
+      "committedBlobSha256": "287ca0afd52af5522a0b5972eea2761dde334fbd29b4abc8124d2014925f5467",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/src/a2-http-quota.test.js",
+      "workingSha256": "24746cc1426a754d431238b60059c7f53ea071097ad969c825b0af95a079be59",
+      "committedBlobSha256": "24746cc1426a754d431238b60059c7f53ea071097ad969c825b0af95a079be59",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/src/a2-reauth.test.js",
+      "workingSha256": "01eb600afeac5a0f530e2895be251532ae2dd7c69d848d8e945d3ef2e2cc5c4b",
+      "committedBlobSha256": "01eb600afeac5a0f530e2895be251532ae2dd7c69d848d8e945d3ef2e2cc5c4b",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/src/a2-scheduling.test.js",
+      "workingSha256": "58fc7780adad6346ee6fbaa552aa30338643b5007f208b520e875214e5639db3",
+      "committedBlobSha256": "58fc7780adad6346ee6fbaa552aa30338643b5007f208b520e875214e5639db3",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/src/admission.js",
+      "workingSha256": "b4424bed678362276ac0cd64bab3e99e7988ce3d9a36bc49e6af9e74a32c8006",
+      "committedBlobSha256": "b4424bed678362276ac0cd64bab3e99e7988ce3d9a36bc49e6af9e74a32c8006",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/src/admission.test.js",
+      "workingSha256": "859cbe434c1418f2a88ea764a4d561833a9ec6895dd5c5ccd270511e78513de4",
+      "committedBlobSha256": "859cbe434c1418f2a88ea764a4d561833a9ec6895dd5c5ccd270511e78513de4",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/src/http_relay.js",
+      "workingSha256": "855b171441e84be4c7a75b7d5ee526e990823d8137a6227c4e2a2618f1c27aff",
+      "committedBlobSha256": "855b171441e84be4c7a75b7d5ee526e990823d8137a6227c4e2a2618f1c27aff",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/src/http_relay.test.js",
+      "workingSha256": "5a2a9ad4d7ddcd5f7b0f1d8134280a807b110ff39619d7557b6493f973c402b6",
+      "committedBlobSha256": "5a2a9ad4d7ddcd5f7b0f1d8134280a807b110ff39619d7557b6493f973c402b6",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/src/lifecycle.js",
+      "workingSha256": "5bfec2f2a5ad9c2abb7368a47a490d769817edadc07d431cebf47c7bfd772853",
+      "committedBlobSha256": "5bfec2f2a5ad9c2abb7368a47a490d769817edadc07d431cebf47c7bfd772853",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/src/lifecycle.test.js",
+      "workingSha256": "e49dece90aa9019c29fe38c89b4b43910570a42e8ccee73768b9f68d0237b258",
+      "committedBlobSha256": "e49dece90aa9019c29fe38c89b4b43910570a42e8ccee73768b9f68d0237b258",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/src/phase16f-security.test.js",
+      "workingSha256": "8ee006edfe234fb5696c700cfc15f91f4c03db736e433440f0b7930c9935a29c",
+      "committedBlobSha256": "8ee006edfe234fb5696c700cfc15f91f4c03db736e433440f0b7930c9935a29c",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/relay/src/worker.js",
+      "workingSha256": "355ba270b1e7efadb7be76f00da152712a75168508ea3ed10bc48e2a990df873",
+      "committedBlobSha256": "355ba270b1e7efadb7be76f00da152712a75168508ea3ed10bc48e2a990df873",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/student/src/services/studentHttpApi.test.ts",
+      "workingSha256": "e43b3533f798031858fcd1d2cd8a7fa6ef70bd4f9a2c44da2e95e19067bcd1c7",
+      "committedBlobSha256": "e43b3533f798031858fcd1d2cd8a7fa6ef70bd4f9a2c44da2e95e19067bcd1c7",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/student/src/services/studentHttpApi.ts",
+      "workingSha256": "5792ad451480e6ad39e96b53249d583fb9cf0fa53c6fc8b6cb4468206dc19aa1",
+      "committedBlobSha256": "5792ad451480e6ad39e96b53249d583fb9cf0fa53c6fc8b6cb4468206dc19aa1",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/mod.rs",
+      "workingSha256": "b171ff365518ef1490db13856236753410891fce95da470d73c6b637bfc7337f",
+      "committedBlobSha256": "b171ff365518ef1490db13856236753410891fce95da470d73c6b637bfc7337f",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/participant_http.rs",
+      "workingSha256": "ae5cbb84307c69461524008c10f359a14636149ce409e3de738fd6847827a99b",
+      "committedBlobSha256": "ae5cbb84307c69461524008c10f359a14636149ce409e3de738fd6847827a99b",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_capacity_metrics.rs",
+      "workingSha256": "2aa808f8a5f3d2f26b81d39f3bd9f5f2641a5cc05f0a561892cbbfab8069d307",
+      "committedBlobSha256": "2aa808f8a5f3d2f26b81d39f3bd9f5f2641a5cc05f0a561892cbbfab8069d307",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_capacity_smoke.rs",
+      "workingSha256": "88e80eff2ab37cff0fa2939cd528a990a0019ee6de06335fccbc22136a90675a",
+      "committedBlobSha256": "88e80eff2ab37cff0fa2939cd528a990a0019ee6de06335fccbc22136a90675a",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_control.rs",
+      "workingSha256": "40496de8fb3cb0df2c59c47a5cacda7f11f808cc51c11f8228632507697423b8",
+      "committedBlobSha256": "40496de8fb3cb0df2c59c47a5cacda7f11f808cc51c11f8228632507697423b8",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_http.rs",
+      "workingSha256": "4e87ea3b8c6e50a800d31f60e651c8e70a24038f9e05e1ceb4f8814062545e53",
+      "committedBlobSha256": "4e87ea3b8c6e50a800d31f60e651c8e70a24038f9e05e1ceb4f8814062545e53",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_participant.rs",
+      "workingSha256": "9eba6fff11a4ff871ccbed3b5097badaa9b50bc7c4d9014a83b2f444dae3b9c7",
+      "committedBlobSha256": "9eba6fff11a4ff871ccbed3b5097badaa9b50bc7c4d9014a83b2f444dae3b9c7",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_participant_tests.rs",
+      "workingSha256": "a7f9826abd2ef2756f55a423a4e70d1ed0adb32f948b4dce863509e775ad55b5",
+      "committedBlobSha256": "a7f9826abd2ef2756f55a423a4e70d1ed0adb32f948b4dce863509e775ad55b5",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "docs/phase16f-a2-security-evidence.md",
+      "workingSha256": "c7ded6124580d6f7d3075aa217122dfa659520a1d3ef50ae0af34a0ee4bfcbfa",
+      "committedBlobSha256": "c7ded6124580d6f7d3075aa217122dfa659520a1d3ef50ae0af34a0ee4bfcbfa",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "docs/phase16f-auth-audit.md",
+      "workingSha256": "457a23fbce2b8ce7ccdab8209c6a8243b555b36a57a9ba25acd45b0fa39b4a31",
+      "committedBlobSha256": "457a23fbce2b8ce7ccdab8209c6a8243b555b36a57a9ba25acd45b0fa39b4a31",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "docs/phase16f-cost-and-release.md",
+      "workingSha256": "30b976ddd660a8bdc80b1324cf5812da2089918f74b735b401256b16ef9a91f6",
+      "committedBlobSha256": "30b976ddd660a8bdc80b1324cf5812da2089918f74b735b401256b16ef9a91f6",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "docs/phase16f-pass-a2.md",
+      "workingSha256": "9eee2610e866940cadff10da3f70fa2564a82db82c6a8b360e62224a48ee1156",
+      "committedBlobSha256": "9eee2610e866940cadff10da3f70fa2564a82db82c6a8b360e62224a48ee1156",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "docs/phase16f-relay-audit.md",
+      "workingSha256": "87fcb854577b4f6937ac72cb0c963422fb44ca79b3214a83b5205aa222815e58",
+      "committedBlobSha256": "87fcb854577b4f6937ac72cb0c963422fb44ca79b3214a83b5205aa222815e58",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    },
+    {
+      "file": "docs/remote-release-verification.md",
+      "workingSha256": "3fea6d0320d46aba6c67f1c0b53239269e45c6897a041a7d9f06d76d20f4614b",
+      "committedBlobSha256": "3fea6d0320d46aba6c67f1c0b53239269e45c6897a041a7d9f06d76d20f4614b",
+      "exactBytes": true,
+      "onlyCrLfToLf": false
+    }
+  ]
+}

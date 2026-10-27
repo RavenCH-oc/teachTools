@@ -6,6 +6,7 @@ use crate::error::AppError;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -66,7 +67,7 @@ struct Pending {
     media_permit: Option<OwnedSemaphorePermit>,
     task: Option<JoinHandle<()>>,
     response: Option<HttpReadResponse>,
-    participant_id: String,
+    owner: [u8; 32],
     media: bool,
     deadline: Instant,
     progress: Instant,
@@ -101,6 +102,8 @@ impl RemoteHttp {
         budget: HttpReadBudget,
     ) -> Self {
         let (sender, receiver) = mpsc::channel(MAX_REQUESTS);
+        #[cfg(test)]
+        super::remote_capacity_metrics::budget(budget.readers.clone(), budget.media.clone());
         Self {
             budget,
             service,
@@ -145,10 +148,20 @@ impl RemoteHttp {
                     return Err(AppError::RemoteProtocolMismatch);
                 }
                 let media = matches!(request, HttpOperation::SessionAssetGet { .. });
-                let owned = self
-                    .pending
-                    .values()
-                    .filter(|p| p.participant_id == identity.participant_id);
+                // Bind provisional quotas to the presented bearer, not its unverified
+                // participant claim. This is not authorization; service.read below
+                // independently authenticates before any asset/domain read.
+                let owner: [u8; 32] = Sha256::digest(
+                    json!([
+                        identity.session_id,
+                        identity.participant_id,
+                        identity.credential
+                    ])
+                    .to_string()
+                    .as_bytes(),
+                )
+                .into();
+                let owned = self.pending.values().filter(|p| p.owner == owner);
                 if self.pending.len() >= MAX_REQUESTS
                     || owned.clone().count() >= 4
                     || (media
@@ -170,7 +183,6 @@ impl RemoteHttp {
                 } else {
                     None
                 };
-                let participant_id = identity.participant_id.clone();
                 let service = self.service.clone();
                 let instance = self.instance.clone();
                 let session_id = self.session_id.clone();
@@ -181,7 +193,23 @@ impl RemoteHttp {
                         let _read_permit = read_permit;
                         Prepared {
                             id,
-                            response: service.read(identity, &instance, Some(&session_id), request),
+                            response: {
+                                #[cfg(test)]
+                                {
+                                    super::remote_capacity_metrics::reading(id, || {
+                                        service.read(
+                                            identity,
+                                            &instance,
+                                            Some(&session_id),
+                                            request,
+                                        )
+                                    })
+                                }
+                                #[cfg(not(test))]
+                                {
+                                    service.read(identity, &instance, Some(&session_id), request)
+                                }
+                            },
                             media_permit,
                         }
                     })
@@ -204,7 +232,7 @@ impl RemoteHttp {
                         media_permit: None,
                         task: Some(task),
                         response: None,
-                        participant_id,
+                        owner,
                         media,
                         deadline: now + if media { MEDIA_TIMEOUT } else { DETAIL_TIMEOUT },
                         progress: now,
@@ -213,6 +241,8 @@ impl RemoteHttp {
                         credits: 0,
                     },
                 );
+                #[cfg(test)]
+                super::remote_capacity_metrics::pending(self.pending.len());
                 Ok(Vec::new())
             }
             Incoming::Cancel { generation } => {
@@ -238,6 +268,8 @@ impl RemoteHttp {
                 {
                     return Err(AppError::RemoteProtocolMismatch);
                 }
+                #[cfg(test)]
+                super::remote_capacity_metrics::credit(envelope.id);
                 pending.credits += credits;
                 pending.progress = Instant::now();
                 Ok(self.pump(envelope.id))
@@ -274,6 +306,8 @@ impl RemoteHttp {
         pending.task = None;
         pending.media_permit = prepared.media_permit;
         pending.response = Some(response);
+        #[cfg(test)]
+        super::remote_capacity_metrics::starved(prepared.id);
         pending.progress = Instant::now();
         vec![self.frame(prepared.id, start)]
     }
@@ -303,6 +337,9 @@ impl RemoteHttp {
         }
         if complete {
             self.remove(id);
+        } else {
+            #[cfg(test)]
+            super::remote_capacity_metrics::starved(id);
         }
         payloads
             .into_iter()
@@ -311,6 +348,8 @@ impl RemoteHttp {
     }
 
     fn remove(&mut self, id: Uuid) {
+        #[cfg(test)]
+        super::remote_capacity_metrics::removed(id);
         if let Some(pending) = self.pending.remove(&id) {
             if let Some(task) = pending.task {
                 task.abort();
@@ -340,6 +379,10 @@ impl RemoteHttp {
 
 impl Drop for RemoteHttp {
     fn drop(&mut self) {
+        #[cfg(test)]
+        for id in self.pending.keys() {
+            super::remote_capacity_metrics::removed(*id);
+        }
         for pending in self.pending.values() {
             if let Some(task) = &pending.task {
                 task.abort();
@@ -377,7 +420,7 @@ mod tests {
                 media_permit: None,
                 task: None,
                 response: None,
-                participant_id: "fixture".to_owned(),
+                owner: [0; 32],
                 media: true,
                 deadline: now + MEDIA_TIMEOUT,
                 progress: now,
@@ -526,5 +569,147 @@ mod tests {
         assert!(next.handle(&raw).await.expect("permit released").is_empty());
         let prepared = next.prepared().await.expect("authoritative read");
         assert_eq!(next.ready(prepared)[0]["payload"]["status"], 401);
+    }
+    #[tokio::test]
+    async fn http_native_forged_identity_does_not_reserve_victim_quota() {
+        use crate::infrastructure::persistence::database::Database;
+        use crate::infrastructure::persistence::repositories::{
+            ClassroomRepository, NewClassroom, NewStudent, StudentRepository,
+        };
+        let dir = tempfile::tempdir().expect("isolated application directory");
+        let db = Database::open_in_app_data(dir.path()).expect("database");
+        db.initialize().expect("schema");
+        let classroom = ClassroomRepository::create(
+            &db,
+            NewClassroom {
+                name: "Quota fixture".to_owned(),
+                academic_year: None,
+            },
+        )
+        .expect("classroom");
+        StudentRepository::create(
+            &db,
+            NewStudent {
+                class_id: classroom.id.clone(),
+                seat_number: 1,
+                name: "Synthetic".to_owned(),
+            },
+        )
+        .expect("student");
+        let sessions = super::super::LocalSessionService::initialize(db.clone()).expect("sessions");
+        let quiz = super::super::LiveQuizService::initialize(db, dir.path()).expect("quiz");
+        let remote_id = "a".repeat(32);
+        let instance = format!("remote:{remote_id}");
+        let local = sessions
+            .create(classroom.id, instance.clone())
+            .expect("session");
+        sessions
+            .open_lobby(local.id.clone(), instance.clone())
+            .expect("lobby");
+        let joined = sessions
+            .join(&local.join_code, 1, "Synthetic", &instance)
+            .expect("valid participant");
+        let joined = serde_json::to_value(joined).expect("participant contract");
+        let identity = json!({"sessionId":local.id,"participantId":joined["participantId"],"credential":joined["credential"]});
+        let mut actor = RemoteHttp::new(
+            ParticipantHttpService::new(sessions, quiz),
+            local.id,
+            &remote_id,
+            1,
+            HttpReadBudget::default(),
+        );
+        let request =
+            json!({"operation":"SESSION_ASSET_GET","arguments":{"assetId":Uuid::now_v7()}});
+        let attack = Uuid::now_v7();
+        let victim = Uuid::now_v7();
+        let mut forged = identity.clone();
+        forged["credential"] = json!("B".repeat(43));
+        assert!(actor
+            .handle(&incoming(
+                attack,
+                json!({"op":"HTTP_REQUEST","generation":1,"identity":forged,"request":request})
+            ))
+            .await
+            .expect("bounded attacker read")
+            .is_empty());
+        let admitted = actor
+            .handle(&incoming(
+                victim,
+                json!({"op":"HTTP_REQUEST","generation":1,"identity":identity,"request":request}),
+            ))
+            .await
+            .expect("independent victim admission");
+        assert!(
+            admitted.is_empty(),
+            "claimed ID must not reserve another credential's quota"
+        );
+        assert_eq!(actor.pending.len(), 2);
+        let duplicate = actor
+            .handle(&incoming(
+                Uuid::now_v7(),
+                json!({"op":"HTTP_REQUEST","generation":1,"identity":identity,"request":request}),
+            ))
+            .await
+            .expect("duplicate admission");
+        assert_eq!(
+            duplicate[0]["payload"]["code"],
+            "REMOTE_SERVICE_UNAVAILABLE"
+        );
+        let mut statuses = HashMap::new();
+        for _ in 0..2 {
+            let prepared = actor.prepared().await.expect("authorized response");
+            statuses.insert(prepared.id, prepared.response.status);
+            actor.ready(prepared);
+        }
+        assert_eq!(
+            statuses.get(&attack),
+            Some(&401),
+            "forged credential rejected before asset lookup"
+        );
+        assert_eq!(
+            statuses.get(&victim),
+            Some(&404),
+            "valid identity reaches the missing synthetic asset lookup"
+        );
+        actor.remove(attack);
+        actor.remove(victim);
+        assert!(actor.pending.is_empty());
+        assert_eq!(actor.budget.media.available_permits(), MAX_MEDIA);
+    }
+    #[tokio::test]
+    async fn http_native_rotating_invalid_credentials_cannot_exceed_session_media_budget() {
+        let (mut actor, _dir) = actor();
+        let participant = Uuid::now_v7();
+        let mut ids = Vec::new();
+        for index in 0..=MAX_MEDIA {
+            let id = Uuid::now_v7();
+            let raw = incoming(
+                id,
+                json!({"op":"HTTP_REQUEST","generation":1,
+                "identity":{"sessionId":actor.session_id,"participantId":participant,"credential":format!("{index:043}")},
+                "request":{"operation":"SESSION_ASSET_GET","arguments":{"assetId":Uuid::now_v7()}}}),
+            );
+            let response = actor.handle(&raw).await.expect("bounded admission");
+            if index < MAX_MEDIA {
+                assert!(response.is_empty());
+                ids.push(id);
+            } else {
+                assert_eq!(response[0]["payload"]["code"], "REMOTE_SERVICE_UNAVAILABLE");
+            }
+        }
+        assert_eq!(actor.pending.len(), MAX_MEDIA);
+        for _ in 0..MAX_MEDIA {
+            let response = actor
+                .prepared()
+                .await
+                .expect("Rust rejects forged identities");
+            assert_eq!(response.response.status, 401);
+            actor.ready(response);
+        }
+        for id in ids {
+            actor.remove(id);
+        }
+        assert!(actor.pending.is_empty());
+        assert_eq!(actor.budget.media.available_permits(), MAX_MEDIA);
     }
 }

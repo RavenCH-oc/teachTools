@@ -1,0 +1,321 @@
+{
+  "exportType": "Selected-field derivative; not original report bytes",
+  "originalFile": "no-pipe-wait.json",
+  "originalSha256": "b31d8542e5f20b8007fcc2f32ceefcb7c6a5a8240808df0579a8554263bb9704",
+  "omittedPaths": [
+    "observations.1.transportEvents",
+    "observations.1.native.requests",
+    "observations.1.native.timeline"
+  ],
+  "observations": [
+    {
+      "label": "thresholds",
+      "textAckP95Ms": 2000,
+      "mediaAckP95Ms": 3000,
+      "image95PercentMs": 30000,
+      "imageAllMs": 60000,
+      "algorithm": "nearest-rank ceil(p*n)-1; monotonic per process",
+      "clientPolicy": "actual bundled studentHttpRead",
+      "network": "same Windows PC, loopback; not mobile render"
+    },
+    {
+      "label": "C4_stream_probe",
+      "students": 40,
+      "streams": 4,
+      "trigger": "after all active streams first body bytes",
+      "pdfs": [
+        {
+          "client": 1,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1958.7509,
+          "firstByteMs": 1975.9016000000001,
+          "totalMs": 47777.715,
+          "bodyMs": 45818.9641,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 2,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1894.6504000000004,
+          "firstByteMs": 1895.7250999999997,
+          "totalMs": 47682.9756,
+          "bodyMs": 45788.3252,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 3,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1829.036000000001,
+          "firstByteMs": 1832.502300000001,
+          "totalMs": 47544.71950000001,
+          "bodyMs": 45715.68350000001,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        },
+        {
+          "client": 4,
+          "status": 200,
+          "bytes": 104857600,
+          "headersMs": 1988.1840999999995,
+          "firstByteMs": 2017.9363999999996,
+          "totalMs": 47805.3638,
+          "bodyMs": 45817.1797,
+          "hashOk": true,
+          "mime": "application/pdf",
+          "attempts": [
+            200
+          ]
+        }
+      ],
+      "eventLoopDelay": {
+        "n": 508,
+        "p50": 1.6221999999979744,
+        "p95": 9.055299999999988,
+        "max": 14.91149999999925
+      },
+      "rawAcks": [
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        },
+        {
+          "ms": 10000,
+          "accepted": false
+        }
+      ],
+      "ack": {
+        "n": 40,
+        "p50": 10000,
+        "p95": 10000,
+        "max": 10000
+      },
+      "detail": {
+        "client": 40,
+        "status": 200,
+        "bytes": 348,
+        "headersMs": 40049.6497,
+        "firstByteMs": 40057.449199999995,
+        "totalMs": 40057.4794,
+        "bodyMs": 7.829699999994773,
+        "hashOk": true,
+        "mime": "application/json",
+        "attempts": [
+          200
+        ]
+      },
+      "progress": 0,
+      "elapsedAfterFirstMs": 50370.64139999999,
+      "pingLatency": {
+        "n": 55,
+        "p50": 300.97380000000067,
+        "p95": 1338.1326,
+        "max": 1476.8594999999996
+      },
+      "counters": {
+        "http": 45,
+        "studentWsFrames": 787,
+        "studentWsUtf8Bytes": 160566,
+        "receivedFrames": 747,
+        "offline": 0,
+        "unexpectedOffline": 0,
+        "reauth": 40,
+        "auth": 40,
+        "sync": 200,
+        "pongs": 55,
+        "wsErrors": 0
+      },
+      "native": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 419430748,
+        "pendingHigh": 4,
+        "sendWaitMaxMs": 24.0825,
+        "sendWaitMs": 32723.526200000368,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 80,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 3,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 12801,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 5,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 5,
+          "REALTIME:pong": 55,
+          "REALTIME:question_revealed": 86,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 240,
+          "REALTIME:submission_result": 86
+        },
+        "teacherWsUtf8BytesReserved": 561645334
+      },
+      "status": "FAIL_BLOCKER"
+    }
+  ]
+}

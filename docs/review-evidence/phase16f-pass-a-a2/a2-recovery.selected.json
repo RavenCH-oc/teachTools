@@ -1,0 +1,280 @@
+{
+  "exportType": "Selected-field derivative; not original report bytes",
+  "originalFile": "a2-recovery.json",
+  "originalSha256": "325e796ac0114181cb232f2cbda2c527b45ca99ddd3317b679acedf411e62146",
+  "omittedPaths": [
+    "observations.1.native.requests",
+    "observations.1.native.timeline",
+    "observations.1.transportEvents"
+  ],
+  "observations": [
+    {
+      "label": "thresholds",
+      "textAckP95Ms": 2000,
+      "mediaAckP95Ms": 3000,
+      "image95PercentMs": 30000,
+      "imageAllMs": 60000,
+      "algorithm": "nearest-rank ceil(p*n)-1; monotonic per process",
+      "clientPolicy": "actual bundled studentHttpRead",
+      "network": "same Windows PC, loopback; not mobile render"
+    },
+    {
+      "label": "A2_generation_cancel",
+      "interruption": {
+        "client": 1,
+        "status": "INTERRUPTED",
+        "bytes": 262144,
+        "totalMs": 1843.6561999999994
+      },
+      "recoveryMs": 2773.5576,
+      "rawAcks": [
+        {
+          "ms": 78.9989000000005,
+          "accepted": true
+        },
+        {
+          "ms": 86.60410000000047,
+          "accepted": true
+        },
+        {
+          "ms": 94.99699999999939,
+          "accepted": true
+        },
+        {
+          "ms": 104.76939999999922,
+          "accepted": true
+        },
+        {
+          "ms": 113.38590000000113,
+          "accepted": true
+        },
+        {
+          "ms": 148.5078999999987,
+          "accepted": true
+        },
+        {
+          "ms": 140.1170000000002,
+          "accepted": true
+        },
+        {
+          "ms": 122.16409999999996,
+          "accepted": true
+        },
+        {
+          "ms": 131.36689999999908,
+          "accepted": true
+        },
+        {
+          "ms": 157.8122000000003,
+          "accepted": true
+        },
+        {
+          "ms": 166.6784000000007,
+          "accepted": true
+        },
+        {
+          "ms": 175.27659999999923,
+          "accepted": true
+        },
+        {
+          "ms": 183.4977999999992,
+          "accepted": true
+        },
+        {
+          "ms": 192.41480000000047,
+          "accepted": true
+        },
+        {
+          "ms": 200.7383000000009,
+          "accepted": true
+        },
+        {
+          "ms": 209.41220000000067,
+          "accepted": true
+        },
+        {
+          "ms": 217.5747999999985,
+          "accepted": true
+        },
+        {
+          "ms": 226.72069999999985,
+          "accepted": true
+        },
+        {
+          "ms": 235.26970000000074,
+          "accepted": true
+        },
+        {
+          "ms": 243.8884999999991,
+          "accepted": true
+        },
+        {
+          "ms": 252.6285000000007,
+          "accepted": true
+        },
+        {
+          "ms": 261.9310999999998,
+          "accepted": true
+        },
+        {
+          "ms": 270.89949999999953,
+          "accepted": true
+        },
+        {
+          "ms": 288.3203999999987,
+          "accepted": true
+        },
+        {
+          "ms": 279.4470999999994,
+          "accepted": true
+        },
+        {
+          "ms": 296.65640000000167,
+          "accepted": true
+        },
+        {
+          "ms": 314.2394999999997,
+          "accepted": true
+        },
+        {
+          "ms": 305.91439999999966,
+          "accepted": true
+        },
+        {
+          "ms": 323.0610000000015,
+          "accepted": true
+        },
+        {
+          "ms": 331.72119999999995,
+          "accepted": true
+        },
+        {
+          "ms": 341.04499999999825,
+          "accepted": true
+        },
+        {
+          "ms": 358.4413999999997,
+          "accepted": true
+        },
+        {
+          "ms": 349.90520000000106,
+          "accepted": true
+        },
+        {
+          "ms": 367.0475999999999,
+          "accepted": true
+        },
+        {
+          "ms": 376.72310000000107,
+          "accepted": true
+        },
+        {
+          "ms": 385.77340000000004,
+          "accepted": true
+        },
+        {
+          "ms": 394.0532000000003,
+          "accepted": true
+        },
+        {
+          "ms": 402.737000000001,
+          "accepted": true
+        },
+        {
+          "ms": 411.64869999999974,
+          "accepted": true
+        },
+        {
+          "ms": 420.7414000000008,
+          "accepted": true
+        }
+      ],
+      "ack": {
+        "n": 40,
+        "p50": 243.8884999999991,
+        "p95": 402.737000000001,
+        "max": 420.7414000000008
+      },
+      "progress": 40,
+      "image": {
+        "client": 1,
+        "status": 200,
+        "bytes": 2094909,
+        "headersMs": 56.806000000000495,
+        "firstByteMs": 58.152500000000146,
+        "totalMs": 500.46010000000024,
+        "bodyMs": 443.65409999999974,
+        "hashOk": true,
+        "mime": "image/png",
+        "attempts": [
+          200
+        ]
+      },
+      "canceled": {
+        "client": 2,
+        "status": "CANCELLED",
+        "bytes": 8192,
+        "totalMs": 1419.983400000001
+      },
+      "replacement": {
+        "client": 2,
+        "status": 200,
+        "bytes": 2094909,
+        "headersMs": 63.71589999999924,
+        "firstByteMs": 66.20720000000074,
+        "totalMs": 484.7381000000005,
+        "bodyMs": 421.02220000000125,
+        "hashOk": true,
+        "mime": "image/png",
+        "attempts": [
+          200
+        ]
+      },
+      "presence": {
+        "generation": 3,
+        "online": 40,
+        "total": 40
+      },
+      "native": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "nativeRawBytesReserved": 4714106,
+        "pendingHigh": 1,
+        "sendWaitMaxMs": 0.09720000000000001,
+        "sendWaitMs": 19.71589999999997,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 80,
+          "CONTROL:join_result": 40,
+          "CONTROL:ping": 2,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 144,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 2,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 4,
+          "REALTIME:pong": 107,
+          "REALTIME:question_revealed": 89,
+          "REALTIME:question_state_changed": 160,
+          "REALTIME:session_state_changed": 40,
+          "REALTIME:session_sync": 240,
+          "REALTIME:submission_acknowledged": 40,
+          "REALTIME:submission_result": 89
+        },
+        "teacherWsUtf8BytesReserved": 6799791
+      },
+      "counters": {
+        "http": 44,
+        "studentWsFrames": 268,
+        "studentWsUtf8Bytes": 75104,
+        "receivedFrames": 966,
+        "offline": 40,
+        "unexpectedOffline": 0,
+        "reauth": 80,
+        "auth": 80,
+        "sync": 240,
+        "pongs": 108,
+        "wsErrors": 0
+      },
+      "status": "PASS"
+    }
+  ]
+}

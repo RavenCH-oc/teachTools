@@ -1,0 +1,222 @@
+{
+  "baseline": "c5285196a08e412732eb2246efd78e3c9644d15a",
+  "sourceDigest": "374d69fdb0ebabca7be318d401a371ddb8c5c3091675360a48e24bf195b7e4e3",
+  "algorithm": "SHA-256(UTF-8 JSON.stringify(sorted [{file,sha256}])) exact working bytes; changed/new apps files; docs excluded; unchanged source identified by baseline",
+  "files": [
+    {
+      "file": "apps/relay/scripts/build-capacity-client.js",
+      "sha256": "1654134a9927b7432515de96bd3caeb6dbad7793bcaed8948c0bb496b12ffff3"
+    },
+    {
+      "file": "apps/relay/scripts/capacity-local-server.js",
+      "sha256": "f58c8449b5f0c04fb949ae5fac7b45aa247c1a9c1315fc849146e6164a13ecf0"
+    },
+    {
+      "file": "apps/relay/scripts/capacity-local-server.test.js",
+      "sha256": "56f9041b21cb236b35b00ba5c08f7e38bf8f9d149148f0fcf426023f25087ab1"
+    },
+    {
+      "file": "apps/relay/scripts/capacity-local.js",
+      "sha256": "0998752df52704c0ca9a9e46fd4d496afc3c274e130a8f7a28853ea5e8fc3617"
+    },
+    {
+      "file": "apps/relay/scripts/capacity-local.safety.test.js",
+      "sha256": "7c5a01432de10baa08c476f6e5595a7c92745b6aefd4d34228d880c5c719c5e6"
+    },
+    {
+      "file": "apps/relay/scripts/generate-capacity-media.js",
+      "sha256": "287ca0afd52af5522a0b5972eea2761dde334fbd29b4abc8124d2014925f5467"
+    },
+    {
+      "file": "apps/relay/src/a2-http-quota.test.js",
+      "sha256": "24746cc1426a754d431238b60059c7f53ea071097ad969c825b0af95a079be59"
+    },
+    {
+      "file": "apps/relay/src/a2-reauth.test.js",
+      "sha256": "01eb600afeac5a0f530e2895be251532ae2dd7c69d848d8e945d3ef2e2cc5c4b"
+    },
+    {
+      "file": "apps/relay/src/a2-scheduling.test.js",
+      "sha256": "58fc7780adad6346ee6fbaa552aa30338643b5007f208b520e875214e5639db3"
+    },
+    {
+      "file": "apps/relay/src/admission.js",
+      "sha256": "b4424bed678362276ac0cd64bab3e99e7988ce3d9a36bc49e6af9e74a32c8006"
+    },
+    {
+      "file": "apps/relay/src/admission.test.js",
+      "sha256": "859cbe434c1418f2a88ea764a4d561833a9ec6895dd5c5ccd270511e78513de4"
+    },
+    {
+      "file": "apps/relay/src/http_relay.js",
+      "sha256": "855b171441e84be4c7a75b7d5ee526e990823d8137a6227c4e2a2618f1c27aff"
+    },
+    {
+      "file": "apps/relay/src/http_relay.test.js",
+      "sha256": "5a2a9ad4d7ddcd5f7b0f1d8134280a807b110ff39619d7557b6493f973c402b6"
+    },
+    {
+      "file": "apps/relay/src/lifecycle.js",
+      "sha256": "5bfec2f2a5ad9c2abb7368a47a490d769817edadc07d431cebf47c7bfd772853"
+    },
+    {
+      "file": "apps/relay/src/lifecycle.test.js",
+      "sha256": "e49dece90aa9019c29fe38c89b4b43910570a42e8ccee73768b9f68d0237b258"
+    },
+    {
+      "file": "apps/relay/src/phase16f-security.test.js",
+      "sha256": "8ee006edfe234fb5696c700cfc15f91f4c03db736e433440f0b7930c9935a29c"
+    },
+    {
+      "file": "apps/relay/src/worker.js",
+      "sha256": "355ba270b1e7efadb7be76f00da152712a75168508ea3ed10bc48e2a990df873"
+    },
+    {
+      "file": "apps/student/src/services/studentHttpApi.test.ts",
+      "sha256": "e43b3533f798031858fcd1d2cd8a7fa6ef70bd4f9a2c44da2e95e19067bcd1c7"
+    },
+    {
+      "file": "apps/student/src/services/studentHttpApi.ts",
+      "sha256": "5792ad451480e6ad39e96b53249d583fb9cf0fa53c6fc8b6cb4468206dc19aa1"
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/mod.rs",
+      "sha256": "b171ff365518ef1490db13856236753410891fce95da470d73c6b637bfc7337f"
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/participant_http.rs",
+      "sha256": "ae5cbb84307c69461524008c10f359a14636149ce409e3de738fd6847827a99b"
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_capacity_metrics.rs",
+      "sha256": "2aa808f8a5f3d2f26b81d39f3bd9f5f2641a5cc05f0a561892cbbfab8069d307"
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_capacity_smoke.rs",
+      "sha256": "88e80eff2ab37cff0fa2939cd528a990a0019ee6de06335fccbc22136a90675a"
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_control.rs",
+      "sha256": "40496de8fb3cb0df2c59c47a5cacda7f11f808cc51c11f8228632507697423b8"
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_http.rs",
+      "sha256": "4e87ea3b8c6e50a800d31f60e651c8e70a24038f9e05e1ceb4f8814062545e53"
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_participant.rs",
+      "sha256": "9eba6fff11a4ff871ccbed3b5097badaa9b50bc7c4d9014a83b2f444dae3b9c7"
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_participant_tests.rs",
+      "sha256": "a7f9826abd2ef2756f55a423a4e70d1ed0adb32f948b4dce863509e775ad55b5"
+    }
+  ],
+  "relayVariants": {
+    "frozenBefore": {
+      "sha256": "a73ad112a4bbf0d74f6978cc565980c1db0840cc704cd9f19554d4e35a9f7483",
+      "files": [
+        {
+          "file": "contract.js",
+          "sha256": "207cca6cc6f75c75fd2e086003feb8c52399f52dee7dc3fef3a56e6df7a90bc2"
+        },
+        {
+          "file": "http_relay.js",
+          "sha256": "ac1dc86b28d08c3b52ee685b42390e96cb29fbd5edf9ee708103eeb672c0211e"
+        },
+        {
+          "file": "lifecycle.js",
+          "sha256": "51015954d5063a75baaf1f3102a29fe3d01a9c3930fcf06f35eba70370c42304"
+        },
+        {
+          "file": "worker.js",
+          "sha256": "4588494119683b3ebac58b8a00f6d151d4942407c3347fb53565ae0950f5d13a"
+        }
+      ]
+    },
+    "diagnosticNoPipeWait": {
+      "sha256": "3a8b0eb2eedd9102c84a99b3ec7cf6852ae49af16c35b9952c726731c0d856ac",
+      "files": [
+        {
+          "file": "contract.js",
+          "sha256": "207cca6cc6f75c75fd2e086003feb8c52399f52dee7dc3fef3a56e6df7a90bc2"
+        },
+        {
+          "file": "http_relay.js",
+          "sha256": "ac1dc86b28d08c3b52ee685b42390e96cb29fbd5edf9ee708103eeb672c0211e"
+        },
+        {
+          "file": "lifecycle.js",
+          "sha256": "51015954d5063a75baaf1f3102a29fe3d01a9c3930fcf06f35eba70370c42304"
+        },
+        {
+          "file": "worker.js",
+          "sha256": "336c87a3a87bbcc1e543022152f66dd3763b711d76e8d86832055c16627a0b66"
+        }
+      ]
+    },
+    "final": {
+      "sha256": "44dc168969f3c990e777ec87f09c245528471e730cdcf6b7cb2bdb88d5dbc23f",
+      "files": [
+        {
+          "file": "admission.js",
+          "sha256": "b4424bed678362276ac0cd64bab3e99e7988ce3d9a36bc49e6af9e74a32c8006"
+        },
+        {
+          "file": "contract.js",
+          "sha256": "207cca6cc6f75c75fd2e086003feb8c52399f52dee7dc3fef3a56e6df7a90bc2"
+        },
+        {
+          "file": "http_relay.js",
+          "sha256": "855b171441e84be4c7a75b7d5ee526e990823d8137a6227c4e2a2618f1c27aff"
+        },
+        {
+          "file": "lifecycle.js",
+          "sha256": "5bfec2f2a5ad9c2abb7368a47a490d769817edadc07d431cebf47c7bfd772853"
+        },
+        {
+          "file": "worker.js",
+          "sha256": "355ba270b1e7efadb7be76f00da152712a75168508ea3ed10bc48e2a990df873"
+        }
+      ]
+    }
+  },
+  "workloadSourceManifest": {
+    "file": "workload-source-manifest.json",
+    "sha256": "5efd9dc4f4724e00969807ea4a175f5127aa91a5df734eff04f9a3f4d8812c03"
+  },
+  "reports": [
+    {
+      "file": "before-four.json",
+      "sha256": "eb215f6d252bbac830a621b6a49205c9fa4712e17ac0573593d64c5b6de0ca29"
+    },
+    {
+      "file": "before-four-2.json",
+      "sha256": "1972e8bdb3fe1917289b56af557b178c24a29daecaf743fc544967064c30e752"
+    },
+    {
+      "file": "no-pipe-wait.json",
+      "sha256": "b31d8542e5f20b8007fcc2f32ceefcb7c6a5a8240808df0579a8554263bb9704"
+    },
+    {
+      "file": "direct-before.json",
+      "sha256": "c6f4daf37b1ef1725c0501dc5ee96a0d15448511337bc33bc45ed8d4a2886bd6"
+    },
+    {
+      "file": "direct-after.json",
+      "sha256": "8fea3e483c858ff626bda031134ef80f9bd7c5ba5a73c36e67feab5784ef788c"
+    },
+    {
+      "file": "wrangler-after-four.json",
+      "sha256": "1bffdbcf24ee600ebc2b84858cf9be2b8ed9f57f45db226e9445e0afb261fe56"
+    },
+    {
+      "file": "a2-images.json",
+      "sha256": "cd1c187242dd899900b5cc01376ae4df36e92ec1930b3fc7a1bf721f487d6e2f"
+    },
+    {
+      "file": "a2-recovery.json",
+      "sha256": "325e796ac0114181cb232f2cbda2c527b45ca99ddd3317b679acedf411e62146"
+    }
+  ]
+}

@@ -540,11 +540,19 @@ struct RemoteRuntime {
 async fn send_frames(socket: &mut TeacherSocket, frames: Vec<serde_json::Value>) -> bool {
     for frame in frames {
         let raw = frame.to_string();
+        #[cfg(test)]
+        if !super::remote_capacity_metrics::sent(&raw) {
+            return false;
+        }
+        #[cfg(test)]
+        let send_started = std::time::Instant::now();
         if raw.len() > MAX_REMOTE_ENVELOPE_BYTES
             || socket.send(Message::Text(raw.into())).await.is_err()
         {
             return false;
         }
+        #[cfg(test)]
+        super::remote_capacity_metrics::send_wait(send_started.elapsed().as_secs_f64() * 1000.0);
     }
     true
 }
@@ -585,7 +593,14 @@ async fn connection_loop(
                 let mut http_deadline = interval(Duration::from_millis(100));
                 update_status(&active, &id, RemoteConnectionState::Open, Some(generation));
                 attempt = 0;
-                let mut heartbeat = interval(Duration::from_secs(if cfg!(test) { 2 } else { 20 }));
+                let heartbeat_seconds = if cfg!(test) { 2 } else { 20 };
+                #[cfg(test)]
+                let heartbeat_seconds = if super::remote_capacity_metrics::enabled() {
+                    20
+                } else {
+                    heartbeat_seconds
+                };
+                let mut heartbeat = interval(Duration::from_secs(heartbeat_seconds));
                 loop {
                     tokio::select! {
                         changed = stop.changed() => {
@@ -597,11 +612,15 @@ async fn connection_loop(
                         _ = heartbeat.tick() => {
                             let ping = serde_json::json!({ "v": REMOTE_PROTOCOL_VERSION,
                                 "type": "CONTROL", "id": Uuid::now_v7(), "payload": { "op": "ping" } });
+                            #[cfg(test)]
+                            if !super::remote_capacity_metrics::sent(&ping.to_string()) { break; }
                             if socket.send(Message::Text(ping.to_string().into())).await.is_err() { break; }
                         }
                         message = socket.next() => {
                             match message {
                                 Some(Ok(Message::Text(text))) if text.len() <= MAX_ENVELOPE_BYTES => {
+                                    #[cfg(test)]
+                                    super::remote_capacity_metrics::received(&text);
                                     let is_http = serde_json::from_str::<serde_json::Value>(&text).is_ok_and(|value| value["type"] == "HTTP_RELAY");
                                     let response = if is_http { http.handle(&text).await } else { participants.handle(&text, generation).await };
                                     match response {
@@ -932,6 +951,16 @@ mod tests {
     #[tokio::test]
     async fn local_relay_and_windows_credential_lifecycle() {
         let _credential_lock = TEST_CREDENTIAL_LOCK.lock().await;
+        let restore_entry = credential_entry().expect("isolated test credential");
+        let previous = match restore_entry.get_password() {
+            Ok(value) => Some(value),
+            Err(keyring_core::Error::NoEntry) => None,
+            Err(_) => panic!("test credential unavailable"),
+        };
+        let _restore = TestInstallationRestore {
+            entry: restore_entry,
+            previous,
+        };
         let directory = tempfile::tempdir().expect("temporary database directory");
         let database = Database::open_in_app_data(directory.path()).expect("database path");
         database.initialize().expect("database initialized");
@@ -1292,3 +1321,7 @@ mod tests {
 #[cfg(all(test, windows))]
 #[path = "remote_http_smoke.rs"]
 mod http_smoke;
+
+#[cfg(all(test, windows))]
+#[path = "remote_capacity_smoke.rs"]
+mod capacity_smoke;

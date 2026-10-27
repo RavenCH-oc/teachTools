@@ -1,0 +1,114 @@
+{
+  "date": "2026-10-26",
+  "scope": "Packaging only; original ignored evidence retained. Hashes below describe originals and selected exports, not a new test.",
+  "records": [
+    {
+      "file": "source-harness-manifest.json",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/source-harness-manifest.json",
+      "originalBytes": 8087,
+      "originalSha256": "503894acd68c88dc8b8d960362a48e77b68a1a2bb72be3992bb32be49b816cad",
+      "exportBytes": 8087,
+      "exportSha256": "503894acd68c88dc8b8d960362a48e77b68a1a2bb72be3992bb32be49b816cad",
+      "transformation": "Exact byte copy; not a new measurement."
+    },
+    {
+      "file": "workload-source-manifest.json",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/workload-source-manifest.json",
+      "originalBytes": 5235,
+      "originalSha256": "5efd9dc4f4724e00969807ea4a175f5127aa91a5df734eff04f9a3f4d8812c03",
+      "exportBytes": 5235,
+      "exportSha256": "5efd9dc4f4724e00969807ea4a175f5127aa91a5df734eff04f9a3f4d8812c03",
+      "transformation": "Exact byte copy; not a new measurement."
+    },
+    {
+      "file": "after-native-memory.json",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/after-native-memory.json",
+      "originalBytes": 3204,
+      "originalSha256": "589088f0534ac761b2ae0624f1167c8c5ace3ff62c8fdd91bcd0f28649661a64",
+      "exportBytes": 3052,
+      "exportSha256": "a01fb6d36031469481373539413678a083287c8874b28083a6c20a8f33f315f3",
+      "transformation": "LF-normalized derivative of the original 152 CRLF lines; JSON values unchanged. Original bytes/hash retained locally; no new measurement."
+    },
+    {
+      "file": "before-four.selected.json",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/before-four.json",
+      "originalBytes": 258910,
+      "originalSha256": "eb215f6d252bbac830a621b6a49205c9fa4712e17ac0573593d64c5b6de0ca29",
+      "exportBytes": 7346,
+      "exportSha256": "fa83807c0269e7164de67bf2433a58a02d61ff47ef83bf9061e698718a862c4a",
+      "transformation": "Selected-field derivative: omit native request/timeline and transport event traces. All remaining values copied unchanged; raw metrics, attempts, gates, presence samples and failures retained."
+    },
+    {
+      "file": "before-four-2.selected.json",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/before-four-2.json",
+      "originalBytes": 256621,
+      "originalSha256": "1972e8bdb3fe1917289b56af557b178c24a29daecaf743fc544967064c30e752",
+      "exportBytes": 7302,
+      "exportSha256": "0cc8d1e3b1e3217ad7c1b9ea021ffd931a4546b016924eca3bc0819894d4cf61",
+      "transformation": "Selected-field derivative: omit native request/timeline and transport event traces. All remaining values copied unchanged; raw metrics, attempts, gates, presence samples and failures retained."
+    },
+    {
+      "file": "no-pipe-wait.selected.json",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/no-pipe-wait.json",
+      "originalBytes": 258704,
+      "originalSha256": "b31d8542e5f20b8007fcc2f32ceefcb7c6a5a8240808df0579a8554263bb9704",
+      "exportBytes": 7311,
+      "exportSha256": "c5ff12e6b2de83f288e80f1be5f870aaabb880dd17a9a45f2a080cc8de15962e",
+      "transformation": "Selected-field derivative: omit native request/timeline and transport event traces. All remaining values copied unchanged; raw metrics, attempts, gates, presence samples and failures retained."
+    },
+    {
+      "file": "direct-before.selected.json",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/direct-before.json",
+      "originalBytes": 228138,
+      "originalSha256": "c6f4daf37b1ef1725c0501dc5ee96a0d15448511337bc33bc45ed8d4a2886bd6",
+      "exportBytes": 7350,
+      "exportSha256": "1c6be2dca2ed341cab561b83b3ab8d07c73896404b7ecb7d2cc38a98243cfb8e",
+      "transformation": "Selected-field derivative: omit native request/timeline and transport event traces. All remaining values copied unchanged; raw metrics, attempts, gates, presence samples and failures retained."
+    },
+    {
+      "file": "direct-after.selected.json",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/direct-after.json",
+      "originalBytes": 283639,
+      "originalSha256": "8fea3e483c858ff626bda031134ef80f9bd7c5ba5a73c36e67feab5784ef788c",
+      "exportBytes": 11845,
+      "exportSha256": "27faa1114c2da24cc32b98af48ef4bb0113cd2e90168b7ee9e4e6bfec747705e",
+      "transformation": "Selected-field derivative: omit native request/timeline and transport event traces. All remaining values copied unchanged; raw metrics, attempts, gates, presence samples and failures retained."
+    },
+    {
+      "file": "wrangler-after-four.selected.json",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/wrangler-after-four.json",
+      "originalBytes": 295775,
+      "originalSha256": "1bffdbcf24ee600ebc2b84858cf9be2b8ed9f57f45db226e9445e0afb261fe56",
+      "exportBytes": 15255,
+      "exportSha256": "fb362960b2fc4d4dd3c9fbc76ad96be29b463d7f547d50cc04e1eb45fdd322f1",
+      "transformation": "Selected-field derivative: omit native request/timeline and transport event traces. All remaining values copied unchanged; raw metrics, attempts, gates, presence samples and failures retained."
+    },
+    {
+      "file": "a2-images.selected.json",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/a2-images.json",
+      "originalBytes": 3844757,
+      "originalSha256": "cd1c187242dd899900b5cc01376ae4df36e92ec1930b3fc7a1bf721f487d6e2f",
+      "exportBytes": 83651,
+      "exportSha256": "9dd61580c51d64794cab806efc28ef07a05edf5c2650f02c4334bb059fd8ec1b",
+      "transformation": "Selected-field derivative: omit native request/timeline and transport event traces. All remaining values copied unchanged; raw metrics, attempts, gates, presence samples and failures retained."
+    },
+    {
+      "file": "a2-recovery.selected.json",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/a2-recovery.json",
+      "originalBytes": 268841,
+      "originalSha256": "325e796ac0114181cb232f2cbda2c527b45ca99ddd3317b679acedf411e62146",
+      "exportBytes": 6700,
+      "exportSha256": "c7943927b301f4b05a06b39b5b165b3787537d1619668fd15e05be75a1f7b62d",
+      "transformation": "Selected-field derivative: omit native request/timeline and transport event traces. All remaining values copied unchanged; raw metrics, attempts, gates, presence samples and failures retained."
+    },
+    {
+      "file": "security-scheduling.patch",
+      "originalLocalFile": "apps/teacher/src-tauri/target/phase16f-a2-trace/security-scheduling.patch",
+      "originalBytes": 28420,
+      "originalSha256": "1d6997ab52fdd4d4d7170ac3aba053793d261b7a088943eb66b00ac50488927b",
+      "exportBytes": 28411,
+      "exportSha256": "dfec938ad7bc6138acc1435315f1ef078fd5d491496ec92205298fb0b91fd592",
+      "transformation": "Historical Pass A to A2 incremental patch. Review-only derivative: CRLF to LF plus remove nine single-space empty context markers; hunk semantics unchanged. Full review scope is the PR diff."
+    }
+  ]
+}

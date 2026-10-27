@@ -74,7 +74,7 @@ test("hibernation wake invalidates same-generation auth without retaining creden
   const ctx = { getWebSockets: (tag) => { assert.equal(tag, "student"); return [socket]; } };
   assert.equal(invalidateStudents(ctx, { status: "OPEN", teacherGeneration: 7 }, 1000), 1);
   assert.deepEqual(attachment, { role: "student", connectionId: "00000000-0000-4000-8000-000000000003",
-    generation: 7, authState: "UNAUTHENTICATED", authDeadline: 6000, authRequestId: null });
+    generation: 7, authState: "UNAUTHENTICATED", reauthPending: true, authDeadline: 6000, authRequestId: null });
   assert.deepEqual(messages[0].payload, { op: "REAUTH_REQUIRED", generation: 7 });
   invalidateStudents(ctx, { status: "TEACHER_OFFLINE", teacherGeneration: 7 }, 2000);
   assert.equal(attachment.authState, "TEACHER_OFFLINE");
