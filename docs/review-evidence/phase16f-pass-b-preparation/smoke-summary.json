@@ -1,0 +1,403 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "SELECTED_DERIVATIVE_OF_LOCAL_LOOPBACK_REPORT",
+  "scope": "Preparation smoke with two synthetic Students; not production/WAN/30-client capacity or installed UI acceptance",
+  "taskBase": "7db449392ed741ab1df1b15e3cb67f02c730392f",
+  "testedHead": "7db449392ed741ab1df1b15e3cb67f02c730392f",
+  "snapshotMeaning": "Exact working-file bytes at build/run time, including uncommitted task source; not the later delivery commit",
+  "sourceDigest": "2af1b310275f49d6fb609056c90e679684104fe7d0d7b2fbe30bd4fc40c00b7f",
+  "changedSource": [
+    {
+      "file": "apps/relay/scripts/pass-b-adapters.js",
+      "sha256": "08ff9a6f91b6d1468abbcbbdafc4072ab00e61bbc1f0c26ddfe5566abe51ef9f"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b-adapters.test.js",
+      "sha256": "ba59cec9bcd179b87a7e38fc26bfcecd914706da955cbe62904a63fac00313bd"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b-build.js",
+      "sha256": "216a49bc664a9c9274a063550bcbacc3226870e7e7aae9d248258a37a2cf8a62"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b-ledger.js",
+      "sha256": "7a47b8815146fb45ab649e93152e71b52a2f3174409f39dfad0f6d7e814b1f90"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b-ledger.test.js",
+      "sha256": "a176257043ea1c73db8dbcd9a8dee159c38aa54dbfffbec05dae27ac9c526460"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b-process.js",
+      "sha256": "ebe1863f6a76887b5c2782726c3164ea23a6d7d018ddcc29cecf8db5a9515fdc"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b-process.test.js",
+      "sha256": "7fb1a625230116cc330a52c34c987f8ebb70be4b071468de6046ff1052b7a635"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b-safety.js",
+      "sha256": "4943199095dbafd59448f0983b5dfd8db896f5ac5c9c2f3d2fc408ce0240b124"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b-safety.test.js",
+      "sha256": "b24b471410ac3d6d8dcd5d972b2802b93851735ae9ae86bbba8d1b2f2782e601"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b-supervisor.test.js",
+      "sha256": "652082b613d9c58170342d2e096fff4cfa84928da6ea7ce14bcad884cbaf6293"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b-workload.js",
+      "sha256": "e40a189be5f696f4234e5776a4cd975a6c30fcc318fa003a8ee8ee705cbd105f"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b-workload.test.js",
+      "sha256": "2946684dda5d24b130ae36940eba2c6375a35baa338d7cfdbb8c5a8791fdd2dd"
+    },
+    {
+      "file": "apps/relay/scripts/pass-b.js",
+      "sha256": "90d6cb47a5922a35e38ef863ca186b7c75e86a8ffc03bda886e9358f07e9a350"
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_capacity_metrics.rs",
+      "sha256": "f8c4a4d510775d52bc4b1fede9d5bbbd47b385559a6bb1fc748f198a9ca12edc"
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_control.rs",
+      "sha256": "869b36c380f1cd9c2d30b31f163b85996d81c1158f7aeea0a7e913074efe8896"
+    },
+    {
+      "file": "apps/teacher/src-tauri/src/application/remote_pass_b.rs",
+      "sha256": "ff6b3eada90e94f741aefd4548df48de5a679f71683a0a4b056ed18b4f16f310"
+    }
+  ],
+  "runId": "dd3af874-c2cb-4354-94cb-6ac6af956a58",
+  "profile": {
+    "mode": "loopback",
+    "origin": "http://127.0.0.1:8794/",
+    "runId": "dd3af874-c2cb-4354-94cb-6ac6af956a58",
+    "students": 2,
+    "teachers": 1,
+    "classrooms": 1,
+    "stages": [
+      1,
+      2
+    ],
+    "rawBytes": 1073741824,
+    "teacherUtf8Bytes": 2147483648,
+    "wallMs": 1800000,
+    "cleanupMs": 120000
+  },
+  "fixture": {
+    "bytes": 2094909,
+    "mime": "image/png",
+    "sha256": "3b142a0faa4567c8fbbfac5482f61da7c9f09119850613d7a01d4dfccbccc2b9"
+  },
+  "nativeSha256": "aa061700744df9f9abb1110c823b7fc5ef63040839e8fcb18f4fdacefc560486",
+  "studentHttpBundleSha256": "3d182db18ce6ee238761e0e8bac4b094e73bad9f28a3506f8181b719fd0a487d",
+  "toolchain": {
+    "node": "v24.19.0",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+  },
+  "nativeBuildCommand": [
+    "cargo",
+    "test",
+    "--manifest-path",
+    "I:\\ChatGPT\\teachTools\\apps\\teacher\\src-tauri\\Cargo.toml",
+    "--lib",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "studentBuild": "Vite library build of current studentHttpApi.ts, no policy substitution",
+  "originals": {
+    "report": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b/dd3af874-c2cb-4354-94cb-6ac6af956a58/report.json",
+      "sha256": "976d0a47bd3a9152f5ed78ffe85a9eb15cd1b7e8ac1d92eaec2b8f90e4b8bc13",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "buildManifest": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/45feb21a-36e1-48e9-aec3-1a4533a653fc/build-manifest.json",
+      "sha256": "b2dea8b0dfe9f7f44c6c07f03625f1171fc016a2b639448752e23c54d71496d4",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "operationLedger": {
+      "path": "apps\\teacher\\src-tauri\\target\\phase16f-pass-b\\dd3af874-c2cb-4354-94cb-6ac6af956a58\\operation-ledger.json",
+      "sha256": "22da4aa0723f5c865f927a28b40f7010157eb55c21812890b306abb066912f6c",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    }
+  },
+  "overall": "PASS",
+  "runnerCompleted": true,
+  "workloadCompleted": true,
+  "productGatesPass": true,
+  "gates": [
+    {
+      "name": "text_ack",
+      "status": "PASS"
+    },
+    {
+      "name": "text_authoritative_answers",
+      "status": "PASS"
+    },
+    {
+      "name": "image_completion_1",
+      "status": "PASS"
+    },
+    {
+      "name": "media_overlap_1",
+      "status": "PASS"
+    },
+    {
+      "name": "media_ack_1",
+      "status": "PASS"
+    },
+    {
+      "name": "media_detail_1",
+      "status": "PASS"
+    },
+    {
+      "name": "media_answers_presence_1",
+      "status": "PASS"
+    },
+    {
+      "name": "media_release_1",
+      "status": "PASS"
+    },
+    {
+      "name": "image_completion_2",
+      "status": "PASS"
+    },
+    {
+      "name": "media_overlap_2",
+      "status": "PASS"
+    },
+    {
+      "name": "media_ack_2",
+      "status": "PASS"
+    },
+    {
+      "name": "media_detail_2",
+      "status": "PASS"
+    },
+    {
+      "name": "media_answers_presence_2",
+      "status": "PASS"
+    },
+    {
+      "name": "media_release_2",
+      "status": "PASS"
+    },
+    {
+      "name": "lock_reveal",
+      "status": "PASS"
+    },
+    {
+      "name": "cancel_release",
+      "status": "PASS"
+    },
+    {
+      "name": "generation_auth_sync",
+      "status": "PASS"
+    },
+    {
+      "name": "generation_inflight_interruption",
+      "status": "PASS"
+    },
+    {
+      "name": "generation_answers",
+      "status": "PASS"
+    },
+    {
+      "name": "generation_image",
+      "status": "PASS"
+    },
+    {
+      "name": "final_release",
+      "status": "PASS"
+    },
+    {
+      "name": "final_liveness",
+      "status": "PASS"
+    }
+  ],
+  "elapsedMs": 6001.4343,
+  "participantAdmission": "ALL_JOIN_AUTH_SYNC_IN_LOBBY_BEFORE_MEDIA_LADDER",
+  "thresholds": {
+    "textAckP95Ms": 2000,
+    "mediaAckP95Ms": 3000,
+    "image95PercentMs": 30000,
+    "imageAllMs": 60000
+  },
+  "textAck": {
+    "summary": {
+      "n": 2,
+      "p50": 25.801799999999957,
+      "p95": 34.47400000000016,
+      "max": 34.47400000000016
+    },
+    "authoritativeAnsweredCount": 2
+  },
+  "imageStages": [
+    {
+      "readers": 1,
+      "connectedParticipants": 2,
+      "activeMediaBodiesAtProbe": 1,
+      "probeStartedAtMs": 476.5055,
+      "controlCompletedAtMs": 706.9426999999998,
+      "ack": {
+        "n": 2,
+        "p50": 16.56749999999988,
+        "p95": 23.270700000000033,
+        "max": 23.270700000000033
+      },
+      "firstAttemptRejected": 0,
+      "transfers": [
+        {
+          "client": 1,
+          "startedAtMs": 415.3904,
+          "firstByteAtMs": 476.4622999999999,
+          "completedAtMs": 706.9260999999999,
+          "status": 200,
+          "bytes": 2094909,
+          "hashOk": true,
+          "totalMs": 291.5609000000002,
+          "attempts": [
+            {
+              "status": 200,
+              "atMs": 416.16099999999983,
+              "completedAtMs": 472.2801999999999
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "readers": 2,
+      "connectedParticipants": 2,
+      "activeMediaBodiesAtProbe": 1,
+      "probeStartedAtMs": 910.0578999999998,
+      "controlCompletedAtMs": 1286.0313999999998,
+      "ack": {
+        "n": 2,
+        "p50": 17.84400000000005,
+        "p95": 24.281999999999698,
+        "max": 24.281999999999698
+      },
+      "firstAttemptRejected": 0,
+      "transfers": [
+        {
+          "client": 1,
+          "startedAtMs": 839.0846000000001,
+          "firstByteAtMs": 946.1176,
+          "completedAtMs": 1286.0212999999999,
+          "status": 200,
+          "bytes": 2094909,
+          "hashOk": true,
+          "totalMs": 446.96810000000005,
+          "attempts": [
+            {
+              "status": 200,
+              "atMs": 839.3836000000001,
+              "completedAtMs": 943.2129999999997
+            }
+          ]
+        },
+        {
+          "client": 2,
+          "startedAtMs": 839.681,
+          "firstByteAtMs": 910.0246999999999,
+          "completedAtMs": 1230.6942,
+          "status": 200,
+          "bytes": 2094909,
+          "hashOk": true,
+          "totalMs": 391.0178999999998,
+          "attempts": [
+            {
+              "status": 200,
+              "atMs": 839.7527999999998,
+              "completedAtMs": 907.0540000000001
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "cleanupComplete": true,
+  "cleanupDisposition": "CONFIRMED_CLEANED",
+  "resources": {
+    "activation": {
+      "state": "CONFIRMED_CREATED",
+      "cleanup": "CONFIRMED_CLEANED"
+    },
+    "installation": {
+      "state": "CONFIRMED_CREATED",
+      "cleanup": "CONFIRMED_CLEANED"
+    },
+    "session": {
+      "state": "CONFIRMED_CREATED",
+      "cleanup": "CONFIRMED_CLEANED"
+    },
+    "credential": {
+      "state": "CONFIRMED_CREATED",
+      "cleanup": "CONFIRMED_CLEANED"
+    },
+    "child": {
+      "state": "CONFIRMED_CREATED",
+      "cleanup": "CONFIRMED_CLEANED"
+    },
+    "temporaryData": {
+      "state": "CONFIRMED_CREATED",
+      "cleanup": "CONFIRMED_CLEANED"
+    }
+  },
+  "unresolved": [],
+  "workloadCleanup": {
+    "complete": true,
+    "ownedSocketsClosed": true,
+    "httpCancellationConfirmed": true,
+    "cancellationFailures": 0,
+    "pendingOperationsCleared": true,
+    "timersCleared": true
+  },
+  "ledgerPersistence": "CONFIRMED",
+  "emergencyStopRequested": false,
+  "lateAdapterCleanup": "NOT_NEEDED",
+  "nativeMetrics": {
+    "activeMedia": 0,
+    "activeReaders": 0,
+    "budgetStopped": false,
+    "creditWaiters": 0,
+    "deniedBeforeSend": 0,
+    "nativeRawBytesReserved": 13093802,
+    "pendingHigh": 3,
+    "sendWaitMaxMs": 0.18230000000000002,
+    "sendWaitMs": 16.93189999999999,
+    "teacherFrames": {
+      "AUTH:participant_authenticated": 4,
+      "CONTROL:join_result": 2,
+      "CONTROL:ping": 2,
+      "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 402,
+      "HTTP_RELAY:HTTP_RESPONSE_END": 8,
+      "HTTP_RELAY:HTTP_RESPONSE_START": 10,
+      "REALTIME:question_revealed": 10,
+      "REALTIME:question_state_changed": 20,
+      "REALTIME:session_state_changed": 2,
+      "REALTIME:session_sync": 24,
+      "REALTIME:submission_acknowledged": 8,
+      "REALTIME:submission_result": 10
+    },
+    "teacherWsUtf8BytesReserved": 17576201
+  },
+  "productionExecution": "NOT_EXECUTED",
+  "mobileRender": "NOT_EXECUTED",
+  "installedQA": "NOT_EXECUTED",
+  "finalRC": "NOT_EXECUTED",
+  "release": "HOLD",
+  "priorDevelopmentSmoke": {
+    "runId": "abcaa763-56f6-421f-9638-b9837e5b900f",
+    "overall": "PASS",
+    "status": "EARLIER_SOURCE_SNAPSHOT; retained unchanged in ignored target; superseded by this run after safety fixes"
+  }
+}

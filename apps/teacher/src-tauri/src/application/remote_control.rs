@@ -85,6 +85,32 @@ pub struct RemoteControlService {
     realtime: ParticipantRealtimeService,
     operation: AsyncMutex<()>,
     active: Arc<Mutex<Option<ActiveRemote>>>,
+    #[cfg(all(test, windows))]
+    pass_b: Option<Arc<pass_b::Context>>,
+}
+
+fn configured_base_url() -> Option<reqwest::Url> {
+    #[cfg(debug_assertions)]
+    let configured = std::env::var("CLASSROOM_REMOTE_BASE_URL").unwrap_or_else(|_| {
+        option_env!("CLASSROOM_REMOTE_BASE_URL")
+            .unwrap_or("")
+            .to_owned()
+    });
+    #[cfg(not(debug_assertions))]
+    let configured = option_env!("CLASSROOM_REMOTE_BASE_URL")
+        .unwrap_or("")
+        .to_owned();
+    reqwest::Url::parse(&configured).ok().filter(|url| {
+        let loopback_debug = cfg!(debug_assertions)
+            && url.scheme() == "http"
+            && matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1"));
+        (url.scheme() == "https" || loopback_debug)
+            && url.query().is_none()
+            && url.fragment().is_none()
+            && url.username().is_empty()
+            && url.password().is_none()
+            && url.path() == "/"
+    })
 }
 
 impl RemoteControlService {
@@ -98,27 +124,7 @@ impl RemoteControlService {
                 keyring_core::set_default_store(store);
             }
         }
-        #[cfg(debug_assertions)]
-        let configured = std::env::var("CLASSROOM_REMOTE_BASE_URL").unwrap_or_else(|_| {
-            option_env!("CLASSROOM_REMOTE_BASE_URL")
-                .unwrap_or("")
-                .to_owned()
-        });
-        #[cfg(not(debug_assertions))]
-        let configured = option_env!("CLASSROOM_REMOTE_BASE_URL")
-            .unwrap_or("")
-            .to_owned();
-        let base_url = reqwest::Url::parse(&configured).ok().filter(|url| {
-            let loopback_debug = cfg!(debug_assertions)
-                && url.scheme() == "http"
-                && matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1"));
-            (url.scheme() == "https" || loopback_debug)
-                && url.query().is_none()
-                && url.fragment().is_none()
-                && url.username().is_empty()
-                && url.password().is_none()
-                && url.path() == "/"
-        });
+        let base_url = configured_base_url();
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .timeout(Duration::from_secs(10))
@@ -131,6 +137,8 @@ impl RemoteControlService {
             realtime,
             operation: AsyncMutex::new(()),
             active: Arc::new(Mutex::new(None)),
+            #[cfg(all(test, windows))]
+            pass_b: None,
         }
     }
 
@@ -153,7 +161,23 @@ impl RemoteControlService {
     }
 
     pub fn enrolled(&self) -> Result<bool, AppError> {
-        Ok(read_installation()?.is_some())
+        Ok(self.installation()?.is_some())
+    }
+
+    fn installation(&self) -> Result<Option<InstallationCredential>, AppError> {
+        #[cfg(all(test, windows))]
+        if let Some(context) = &self.pass_b {
+            return context.read_installation();
+        }
+        read_installation()
+    }
+
+    fn save_installation(&self, installation: &InstallationCredential) -> Result<(), AppError> {
+        #[cfg(all(test, windows))]
+        if let Some(context) = &self.pass_b {
+            return context.write_installation(installation);
+        }
+        write_installation(installation)
     }
 
     pub async fn enroll(&self, activation_code: String) -> Result<(), AppError> {
@@ -176,7 +200,11 @@ impl RemoteControlService {
         {
             return Err(AppError::RemoteProtocolMismatch);
         }
-        write_installation(&installation)?;
+        #[cfg(all(test, windows))]
+        if let Some(context) = &self.pass_b {
+            context.confirmed("installation", &installation.installation_id)?;
+        }
+        self.save_installation(&installation)?;
         Ok(())
     }
 
@@ -196,7 +224,7 @@ impl RemoteControlService {
         if self.status()?.is_some() || self.sessions.has_nonterminal_session()? {
             return Err(AppError::Conflict("another session is active".to_owned()));
         }
-        let installation = read_installation()?.ok_or(AppError::RemoteNotEnrolled)?;
+        let installation = self.installation()?.ok_or(AppError::RemoteNotEnrolled)?;
         let response = self
             .client()?
             .post(self.endpoint("v1/teacher/sessions")?)
@@ -214,12 +242,21 @@ impl RemoteControlService {
         {
             return Err(AppError::RemoteProtocolMismatch);
         }
+        #[cfg(all(test, windows))]
+        if let Some(context) = &self.pass_b {
+            context.confirmed("session", &created.remote_session_id)?;
+        }
         let local = match self.sessions.create(
             classroom_id,
             format!("remote:{}", created.remote_session_id),
         ) {
             Ok(local) => local,
             Err(error) => {
+                #[cfg(all(test, windows))]
+                if self.pass_b.is_some() {
+                    // The supervisor owns intent recording and exact-ID compensation.
+                    return Err(error);
+                }
                 let _ = self
                     .close_relay(&created.remote_session_id, &installation)
                     .await;
@@ -230,6 +267,10 @@ impl RemoteControlService {
             .sessions
             .open_lobby(local.id.clone(), local.server_instance_id.clone())
         {
+            #[cfg(all(test, windows))]
+            if self.pass_b.is_some() {
+                return Err(error);
+            }
             let _ = self.sessions.end(local.id, "remote_setup_failed");
             let _ = self
                 .close_relay(&created.remote_session_id, &installation)
@@ -264,7 +305,13 @@ impl RemoteControlService {
         let local_id = status.local_session_id.clone();
         let sessions = Arc::clone(&self.sessions);
         let realtime = self.realtime.clone();
+        #[cfg(all(test, windows))]
+        let pass_b = self.pass_b.clone();
+        #[cfg(all(test, windows))]
+        let pass_b_guard = pass_b.as_ref().map(pass_b::Context::runtime_guard);
         tauri::async_runtime::spawn(async move {
+            #[cfg(all(test, windows))]
+            let _pass_b_guard = pass_b_guard;
             connection_loop(
                 client,
                 base_url,
@@ -274,6 +321,8 @@ impl RemoteControlService {
                     sessions,
                     realtime,
                     active,
+                    #[cfg(all(test, windows))]
+                    pass_b,
                 },
                 receiver,
             )
@@ -294,7 +343,7 @@ impl RemoteControlService {
     pub async fn close_session(&self) -> Result<(), AppError> {
         let _operation = self.operation.lock().await;
         let status = self.status()?.ok_or(AppError::SessionNotFound)?;
-        let relay_result = match read_installation() {
+        let relay_result = match self.installation() {
             Ok(Some(installation)) => {
                 self.close_relay(&status.remote_session_id, &installation)
                     .await
@@ -334,6 +383,10 @@ impl RemoteControlService {
             .send()
             .await
             .map_err(|_| AppError::RemoteUnavailable)?;
+        #[cfg(all(test, windows))]
+        if self.pass_b.is_some() && response.status() != reqwest::StatusCode::NO_CONTENT {
+            return Err(AppError::RemoteUnavailable);
+        }
         if response.status().is_success() {
             Ok(())
         } else {
@@ -433,6 +486,15 @@ async fn connect_once(
     id: &str,
 ) -> Result<(TeacherSocket, u64), AppError> {
     let installation = read_installation()?.ok_or(AppError::RemoteNotEnrolled)?;
+    connect_with_installation(client, base, id, &installation).await
+}
+
+async fn connect_with_installation(
+    client: &reqwest::Client,
+    base: &reqwest::Url,
+    id: &str,
+    installation: &InstallationCredential,
+) -> Result<(TeacherSocket, u64), AppError> {
     let ticket_url = base
         .join(&format!("v1/teacher/sessions/{id}/tickets"))
         .map_err(|_| AppError::RemoteUnavailable)?;
@@ -535,6 +597,8 @@ struct RemoteRuntime {
     sessions: Arc<LocalSessionService>,
     realtime: ParticipantRealtimeService,
     active: Arc<Mutex<Option<ActiveRemote>>>,
+    #[cfg(all(test, windows))]
+    pass_b: Option<Arc<pass_b::Context>>,
 }
 
 async fn send_frames(socket: &mut TeacherSocket, frames: Vec<serde_json::Value>) -> bool {
@@ -569,6 +633,8 @@ async fn connection_loop(
         sessions,
         realtime,
         active,
+        #[cfg(all(test, windows))]
+        pass_b,
     } = runtime;
     let mut participants =
         RemoteParticipants::new(sessions, realtime.clone(), local_id.clone(), &id);
@@ -578,7 +644,19 @@ async fn connection_loop(
         if *stop.borrow() {
             return;
         }
-        match connect_once(&client, &base, &id).await {
+        #[cfg(test)]
+        if super::remote_capacity_metrics::stopped() {
+            return;
+        }
+        #[cfg(all(test, windows))]
+        let connected = if let Some(context) = &pass_b {
+            context.connect(&client, &base, &id).await
+        } else {
+            connect_once(&client, &base, &id).await
+        };
+        #[cfg(not(all(test, windows)))]
+        let connected = connect_once(&client, &base, &id).await;
+        match connected {
             Ok((mut socket, generation)) => {
                 // Every fresh Teacher ticket creates a new authority generation.
                 participants.disconnect_all();
@@ -602,6 +680,10 @@ async fn connection_loop(
                 };
                 let mut heartbeat = interval(Duration::from_secs(heartbeat_seconds));
                 loop {
+                    #[cfg(test)]
+                    if super::remote_capacity_metrics::stopped() {
+                        break;
+                    }
                     tokio::select! {
                         changed = stop.changed() => {
                             if changed.is_err() || *stop.borrow() {
@@ -619,6 +701,8 @@ async fn connection_loop(
                         message = socket.next() => {
                             match message {
                                 Some(Ok(Message::Text(text))) if text.len() <= MAX_ENVELOPE_BYTES => {
+                                    #[cfg(test)]
+                                    if super::remote_capacity_metrics::stopped() { break; }
                                     #[cfg(test)]
                                     super::remote_capacity_metrics::received(&text);
                                     let is_http = serde_json::from_str::<serde_json::Value>(&text).is_ok_and(|value| value["type"] == "HTTP_RELAY");
@@ -1325,3 +1409,7 @@ mod http_smoke;
 #[cfg(all(test, windows))]
 #[path = "remote_capacity_smoke.rs"]
 mod capacity_smoke;
+
+#[cfg(all(test, windows))]
+#[path = "remote_pass_b.rs"]
+mod pass_b;
