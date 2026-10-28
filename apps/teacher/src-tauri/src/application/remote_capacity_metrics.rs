@@ -4,7 +4,7 @@ use std::{
     cell::RefCell,
     collections::BTreeMap,
     sync::{Arc, Mutex, OnceLock},
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tokio::sync::Semaphore;
 use uuid::Uuid;
@@ -24,6 +24,68 @@ struct Metrics {
     media: Option<Arc<Semaphore>>,
     send_wait_ms: f64,
     send_wait_max_ms: f64,
+    pass_b: Option<PassBBudget>,
+}
+
+/// Pure reservation state. A rejected frame is never counted as reserved/sent.
+struct PassBBudget {
+    deadline: Instant,
+    raw: u64,
+    wire: u64,
+    denied: u64,
+    stopped: bool,
+}
+impl PassBBudget {
+    fn reserve(&mut self, raw: u64, wire: u64, now: Instant) -> bool {
+        let allowed = !self.stopped
+            && now < self.deadline
+            && self
+                .raw
+                .checked_add(raw)
+                .is_some_and(|n| n <= 1024 * 1024 * 1024)
+            && self
+                .wire
+                .checked_add(wire)
+                .is_some_and(|n| n <= 2 * 1024 * 1024 * 1024);
+        if allowed {
+            self.raw += raw;
+            self.wire += wire;
+        } else {
+            self.denied += 1;
+            self.stopped = true;
+        }
+        allowed
+    }
+}
+
+pub fn enable_pass_b(remaining_work: Duration) -> Result<(), &'static str> {
+    let mut s = state().lock().map_err(|_| "METRICS_UNAVAILABLE")?;
+    if s.enabled || remaining_work.is_zero() || remaining_work > Duration::from_secs(1800) {
+        return Err("BUDGET_INVALID");
+    }
+    let now = Instant::now();
+    *s = Metrics {
+        enabled: true,
+        began: Some(now),
+        pass_b: Some(PassBBudget {
+            deadline: now + remaining_work,
+            raw: 0,
+            wire: 0,
+            denied: 0,
+            stopped: false,
+        }),
+        ..Default::default()
+    };
+    Ok(())
+}
+
+pub fn stop_pass_b() {
+    if let Ok(mut s) = state().lock() {
+        if let Some(budget) = s.pass_b.as_mut() {
+            budget.stopped = true;
+            s.stopped = true;
+        }
+    }
 }
 static STATE: OnceLock<Mutex<Metrics>> = OnceLock::new();
 thread_local! { static REQUEST: RefCell<Option<Uuid>> = const { RefCell::new(None) }; }
@@ -41,7 +103,11 @@ pub fn enabled() -> bool {
     state().lock().expect("test metrics lock").enabled
 }
 pub fn stopped() -> bool {
-    state().lock().expect("test metrics lock").stopped
+    let s = state().lock().expect("test metrics lock");
+    s.stopped
+        || s.pass_b
+            .as_ref()
+            .is_some_and(|budget| Instant::now() >= budget.deadline)
 }
 pub fn budget(readers: Arc<Semaphore>, media: Arc<Semaphore>) {
     let mut s = state().lock().expect("test metrics lock");
@@ -153,13 +219,23 @@ pub fn sent(raw: &str) -> bool {
         .as_str()
         .or_else(|| value["payload"]["message"]["type"].as_str())
         .unwrap_or("other");
+    let raw_chunk_bytes = if op == "HTTP_RESPONSE_CHUNK" {
+        let data = value["payload"]["data"].as_str().expect("chunk");
+        (data.len() / 4 * 3 - data.bytes().rev().take_while(|b| *b == b'=').count()) as u64
+    } else {
+        0
+    };
+    if let Some(budget) = s.pass_b.as_mut() {
+        if !budget.reserve(raw_chunk_bytes, raw.len() as u64, Instant::now()) {
+            s.stopped = true;
+            return false;
+        }
+    }
     let key = format!("{family}:{op}");
     *s.counts.entry(key).or_default() += 1;
     s.wire_bytes += raw.len() as u64;
     if op == "HTTP_RESPONSE_CHUNK" {
-        let data = value["payload"]["data"].as_str().expect("chunk");
-        s.raw_bytes +=
-            (data.len() / 4 * 3 - data.bytes().rev().take_while(|b| *b == b'=').count()) as u64;
+        s.raw_bytes += raw_chunk_bytes;
     }
     // Conservative pre-send accounting includes cancelled/retried transfers.
     s.stopped |= s.raw_bytes > 1024 * 1024 * 1024 || s.wire_bytes > 2 * 1024 * 1024 * 1024;
@@ -175,9 +251,54 @@ pub fn send_wait(ms: f64) {
 pub fn snapshot() -> Value {
     let s = state().lock().expect("test metrics lock");
     json!({"nativeRawBytesReserved":s.raw_bytes,"teacherWsUtf8BytesReserved":s.wire_bytes,
-        "budgetStopped":s.stopped,"teacherFrames":s.counts,"pendingHigh":s.pending_high,
+        "budgetStopped":s.stopped || s.pass_b.as_ref().is_some_and(|budget| Instant::now() >= budget.deadline),
+        "deniedBeforeSend":s.pass_b.as_ref().map(|budget|budget.denied),
+        "teacherFrames":s.counts,"pendingHigh":s.pending_high,
         "activeReaders":s.readers.as_ref().map(|v|8-v.available_permits()),
         "activeMedia":s.media.as_ref().map(|v|4-v.available_permits()),
         "creditWaiters":s.waiting.len(),"sendWaitMs":s.send_wait_ms,"sendWaitMaxMs":s.send_wait_max_ms,
         "requests":s.requests,"timeline":s.timeline})
+}
+
+#[cfg(test)]
+mod pass_b_tests {
+    use super::*;
+    #[test]
+    fn pass_b_reservations_cover_retries_cancel_reconnect_and_fail_closed() {
+        let now = Instant::now();
+        let mut budget = PassBBudget {
+            deadline: now + Duration::from_secs(60),
+            raw: 0,
+            wire: 0,
+            denied: 0,
+            stopped: false,
+        };
+        // Repeated chunks are still reserved; cancellation/control consumes wire.
+        assert!(budget.reserve(32_768, 44_000, now));
+        assert!(budget.reserve(32_768, 44_000, now));
+        assert!(budget.reserve(0, 200, now));
+        assert_eq!((budget.raw, budget.wire), (65_536, 88_200));
+        budget.raw = 1024 * 1024 * 1024;
+        assert!(!budget.reserve(1, 1, now));
+        assert_eq!(budget.raw, 1024 * 1024 * 1024);
+        assert!(!budget.reserve(0, 1, now)); // reconnect cannot reset budget
+    }
+    #[test]
+    fn pass_b_wire_deadline_and_overflow_stop_before_send() {
+        let now = Instant::now();
+        let mut budget = PassBBudget {
+            deadline: now,
+            raw: 0,
+            wire: 0,
+            denied: 0,
+            stopped: false,
+        };
+        assert!(!budget.reserve(0, 1, now));
+        budget.deadline = now + Duration::from_secs(10);
+        budget.stopped = false;
+        budget.wire = 2 * 1024 * 1024 * 1024;
+        assert!(!budget.reserve(0, 1, now));
+        budget.stopped = false;
+        assert!(!budget.reserve(u64::MAX, u64::MAX, now));
+    }
 }
