@@ -4,7 +4,7 @@
 本任務實作獨立 runner、focused tests 與本機整合驗證；production execution **NOT_EXECUTED**，Phase 16F release **HOLD**。
 PR #1 的 A／A2 與 PR #2 的交接已整合；[既有交接](handoff/phase16f-after-pr1.md)與[A2 evidence](review-evidence/phase16f-pass-a-a2/README.md)保持歷史內容。
 
-[PR #3](https://github.com/RavenCH-oc/teachTools/pull/3) 已人工 push 並建立 Draft，尚未合併。固定 head `5ffb7d6e4a339b523d135115d764c78eb4a84971` 審查後，本次增量修正單次授權 run identity、unknown provisioning 的 cleanup 判定、generation interruption 的原因分類及 control completion timestamp。新的 [review-fix evidence](review-evidence/phase16f-pass-b-preparation/pr3-fixes.md) 與初版 Windows smoke 分開；修正後 Windows native build／兩人真實 loopback smoke 仍待執行。
+[PR #3](https://github.com/RavenCH-oc/teachTools/pull/3) 沿用既有 Draft，尚未合併。固定 head `5ffb7d6e4a339b523d135115d764c78eb4a84971` 審查後，`843aeab7d3a56aaaa427fcab7d5c5c64e6703f95` 已修正單次授權 run identity、unknown provisioning 的 cleanup 判定、generation interruption 的原因分類、control completion timestamp 與 run-abort 收尾。[Linux review-fix evidence](review-evidence/phase16f-pass-b-preparation/pr3-fixes.md) 保留當時結果；2026-10-28 已以目前 Windows source 重新 build，並完成一次兩人真實 loopback smoke：22 gates PASS、cleanup confirmed，見新的 [Windows verification](review-evidence/phase16f-pass-b-preparation/windows-review-fixes.md)。
 
 ## Pilot 與驗證範圍
 
@@ -106,7 +106,7 @@ Native 在 socket send **之前**保守預留 cumulative raw `HTTP_RESPONSE_CHUN
 
 Generation recovery 記錄舊 response 的 `terminationCause`、`reconnectTriggeredAtMs`、重新 AUTH＋sync、後續作答與圖片。Runner 自己的 total-read／body deadline、run abort、主動 cancel 或 size guard 都不能滿足 generation interruption gate；舊流若一直卡到 client timeout 才結束，該 gate 與整體 product gates 不得 PASS。只有 trigger 時仍在讀取、其後觀察到的 stream interruption 才能作為該觀察證據，並標示 `TEMPORAL_CORRELATION_ONLY`，不能從 generic transport failure 推論更強的 server-side 原因。舊 read 正常完成而未觀察到 interruption 時為 `NOT_OBSERVED`；deadline／abort／guard 或其他不符合條件的失敗為 `FAIL`。不重播成功後中斷的 body、不拼接 generations。
 
-執行完成、各 product gate、cleanup、synthetic protocol evidence 分開記錄。真實手機 Blob／decode／render、WAN、installed build、學校 outbound WSS 均未由初版 smoke 驗證。
+執行完成、各 product gate、cleanup、synthetic protocol evidence 分開記錄。真實手機 Blob／decode／render、WAN、installed build、學校 outbound WSS 均未由這些本機 smoke 驗證。
 
 ## 後續 production 操作前仍待核對
 
@@ -146,6 +146,6 @@ Production authorization 的 `runId` 必須是明確且有效的 UUID 字串；�
 
 初版 tested source digest 按 build 時實際 working bytes 保存，`testedHead` 是當時的 task base，不能用之後的 commit SHA 倒填。Docs 不參與 source digest；build 前後核對相同，執行前再對目前 source 核對。Git 的既有換行正規化可能改變 checkout bytes，新的環境需重新 build／建立新的 manifest，不沿用不符合 bytes 的 artifact。
 
-PR #3 review 的 16 個變更 source hashes 與固定 head 一致，但 review checkout 的完整 digest 與初版 Windows smoke 不同；沒有原完整 manifest，尚不能判定差異原因。修正證據另外公開完整 source-only per-file hash 清單，按目前 checkout 原始 bytes 計算，不正規化換行、不補造歷史 Windows manifest，也不把 source snapshot 當 native／Student artifact build 證據。
+PR #3 的 Linux review 當時未取得原完整 Windows manifest，因此保留完整 digest 差異未解的紀錄。本輪 Windows 找回原 manifest 後完成機械比對：初版與 `5ffb7d6…` Git blobs 的 27 筆差異均為換行差異；目前 Windows 與 Linux review-fix snapshot 的 35 筆差異也全為 CRLF／LF。完整 raw hashes、逐檔比較與限制見 [Windows source manifest](review-evidence/phase16f-pass-b-preparation/windows-review-fixes-source-manifest.json)。沒有改寫換行或舊 evidence；新 build 使用 Windows raw digest `6a01e4c1…`，不是正規化 digest。
 
-初版 targeted tests／loopback 結果與 A2 previous PASS 分開，未重跑 A2 完整 workload 或 repo broad suites。PR #3 增量修正停止於新的 local commit；人工 push 至同一 Draft PR、補足修正後 Windows 驗證並完成新的固定 head review 後，仍需新的 production execution 授權。Phase 16F release 維持 HOLD。
+初版、Linux review fixes、本輪 Windows targeted tests／loopback 與 A2 previous PASS 分開保存，未重跑 A2 完整 workload 或 repo broad suites。本輪 Windows 驗證結果綁定 `843aeab7…` 與新的 manifest，文件 commit 不回填測試時 HEAD。完成 local evidence commit 後停止；人工 push 至同一 Draft PR並完成新固定 head review 後，仍需另外明確授權 production execution。Phase 16F release 維持 HOLD。

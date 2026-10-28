@@ -1,0 +1,810 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-28",
+  "timezone": "Asia/Taipei",
+  "taskBase": "7db449392ed741ab1df1b15e3cb67f02c730392f",
+  "revisionBase": "843aeab7d3a56aaaa427fcab7d5c5c64e6703f95",
+  "headAtVerification": "843aeab7d3a56aaaa427fcab7d5c5c64e6703f95",
+  "branch": "codex/phase16f-pass-b-preparation",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.19.0",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+  },
+  "evidenceKind": "WINDOWS_REVIEW_FIX_NATIVE_AND_STUDENT_LOOPBACK_VERIFICATION",
+  "scope": "One Teacher, one classroom, two synthetic Students; reader stages 1/2. The maximum 30-Student ladder is covered by mocks only; not production/WAN/installed acceptance.",
+  "sourceDigest": "6a01e4c12eedb9e91f3e01d20840d4d073bc4d8a5e44a73c4035307b5c03d830",
+  "sourceFileCount": 247,
+  "sourceManifest": "windows-review-fixes-source-manifest.json",
+  "sourceUnchangedDuringVerification": true,
+  "targetedNode": {
+    "command": "node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap apps/relay/scripts/pass-b-safety.test.js apps/relay/scripts/pass-b-ledger.test.js apps/relay/scripts/pass-b-supervisor.test.js apps/relay/scripts/pass-b-adapters.test.js apps/relay/scripts/pass-b-process.test.js apps/relay/scripts/pass-b-workload.test.js apps/relay/scripts/capacity-local.safety.test.js apps/relay/scripts/capacity-local-server.test.js",
+    "exitCode": 0,
+    "result": "PASS",
+    "tests": 138,
+    "pass": 138,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "startedAt": "2026-10-28T02:44:29.8744329Z",
+    "finishedAt": "2026-10-28T02:44:33.0053682Z",
+    "durationMs": 2957.4746,
+    "stdout": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-windows-verification/cac4eddc-3e36-45db-bc1f-ea0d86c0f153/node-tests.tap",
+      "sha256": "574ceb34e7176eb47d9faa9e828dad84a7920f3f5e871c17730fa2213000eb14",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "stderr": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-windows-verification/cac4eddc-3e36-45db-bc1f-ea0d86c0f153/node-tests.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "attempts": 1
+  },
+  "nativeChecks": [
+    {
+      "command": "cargo fmt --check",
+      "cwd": "apps/teacher/src-tauri",
+      "startedAtUtc": "2026-10-28T02:46:06.5323615+00:00",
+      "finishedAtUtc": "2026-10-28T02:46:08.1089306+00:00",
+      "elapsedMilliseconds": 1570,
+      "exitCode": 0,
+      "log": {
+        "path": "target/phase16f-pass-b-windows-verification/9a122fc7-dff1-4dae-8bb4-dd1c1c74f2cc/01-cargo-fmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      },
+      "sandbox": "use_default",
+      "result": "PASS",
+      "attempts": 1
+    },
+    {
+      "command": "cargo check",
+      "cwd": "apps/teacher/src-tauri",
+      "startedAtUtc": "2026-10-28T02:46:16.5014876+00:00",
+      "finishedAtUtc": "2026-10-28T02:46:21.9411949+00:00",
+      "elapsedMilliseconds": 5434,
+      "exitCode": 0,
+      "log": {
+        "path": "target/phase16f-pass-b-windows-verification/9a122fc7-dff1-4dae-8bb4-dd1c1c74f2cc/02-cargo-check.log",
+        "sha256": "aa293fa1295dd98bcd8a871f271947d7b8a90892c764e3a23e24d89051aeac65",
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      },
+      "sandbox": "use_default",
+      "result": "PASS",
+      "attempts": 1
+    },
+    {
+      "command": "cargo clippy --all-targets --all-features -- -D warnings",
+      "cwd": "apps/teacher/src-tauri",
+      "startedAtUtc": "2026-10-28T02:46:31.4878993+00:00",
+      "finishedAtUtc": "2026-10-28T02:46:32.4032489+00:00",
+      "elapsedMilliseconds": 910,
+      "exitCode": 0,
+      "log": {
+        "path": "target/phase16f-pass-b-windows-verification/9a122fc7-dff1-4dae-8bb4-dd1c1c74f2cc/03-cargo-clippy.log",
+        "sha256": "525dbb1b4b83094e6699fe079d8feed89e6a2467714a5127fdf2a9a8c6876b73",
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      },
+      "sandbox": "use_default",
+      "result": "PASS",
+      "attempts": 1
+    },
+    {
+      "command": "cargo test --lib pass_b -- --test-threads=1",
+      "cwd": "apps/teacher/src-tauri",
+      "startedAtUtc": "2026-10-28T02:46:49.5399588+00:00",
+      "finishedAtUtc": "2026-10-28T02:46:50.3875163+00:00",
+      "elapsedMilliseconds": 842,
+      "exitCode": 0,
+      "log": {
+        "path": "target/phase16f-pass-b-windows-verification/9a122fc7-dff1-4dae-8bb4-dd1c1c74f2cc/04-cargo-test-pass-b.log",
+        "sha256": "4043e7612012ec4c913ee6d756e19381016586198f9bff611d668bbde24773e9",
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      },
+      "sandbox": "require_escalated",
+      "purpose": "Allow isolated per-run Windows Credential Manager regression under ordinary local user permissions",
+      "result": "PASS",
+      "attempts": 1
+    }
+  ],
+  "nativeFocusedTests": {
+    "passed": 9,
+    "failed": 0,
+    "ignored": 1,
+    "filteredOut": 134,
+    "ignoredEntry": "Opt-in runner omitted from focused tests, then explicitly executed once by the new smoke supervisor"
+  },
+  "defaultPlan": {
+    "command": "node apps/relay/scripts/pass-b.js",
+    "exitCode": 0,
+    "result": "PASS",
+    "students": 30,
+    "teachers": 1,
+    "classrooms": 1,
+    "stages": [
+      1,
+      4,
+      5,
+      10,
+      20,
+      30
+    ],
+    "productionEffects": "NONE",
+    "executionAuthorized": false,
+    "stdout": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-windows-verification/cac4eddc-3e36-45db-bc1f-ea0d86c0f153/default-plan.json",
+      "sha256": "b1f934d07c21d9505c89efd8c08722f139b01fe336c847e0ca2b75b134414eb0",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "stderr": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-windows-verification/cac4eddc-3e36-45db-bc1f-ea0d86c0f153/default-plan.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    }
+  },
+  "artifactBuild": {
+    "command": "node apps/relay/scripts/pass-b-build.js",
+    "exitCode": 0,
+    "startedAt": "2026-10-28T02:47:24.3788042Z",
+    "finishedAt": "2026-10-28T02:47:25.7872412Z",
+    "result": "PASS",
+    "attempts": 1,
+    "createdAt": "2026-10-28T02:47:25.682Z",
+    "manifest": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/1e45243e-5919-4fe9-a534-d28edee99369/build-manifest.json",
+      "sha256": "2474da8564de83cec38a1fddf418f94fe582c70353e51d79cad6b1713f2e3569",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "stdout": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-windows-verification/cac4eddc-3e36-45db-bc1f-ea0d86c0f153/build.stdout.json",
+      "sha256": "d7d2a414f76f841abb33e7b685e73bbbd9d68fc0ed0fe8d1f8042832cad5956d",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "stderr": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-windows-verification/cac4eddc-3e36-45db-bc1f-ea0d86c0f153/build.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "native": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/1e45243e-5919-4fe9-a534-d28edee99369/teacher-pass-b-test.exe",
+      "sha256": "aa061700744df9f9abb1110c823b7fc5ef63040839e8fcb18f4fdacefc560486"
+    },
+    "studentHttpBundle": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/1e45243e-5919-4fe9-a534-d28edee99369/student-http-client.mjs",
+      "sha256": "3d182db18ce6ee238761e0e8bac4b094e73bad9f28a3506f8181b719fd0a487d"
+    },
+    "fixture": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/1e45243e-5919-4fe9-a534-d28edee99369/image.png",
+      "sha256": "a2e3ee515ce18a45220485d571fb5ac68fae5ecaea3cb6f49a78117cc1e5aad7",
+      "bytes": 2094909,
+      "mime": "image/png"
+    },
+    "nativeBuildCommand": [
+      "cargo",
+      "test",
+      "--manifest-path",
+      "apps/teacher/src-tauri/Cargo.toml",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "studentBuild": "Vite library build of current studentHttpApi.ts, no policy substitution"
+  },
+  "smoke": {
+    "command": "node apps/relay/scripts/pass-b.js loopback-smoke --manifest apps/teacher/src-tauri/target/phase16f-pass-b-build/1e45243e-5919-4fe9-a534-d28edee99369/build-manifest.json --students 2",
+    "exitCode": 0,
+    "startedAt": "2026-10-28T02:47:40.5693114Z",
+    "finishedAt": "2026-10-28T02:47:47.1245944Z",
+    "attempts": 1,
+    "runId": "d54a9e70-cd76-4ff3-9e3a-ee35421f9c15",
+    "overall": "PASS",
+    "runnerCompleted": true,
+    "workloadCompleted": true,
+    "productGatesPass": true,
+    "elapsedMs": 6463.9508,
+    "profile": {
+      "mode": "loopback",
+      "origin": "http://127.0.0.1:8794/",
+      "runId": "d54a9e70-cd76-4ff3-9e3a-ee35421f9c15",
+      "students": 2,
+      "teachers": 1,
+      "classrooms": 1,
+      "stages": [
+        1,
+        2
+      ],
+      "rawBytes": 1073741824,
+      "teacherUtf8Bytes": 2147483648,
+      "wallMs": 1800000,
+      "cleanupMs": 120000
+    },
+    "thresholds": {
+      "textAckP95Ms": 2000,
+      "mediaAckP95Ms": 3000,
+      "image95PercentMs": 30000,
+      "imageAllMs": 60000
+    },
+    "participantAdmission": "ALL_JOIN_AUTH_SYNC_IN_LOBBY_BEFORE_MEDIA_LADDER",
+    "gates": [
+      {
+        "name": "text_ack",
+        "status": "PASS"
+      },
+      {
+        "name": "text_authoritative_answers",
+        "status": "PASS"
+      },
+      {
+        "name": "image_completion_1",
+        "status": "PASS"
+      },
+      {
+        "name": "media_overlap_1",
+        "status": "PASS"
+      },
+      {
+        "name": "media_ack_1",
+        "status": "PASS"
+      },
+      {
+        "name": "media_detail_1",
+        "status": "PASS"
+      },
+      {
+        "name": "media_answers_presence_1",
+        "status": "PASS"
+      },
+      {
+        "name": "media_release_1",
+        "status": "PASS"
+      },
+      {
+        "name": "image_completion_2",
+        "status": "PASS"
+      },
+      {
+        "name": "media_overlap_2",
+        "status": "PASS"
+      },
+      {
+        "name": "media_ack_2",
+        "status": "PASS"
+      },
+      {
+        "name": "media_detail_2",
+        "status": "PASS"
+      },
+      {
+        "name": "media_answers_presence_2",
+        "status": "PASS"
+      },
+      {
+        "name": "media_release_2",
+        "status": "PASS"
+      },
+      {
+        "name": "lock_reveal",
+        "status": "PASS"
+      },
+      {
+        "name": "cancel_release",
+        "status": "PASS"
+      },
+      {
+        "name": "generation_auth_sync",
+        "status": "PASS"
+      },
+      {
+        "name": "generation_inflight_interruption",
+        "status": "PASS"
+      },
+      {
+        "name": "generation_answers",
+        "status": "PASS"
+      },
+      {
+        "name": "generation_image",
+        "status": "PASS"
+      },
+      {
+        "name": "final_release",
+        "status": "PASS"
+      },
+      {
+        "name": "final_liveness",
+        "status": "PASS"
+      }
+    ],
+    "textAck": {
+      "label": "text_ack",
+      "rows": [
+        {
+          "client": 1,
+          "ms": 7.455400000000054,
+          "accepted": true
+        },
+        {
+          "client": 2,
+          "ms": 13.812200000000075,
+          "accepted": true
+        }
+      ],
+      "summary": {
+        "n": 2,
+        "p50": 7.455400000000054,
+        "p95": 13.812200000000075,
+        "max": 13.812200000000075
+      },
+      "authoritativeAnsweredCount": 2
+    },
+    "imageStages": [
+      {
+        "readers": 1,
+        "connectedParticipants": 2,
+        "activeMediaBodiesAtProbe": 1,
+        "probeStartedAtMs": 484.93809999999985,
+        "controlCompletedAtMs": 530.3678,
+        "transfers": [
+          {
+            "client": 1,
+            "startedAtMs": 411.45809999999983,
+            "firstByteAtMs": 484.8831,
+            "completedAtMs": 734.6976,
+            "status": 200,
+            "bytes": 2094909,
+            "terminationCause": "COMPLETED",
+            "mime": "image/png",
+            "hashOk": true,
+            "totalMs": 323.2478000000001,
+            "attempts": [
+              {
+                "status": 200,
+                "atMs": 412.2871,
+                "completedAtMs": 479.90290000000005
+              }
+            ],
+            "firstAttemptStatus": 200
+          }
+        ],
+        "acks": [
+          {
+            "client": 1,
+            "ms": 22.522300000000087,
+            "accepted": true
+          },
+          {
+            "client": 2,
+            "ms": 30.348099999999704,
+            "accepted": true
+          }
+        ],
+        "ack": {
+          "n": 2,
+          "p50": 22.522300000000087,
+          "p95": 30.348099999999704,
+          "max": 30.348099999999704
+        },
+        "detail": {
+          "client": 2,
+          "startedAtMs": 485.11529999999993,
+          "firstByteAtMs": 530.2574,
+          "completedAtMs": 530.3146000000002,
+          "status": 200,
+          "bytes": 30,
+          "terminationCause": "COMPLETED",
+          "mime": "application/json",
+          "hashOk": true,
+          "totalMs": 45.20609999999988,
+          "attempts": [
+            {
+              "status": 200,
+              "atMs": 485.41510000000017,
+              "completedAtMs": 530.0596
+            }
+          ],
+          "firstAttemptStatus": 200
+        },
+        "presence": {
+          "online": 2
+        },
+        "authoritativeAnsweredCount": 2,
+        "firstAttemptRejected": 0
+      },
+      {
+        "readers": 2,
+        "connectedParticipants": 2,
+        "activeMediaBodiesAtProbe": 1,
+        "probeStartedAtMs": 917.9322000000002,
+        "controlCompletedAtMs": 971.5493999999999,
+        "transfers": [
+          {
+            "client": 1,
+            "startedAtMs": 867.0266999999999,
+            "firstByteAtMs": 956.3225000000002,
+            "completedAtMs": 1281.3712999999998,
+            "status": 200,
+            "bytes": 2094909,
+            "terminationCause": "COMPLETED",
+            "mime": "image/png",
+            "hashOk": true,
+            "totalMs": 414.35220000000027,
+            "attempts": [
+              {
+                "status": 200,
+                "atMs": 867.3218000000002,
+                "completedAtMs": 951.9339
+              }
+            ],
+            "firstAttemptStatus": 200
+          },
+          {
+            "client": 2,
+            "startedAtMs": 867.6077999999998,
+            "firstByteAtMs": 917.9005999999999,
+            "completedAtMs": 1225.3903,
+            "status": 200,
+            "bytes": 2094909,
+            "terminationCause": "COMPLETED",
+            "mime": "image/png",
+            "hashOk": true,
+            "totalMs": 357.7846999999997,
+            "attempts": [
+              {
+                "status": 200,
+                "atMs": 867.6777999999999,
+                "completedAtMs": 914.9236000000001
+              }
+            ],
+            "firstAttemptStatus": 200
+          }
+        ],
+        "acks": [
+          {
+            "client": 1,
+            "ms": 17.086299999999937,
+            "accepted": true
+          },
+          {
+            "client": 2,
+            "ms": 24.055599999999686,
+            "accepted": true
+          }
+        ],
+        "ack": {
+          "n": 2,
+          "p50": 17.086299999999937,
+          "p95": 24.055599999999686,
+          "max": 24.055599999999686
+        },
+        "detail": {
+          "client": 2,
+          "startedAtMs": 918.0558000000001,
+          "firstByteAtMs": 971.4481000000001,
+          "completedAtMs": 971.5432000000001,
+          "status": 200,
+          "bytes": 30,
+          "terminationCause": "COMPLETED",
+          "mime": "application/json",
+          "hashOk": true,
+          "totalMs": 53.48919999999998,
+          "attempts": [
+            {
+              "status": 200,
+              "atMs": 918.1514000000002,
+              "completedAtMs": 971.1734999999999
+            }
+          ],
+          "firstAttemptStatus": 200
+        },
+        "presence": {
+          "online": 2
+        },
+        "authoritativeAnsweredCount": 2,
+        "firstAttemptRejected": 0
+      }
+    ],
+    "lockReveal": {
+      "label": "lock_reveal",
+      "lock": {
+        "startedAtMs": 1341.4886000000001,
+        "activeMediaBodiesAtStart": 1,
+        "completedAtMs": 1381.214
+      },
+      "reveal": {
+        "startedAtMs": 1381.2215999999999,
+        "activeMediaBodiesAtStart": 1,
+        "completedAtMs": 1421.6639
+      },
+      "media": {
+        "client": 1,
+        "startedAtMs": 1283.4229,
+        "firstByteAtMs": 1341.4469,
+        "completedAtMs": 1607.0713,
+        "status": 200,
+        "bytes": 2094909,
+        "terminationCause": "COMPLETED",
+        "mime": "image/png",
+        "hashOk": true,
+        "totalMs": 323.65059999999994,
+        "attempts": [
+          {
+            "status": 200,
+            "atMs": 1283.5373,
+            "completedAtMs": 1338.3600000000001
+          }
+        ],
+        "firstAttemptStatus": 200
+      }
+    },
+    "cancelRelease": {
+      "cancelled": {
+        "client": 1,
+        "startedAtMs": 1607.0907000000002,
+        "firstByteAtMs": 1658.9555999999998,
+        "completedAtMs": 1661.8215,
+        "status": "CANCELLED",
+        "bytes": 32768,
+        "terminationCause": "CALLER_CANCELLED",
+        "mime": "image/png",
+        "totalMs": 54.73289999999997,
+        "attempts": [
+          {
+            "status": 200,
+            "atMs": 1607.2298999999998,
+            "completedAtMs": 1656.353
+          }
+        ],
+        "firstAttemptStatus": 200
+      },
+      "replacement": {
+        "client": 1,
+        "startedAtMs": 1722.5488999999998,
+        "firstByteAtMs": 1780.1844,
+        "completedAtMs": 2026.9622,
+        "status": 200,
+        "bytes": 2094909,
+        "terminationCause": "COMPLETED",
+        "mime": "image/png",
+        "hashOk": true,
+        "totalMs": 304.41640000000007,
+        "attempts": [
+          {
+            "status": 200,
+            "atMs": 1722.7415999999998,
+            "completedAtMs": 1776.9146
+          }
+        ],
+        "firstAttemptStatus": 200
+      }
+    },
+    "generationRecovery": {
+      "label": "generation_recovery",
+      "startedAtMs": 2214.3998,
+      "activeMediaBodiesAtStart": 1,
+      "reconnectTriggeredAtMs": 2214.4551,
+      "authSyncCompletedAtMs": 4315.0093,
+      "interrupted": {
+        "client": 1,
+        "startedAtMs": 2158.9474,
+        "firstByteAtMs": 2214.3708,
+        "completedAtMs": 2246.6038,
+        "status": "INTERRUPTED",
+        "bytes": 262144,
+        "terminationCause": "STREAM_INTERRUPTED",
+        "mime": "image/png",
+        "totalMs": 87.6592999999998,
+        "attempts": [
+          {
+            "status": 200,
+            "atMs": 2159.1024,
+            "completedAtMs": 2211.9033
+          }
+        ],
+        "firstAttemptStatus": 200
+      },
+      "interruptionObservedAfterTrigger": true,
+      "interruptionAttribution": "TEMPORAL_CORRELATION_ONLY",
+      "interruptedBodyReplayed": false,
+      "generationsCombined": false,
+      "acks": [
+        {
+          "client": 1,
+          "ms": 8.323099999999613,
+          "accepted": true
+        },
+        {
+          "client": 2,
+          "ms": 15.214399999999841,
+          "accepted": true
+        }
+      ],
+      "authoritativeAnsweredCount": 2,
+      "recoveredImage": {
+        "client": 1,
+        "startedAtMs": 4330.460999999999,
+        "firstByteAtMs": 4377.512699999999,
+        "completedAtMs": 4620.3297999999995,
+        "status": 200,
+        "bytes": 2094909,
+        "terminationCause": "COMPLETED",
+        "mime": "image/png",
+        "hashOk": true,
+        "totalMs": 289.8717999999999,
+        "attempts": [
+          {
+            "status": 200,
+            "atMs": 4330.6068,
+            "completedAtMs": 4373.228999999999
+          }
+        ],
+        "firstAttemptStatus": 200
+      },
+      "native": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "deniedBeforeSend": 0,
+        "nativeRawBytesReserved": 13093802,
+        "pendingHigh": 3,
+        "sendWaitMaxMs": 1.7941,
+        "sendWaitMs": 19.139299999999995,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 4,
+          "CONTROL:join_result": 2,
+          "CONTROL:ping": 2,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 402,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 8,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 10,
+          "REALTIME:question_revealed": 10,
+          "REALTIME:question_state_changed": 20,
+          "REALTIME:session_state_changed": 2,
+          "REALTIME:session_sync": 24,
+          "REALTIME:submission_acknowledged": 8,
+          "REALTIME:submission_result": 10
+        },
+        "teacherWsUtf8BytesReserved": 17576201
+      },
+      "presence": {
+        "online": 2
+      }
+    },
+    "cleanupComplete": true,
+    "cleanupDisposition": "CONFIRMED_CLEANED",
+    "resources": {
+      "activation": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      },
+      "installation": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      },
+      "session": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      },
+      "credential": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      },
+      "child": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      },
+      "temporaryData": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      }
+    },
+    "unresolved": [],
+    "workloadCleanup": {
+      "complete": true,
+      "ownedSocketsClosed": true,
+      "httpCancellationConfirmed": true,
+      "cancellationFailures": 0,
+      "pendingOperationsCleared": true,
+      "timersCleared": true
+    },
+    "ledgerPersistence": "CONFIRMED",
+    "emergencyStopRequested": false,
+    "lateAdapterCleanup": "NOT_NEEDED",
+    "nativeAppDataAbsent": true,
+    "nativeMetrics": {
+      "activeMedia": 0,
+      "activeReaders": 0,
+      "budgetStopped": false,
+      "creditWaiters": 0,
+      "deniedBeforeSend": 0,
+      "nativeRawBytesReserved": 13093802,
+      "pendingHigh": 3,
+      "sendWaitMaxMs": 1.7941,
+      "sendWaitMs": 19.139299999999995,
+      "teacherFrames": {
+        "AUTH:participant_authenticated": 4,
+        "CONTROL:join_result": 2,
+        "CONTROL:ping": 2,
+        "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 402,
+        "HTTP_RELAY:HTTP_RESPONSE_END": 8,
+        "HTTP_RELAY:HTTP_RESPONSE_START": 10,
+        "REALTIME:question_revealed": 10,
+        "REALTIME:question_state_changed": 20,
+        "REALTIME:session_state_changed": 2,
+        "REALTIME:session_sync": 24,
+        "REALTIME:submission_acknowledged": 8,
+        "REALTIME:submission_result": 10
+      },
+      "teacherWsUtf8BytesReserved": 17576201
+    },
+    "report": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b/d54a9e70-cd76-4ff3-9e3a-ee35421f9c15/report.json",
+      "sha256": "bed14bbedcb814bca6ba3fb4c5c775438d2741aab0a0f487d42ee6ccf32a6c27",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "operationLedger": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b/d54a9e70-cd76-4ff3-9e3a-ee35421f9c15/operation-ledger.json",
+      "sha256": "eb003c4d475b21c8445febdc858754c989786ae8bc972fbd6df976d7c59cdbfd",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "stdout": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-windows-verification/cac4eddc-3e36-45db-bc1f-ea0d86c0f153/smoke.stdout.json",
+      "sha256": "7285f1397a0d8c7a56fae13a62f284c18a9cf176af0c9756f5da759627498ee0",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "stderr": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-windows-verification/cac4eddc-3e36-45db-bc1f-ea0d86c0f153/smoke.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    }
+  },
+  "failureRecords": [],
+  "retryCount": 0,
+  "failuresMeaning": "No build/test/smoke command failed in this Windows verification task. Previous Linux/sandbox/development failures remain in their original historical evidence; not replaced by this result.",
+  "warnings": [
+    "Incremental compilation cache could not hard-link on I: and fell back to copying; cargo check and clippy still exited 0"
+  ],
+  "interpretation": {
+    "generationInterruption": "TEMPORAL_CORRELATION_ONLY; observed STREAM_INTERRUPTED after trigger, not server-attested causation",
+    "runAbort": "Negative abort path verified by focused mocked regression, not by the successful integration smoke",
+    "productionCases": "Production authorization and unknown provisioning failures verified with mocks only; no production operations"
+  },
+  "previousEvidencePreserved": [
+    "smoke-summary.json",
+    "pr3-fixes.md",
+    "pr3-fixes-verification.json",
+    "pr3-fixes-source-manifest.json"
+  ],
+  "notExecuted": {
+    "productionExecution": "NOT_EXECUTED",
+    "deployment": "NOT_EXECUTED",
+    "productionD1": "NOT_EXECUTED",
+    "productionLoad": "NOT_EXECUTED",
+    "fullA2Workload": "NOT_EXECUTED",
+    "installer": "NOT_EXECUTED",
+    "finalRc": "NOT_EXECUTED",
+    "installedHumanQa": "NOT_EXECUTED",
+    "mobileRender": "NOT_EXECUTED",
+    "wan": "NOT_EXECUTED",
+    "passC": "NOT_STARTED"
+  },
+  "release": "HOLD",
+  "repositoryChecks": {
+    "relativeDocumentationLinks": {
+      "checked": 28,
+      "broken": 0,
+      "result": "PASS"
+    },
+    "sourceFilesVerified": 247,
+    "artifactAndOriginalHashes": "PASS",
+    "publicProjection": "NO_CREDENTIALS_OR_EXACT_OPERATIONAL_IDS",
+    "nativeAppDataAbsent": true,
+    "expectedChangedFiles": 5,
+    "historicalSmokeAndLinuxReviewEvidence": "UNCHANGED",
+    "sourceRuntimeAndDependencies": "UNCHANGED",
+    "gitDiffCheck": "PASS"
+  }
+}
