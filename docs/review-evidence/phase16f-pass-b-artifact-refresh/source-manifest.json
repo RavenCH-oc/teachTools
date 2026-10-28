@@ -1,0 +1,1051 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-28",
+  "timezone": "Asia/Taipei",
+  "taskBase": "7db449392ed741ab1df1b15e3cb67f02c730392f",
+  "revisionBase": "330b93ee1c7f86b01fddc5d6899bf6eed5d2676a",
+  "headAtVerification": "330b93ee1c7f86b01fddc5d6899bf6eed5d2676a",
+  "branch": "codex/phase16f-pass-b-artifact-refresh",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.19.0",
+    "pnpm": "9.15.0",
+    "wrangler": "4.141.0",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+  },
+  "evidenceKind": "FULL_RAW_WINDOWS_SOURCE_MANIFEST_FOR_ARTIFACT_REFRESH",
+  "snapshotMeaning": "Actual checkout bytes at build and unique smoke on 330b93ee; later documentation commit is not substituted for testedHead",
+  "sourceAlgorithm": "SHA-256(JSON.stringify(sorted [{file,sha256(raw bytes)}])); existing sourceIdentity(); no EOL normalization",
+  "source": {
+    "digest": "49b1da1ad0cd6f57ecb0908b32f7f61ee49cbf5a8bf639bd01bffa741a0b761e",
+    "files": [
+      {
+        "file": "apps/relay/.gitignore",
+        "sha256": "32ae9f77e3f053eebd0b04398dd02eebe14709b1a5ec7309d4291c721c15dcdb"
+      },
+      {
+        "file": "apps/relay/migrations/0001_installations.sql",
+        "sha256": "fc3215e5b86ea1d4c53e185019bb19eeedfac8dd10de0048d839bad7617eca74"
+      },
+      {
+        "file": "apps/relay/package.json",
+        "sha256": "010cfd2cfa74772a7053dd4aff2e64b59372272e85699e2c34c0d7c4bf36299b"
+      },
+      {
+        "file": "apps/relay/scripts/activation-create-prod.js",
+        "sha256": "3b8954c827f750fe6013a878ef79ae14782bc12fa6b13144647b61a5ff82c7e0"
+      },
+      {
+        "file": "apps/relay/scripts/activation-create-prod.test.js",
+        "sha256": "ed74565ccd9d5bf03bc6ddccbffa2b3c2577225ab7706ad1f83777a705cc575d"
+      },
+      {
+        "file": "apps/relay/scripts/build-capacity-client.js",
+        "sha256": "be1c6ac8958939883d71c7b3076374858f07d360d890f82466208bd4c1273177"
+      },
+      {
+        "file": "apps/relay/scripts/capacity-local-server.js",
+        "sha256": "2697131b6907cbf48f8173dad566c3d0e97db19951613860c68665a1376f40ac"
+      },
+      {
+        "file": "apps/relay/scripts/capacity-local-server.test.js",
+        "sha256": "39b0eac0c94c1bfe97d5ad29e8de1ee6db548c56a998525ecae7c80728b001e4"
+      },
+      {
+        "file": "apps/relay/scripts/capacity-local.js",
+        "sha256": "506548dbba7eccd87343437ea636fde3f57979ab81e8bb7088ecf91eda54b921"
+      },
+      {
+        "file": "apps/relay/scripts/capacity-local.safety.test.js",
+        "sha256": "cd30078c0c6b0f0de5c43d3cae8d86b66da4d31eee6facead9261f59956e0ad1"
+      },
+      {
+        "file": "apps/relay/scripts/generate-capacity-media.js",
+        "sha256": "61bfb231108f9026b88dff3d1a5403b507589541ce8d6d87088215b0ad667dbb"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-adapters.js",
+        "sha256": "765e2887bc1c233a31ea5e262468a5b5d51a0b583d4d03ab39b4a3427be32e7c"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-adapters.test.js",
+        "sha256": "018f2c9c6a311a7de0d4becdf873b771e80e8e68607349a319c48cd4aaf4d37c"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-build.js",
+        "sha256": "8adc2b6b9fd7d367ec5ee7e0b5b049027ccbb681d3b4b9e3cfc68d5cd246fc68"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-ledger.js",
+        "sha256": "12ef602543ad2088e0d66b9b820ce3db567b65174776e7e83e8beb9d4ec22598"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-ledger.test.js",
+        "sha256": "d1a0bb577b5e60fefb2acde6aa28ee08d33453f8216df8c1d088f3c5acbd1ee0"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-process.js",
+        "sha256": "c479b7725ff152d0fd4ebc242ecf1a1001b08e564a76f4252388281dc736a66f"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-process.test.js",
+        "sha256": "39bcc58636e71479da7b497f0a0837b56ab96b014f5397800dd3e29e9280483a"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-safety.js",
+        "sha256": "34994ffe96a4953372cf63a8e95d4c198e54d6534e639aecb7a7ad31d184334c"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-safety.test.js",
+        "sha256": "d6bc806534a6f9b1b382ba9cc9eda213d9f11da7b3ff9b40b1688b3ab4236391"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-supervisor.test.js",
+        "sha256": "9c697e7fb78778509ff975910ba12195356a5c418a6d41a1f3da7ca022fb1e53"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-workload.js",
+        "sha256": "9ce1965edbdcd1a1499be69d1edc3d8c48be72f9d7b02098cb0d3e2b55cb509c"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b-workload.test.js",
+        "sha256": "db62aa0fa764669dedcb2a135a5f21b71807b0eebe1f8a07950d113cd0159df8"
+      },
+      {
+        "file": "apps/relay/scripts/pass-b.js",
+        "sha256": "754c2ab1e799bc6f4fec70009104b93c70a7d3f27300224b7b079195a4c700c1"
+      },
+      {
+        "file": "apps/relay/src/a2-http-quota.test.js",
+        "sha256": "9a370fd49ab6aa74892ad344a3db5e09587434b17b366cb1a239be0dd7619ccd"
+      },
+      {
+        "file": "apps/relay/src/a2-reauth.test.js",
+        "sha256": "d9740e60d80d2cf96e10d0c048de504ba6135de49d933b98110ec0e6a3d7e888"
+      },
+      {
+        "file": "apps/relay/src/a2-scheduling.test.js",
+        "sha256": "5bf3068cce45c3d0add95dfcb596fa595d3c731d07d0fd860e3396d3234d1c2e"
+      },
+      {
+        "file": "apps/relay/src/admission.js",
+        "sha256": "4aff50b055889aa9e19045ec68a43c4e753690446a0e671c2a5d8b1109109207"
+      },
+      {
+        "file": "apps/relay/src/admission.test.js",
+        "sha256": "be9432b0dc40e2bd851ada43a796b13b215689a3ecdf4747da9aaf8db2d5f375"
+      },
+      {
+        "file": "apps/relay/src/contract.js",
+        "sha256": "207cca6cc6f75c75fd2e086003feb8c52399f52dee7dc3fef3a56e6df7a90bc2"
+      },
+      {
+        "file": "apps/relay/src/generate-http-benchmark.js",
+        "sha256": "8db2c8d4d9f29cbc1cab46fab0e5ec8ad52559b4d4dff56f6fad93f05c3c8c62"
+      },
+      {
+        "file": "apps/relay/src/http_relay.js",
+        "sha256": "5da52c3a5d3f162d820a84f379fb8e6241a7be093d0d3c5e39c265ed52fb1ea8"
+      },
+      {
+        "file": "apps/relay/src/http_relay.test.js",
+        "sha256": "d19d19f9439473f9d3afc8f5854684d9c4036a8379721adb90390ca257e1121a"
+      },
+      {
+        "file": "apps/relay/src/lifecycle.js",
+        "sha256": "f1e147b49bdc292afceb4c4114364349709c1db4026ca562ac9f114850840757"
+      },
+      {
+        "file": "apps/relay/src/lifecycle.test.js",
+        "sha256": "464d91f3b65e336c0aac9263cf93fb7817f609486ac59a519c9d6cb5a0c2b3d4"
+      },
+      {
+        "file": "apps/relay/src/phase16f-security.test.js",
+        "sha256": "107205b1f4c0322c86d68d6eaea6d43370cfb18b7ccea18418bfa1a4cf3668c7"
+      },
+      {
+        "file": "apps/relay/src/realtime.test.js",
+        "sha256": "6e7ace469429c9a485d277904d3a7fab0fea9d5d58fb335f4a92cdef7db50eb6"
+      },
+      {
+        "file": "apps/relay/src/restart-smoke.js",
+        "sha256": "67e0bfac72598bb229e8d1144b722088e03a5c694decb39b98e894ebee48ac50"
+      },
+      {
+        "file": "apps/relay/src/worker.js",
+        "sha256": "11ed11be9c7d2b1983ad812be555df0f3d36656885a2803b64356424ef7dafa6"
+      },
+      {
+        "file": "apps/relay/src/worker.test.js",
+        "sha256": "5f770c6e103bae3b07e3a3a20402df51116c1ab6d92717bfada2168c61d88b20"
+      },
+      {
+        "file": "apps/relay/wrangler.jsonc",
+        "sha256": "d40708278a11b63a7841dade855bf64d83a1bf909f02009c8a2c3aa4a3a006c0"
+      },
+      {
+        "file": "apps/student/index.html",
+        "sha256": "2facb7f6dd658b22dab0910915fea591687dab6a530229b5404b0042c3caddc9"
+      },
+      {
+        "file": "apps/student/package.json",
+        "sha256": "91f6cb36d5ba931e55448cd4f8900343b84a031bef15f3cb1c6a6fdd5f9af9ac"
+      },
+      {
+        "file": "apps/student/src/App.test.tsx",
+        "sha256": "d0745932c223b6304dba5df55406e17b95d0620a85e1d766d976d07aef451309"
+      },
+      {
+        "file": "apps/student/src/App.tsx",
+        "sha256": "718413f0ae59b6982cc35a7a26bd63a1f2a84aa9db862a61d6568a72714cf58f"
+      },
+      {
+        "file": "apps/student/src/RemoteApp.test.tsx",
+        "sha256": "bd15e6738ac92f1ab1923794df7daf3c3953f4e5b472143407b9b5dc7ea3928b"
+      },
+      {
+        "file": "apps/student/src/features/peer-review/PeerReviewPanel.test.tsx",
+        "sha256": "b4b5a95c70811361cf402fc372419c3546a2473b208b54dba68e3185d2bad45c"
+      },
+      {
+        "file": "apps/student/src/features/peer-review/PeerReviewPanel.tsx",
+        "sha256": "4192022f24b4b041e6f4a275a482ecf29b6521266d6a650579adb3099a47b9ef"
+      },
+      {
+        "file": "apps/student/src/features/peer-review/ReviewActivity.tsx",
+        "sha256": "ce7d618e18440fb7036268912173d216fad67193fb8ac74e749fddee06ab4a50"
+      },
+      {
+        "file": "apps/student/src/features/peer-review/errors.ts",
+        "sha256": "3a97ea7750a1dd7b7348d0d68099c89a1bf1f74e79bf8f3ae29fcb648b2427e0"
+      },
+      {
+        "file": "apps/student/src/features/peer-review/peer-review.css",
+        "sha256": "02775b5b95a736e4b97a938018b740cd46073fae592d04dfc17c734f41afeb53"
+      },
+      {
+        "file": "apps/student/src/features/peer-review/sessionChannel.ts",
+        "sha256": "e6fc4db9bfc9fdd4bbc4cb3393008e2a710394037dd6de954b6016da97cd18ec"
+      },
+      {
+        "file": "apps/student/src/features/peer-review/storage.ts",
+        "sha256": "c00d64d03753a735b90e0035438bdb596e6e97d542dd7c1edf7d99ba0258014b"
+      },
+      {
+        "file": "apps/student/src/features/peer-review/usePage.ts",
+        "sha256": "190c69a1718de491607e80a01fca038eb3de823a08aa09d8c22b96574daa5e3f"
+      },
+      {
+        "file": "apps/student/src/main.tsx",
+        "sha256": "b0e5917bf64ff49b458d9a3df7cefbfc3f254bf4d831037c0bcb2d1920065446"
+      },
+      {
+        "file": "apps/student/src/services/peerReviewApi.test.ts",
+        "sha256": "9776506d381c509063403e8fc13ae53c0d8ae02dcf6ee1bf06cfe7be26dad67c"
+      },
+      {
+        "file": "apps/student/src/services/peerReviewApi.ts",
+        "sha256": "11f213b6e9088ff112c71e4798fad04a1875e53194ab5d9daf321f9b3532b51a"
+      },
+      {
+        "file": "apps/student/src/services/remoteStudentApi.test.ts",
+        "sha256": "0548bfabbf59641ac18193c74d188ec12993a58a769c8781a486468d8b4dd971"
+      },
+      {
+        "file": "apps/student/src/services/remoteStudentApi.ts",
+        "sha256": "a0acd9cddf6d174d957f47dfcfa944f3f8939f19efef209cd5c4b51ed0f5129a"
+      },
+      {
+        "file": "apps/student/src/services/studentApi.test.ts",
+        "sha256": "b8b5e11221356787a3b37414e2ddee89a800dbfe1d5d5204459ec4111fdac209"
+      },
+      {
+        "file": "apps/student/src/services/studentApi.ts",
+        "sha256": "9a80cd648115d711161fb24909a6d140ca41be18426c030dd503b51fc6b8401d"
+      },
+      {
+        "file": "apps/student/src/services/studentHttpApi.test.ts",
+        "sha256": "10f921256761b41f97310363d1cce0183489c16bc7dbeecfbdae6535da0d2176"
+      },
+      {
+        "file": "apps/student/src/services/studentHttpApi.ts",
+        "sha256": "22537987661bbc432af2828c0321e4b10ab5af003e8205939e7c0cd9dddea8b7"
+      },
+      {
+        "file": "apps/student/src/styles.css",
+        "sha256": "88fd6f33c81aafcd4d2c204bdb40c7c79bd3bfb850a9a7783b0a2241f4222dcb"
+      },
+      {
+        "file": "apps/student/src/test-setup.ts",
+        "sha256": "9b328c4843431fa76d8de00008fc159e95f99a840211085ff3b8f25e53d14409"
+      },
+      {
+        "file": "apps/student/tsconfig.json",
+        "sha256": "133929728c61dcfbfa89b4b52da920b70e80a1eff0a35c4d80039a29fa8d4370"
+      },
+      {
+        "file": "apps/student/vite.config.ts",
+        "sha256": "675938b8b2e90c4ff4736e4a9d2e17bbffd50019de98c94a70d2b850c95eb2c5"
+      },
+      {
+        "file": "apps/teacher/index.html",
+        "sha256": "d9e417cd45668a080999a2aa0a7294f2f9fa4d8be5a6c13486ec6595f264f47f"
+      },
+      {
+        "file": "apps/teacher/package.json",
+        "sha256": "b44e54e278b3f8834a5d9eb3aac87f97a236ee79066e4176bebdbbec13f3fefb"
+      },
+      {
+        "file": "apps/teacher/src-tauri/Cargo.lock",
+        "sha256": "05f3efff18688794593909558e1d4650250cb2e7708c78594b6000433b85ee35"
+      },
+      {
+        "file": "apps/teacher/src-tauri/Cargo.toml",
+        "sha256": "0281ee4a0fa0639d4cab9100ce175192645638581317e260246ecc981e25b092"
+      },
+      {
+        "file": "apps/teacher/src-tauri/build.rs",
+        "sha256": "6aeeab41bc35efde4e3c2b644a6248f7fc06d24ae30b75c0d33491cbb0c1fa31"
+      },
+      {
+        "file": "apps/teacher/src-tauri/capabilities/default.json",
+        "sha256": "daa56ad677c089097d039395143ae6e5dbf17b73b25da0d214566aa2a498112b"
+      },
+      {
+        "file": "apps/teacher/src-tauri/gen/schemas/acl-manifests.json",
+        "sha256": "d3eace193b1e453756736eaf27bb156df62c7a41b2fe101403ee92ef93e69699"
+      },
+      {
+        "file": "apps/teacher/src-tauri/gen/schemas/capabilities.json",
+        "sha256": "bb91b5932046aed55e81d304526594c0caf2e104ee7c4591e9deb8f1b3ff7b97"
+      },
+      {
+        "file": "apps/teacher/src-tauri/gen/schemas/desktop-schema.json",
+        "sha256": "2a16f62c90a059a1b67e4501216bb3476f402087e99ba659dd38c9d0521f3b07"
+      },
+      {
+        "file": "apps/teacher/src-tauri/gen/schemas/windows-schema.json",
+        "sha256": "2a16f62c90a059a1b67e4501216bb3476f402087e99ba659dd38c9d0521f3b07"
+      },
+      {
+        "file": "apps/teacher/src-tauri/icons/icon.ico",
+        "sha256": "d96fc447d6278071782a71069824b308b85f5c448e50f4c9743e7341ffcacf04"
+      },
+      {
+        "file": "apps/teacher/src-tauri/migrations/0001_initial_local_schema.sql",
+        "sha256": "0e3fcf415e9389eeeedf1c7560f707756e1883c507ac4d0bb60d996a51d8c8a6"
+      },
+      {
+        "file": "apps/teacher/src-tauri/migrations/0002_question_assets_foundation.sql",
+        "sha256": "0dd502de06d9047f3f4f10bc88374ca1eeff1a2c6060440d104128c62d228e4b"
+      },
+      {
+        "file": "apps/teacher/src-tauri/migrations/0003_local_session_lobby.sql",
+        "sha256": "c1f49cff57704f80824a81bb6a443059e86b043a6bf42f7e502388ed20817e98"
+      },
+      {
+        "file": "apps/teacher/src-tauri/migrations/0004_live_quiz_foundation.sql",
+        "sha256": "44cd29f254554e5b787015ee49a5b0b7216db0051f07ad632de12d30763276ca"
+      },
+      {
+        "file": "apps/teacher/src-tauri/migrations/0005_grouping_foundation.sql",
+        "sha256": "7c11158a30badb0682ff98e02ff4e62b49414f28c4bc798b6847042a2698593e"
+      },
+      {
+        "file": "apps/teacher/src-tauri/migrations/0006_peer_review_foundation.sql",
+        "sha256": "d90d965b1890ab2f027c1f515b1a11dbb09a98df03851079710761c2ccbd08f6"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/assets.rs",
+        "sha256": "a753c443ed39b639f608eefa1ce9e991aef90ecd1c6329a43027433debb59439"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/grouping.rs",
+        "sha256": "fb97d638ac93699a38b66d2b269114d2e3a6cf043c395fde779199f6a47995ce"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/live_quiz.rs",
+        "sha256": "82ba4e30d80d97fd04022e205d64e77fb99941b3b4215d5dd7de496b29636c10"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/local_server.rs",
+        "sha256": "d90336611aaebebc21502c7344cb597c001f63f92acd143ea4dd45614e97c665"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/local_session.rs",
+        "sha256": "02dc82fc1c7769e2ce8ebcf1cb303a2b3a802150e92a22ee28a17127e14b3997"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/mod.rs",
+        "sha256": "f4ce7136a59babdb91e05228f4eadf59dbfdfcbd55d44648d804b6a8c28c1c13"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/participant_http.rs",
+        "sha256": "c704b3f8c0cc4fc363e1fc8398d0247d10e3d882cdf174a817b0e0cb406407fd"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/participant_realtime.rs",
+        "sha256": "72f652acbf0498460ce09dd52706695fc3cb28024a4e553c48f00facfd675d1c"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/participant_realtime_tests.rs",
+        "sha256": "087ef558a87f3318e92a3b0b87a2b9648fbca4001bd728c0e89a5c4e196d3ed8"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/peer_review.rs",
+        "sha256": "cb840c9ad7a1375c4573df0a5864f7263eed10bc5f2afcd73241bd63f960537a"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/peer_review_monitor.rs",
+        "sha256": "0b503b0ce0fd069018ba5561966ed937b0fb2fbba47c036e08b23a7b84f0c6e8"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/peer_review_setup.rs",
+        "sha256": "a807bfa78c4508b7936cad23dd5cd931797415be9de3394ead3ab2772cc26cd5"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/peer_review_student.rs",
+        "sha256": "f5f54ee7562169242305b494f77f21ad785bbc5d5ed3354974ba81ce532d9fe1"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/peer_review_transport_tests.rs",
+        "sha256": "b2e72f489dab50d72f5d7aa1fa26382cb637af3a73f9e27ebcc49d47d8f0791b"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/questions.rs",
+        "sha256": "b42cf92d593eaa3bee80c9f05edccf070f863ee1eb4f888b054e38660bbbcd09"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/remote_capacity_metrics.rs",
+        "sha256": "2bed98b71995019b23dca83c838f4e32efe9670a3723068d9f3920e6355d7123"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/remote_capacity_smoke.rs",
+        "sha256": "b5fc3e960d7de4f1eb061f57e64dbc4808cefe065878f50ee8bfbfab42ade330"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/remote_control.rs",
+        "sha256": "62e3e46e022d19335d82cb7016dd0f571ca72def02fde1e3dd602c189bc9fd88"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/remote_http.rs",
+        "sha256": "9759f428ea25e887d63441fb86706484e0210f59114dc0a7fa32b2b53b35e653"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/remote_http_smoke.rs",
+        "sha256": "357d31cabb815101c7f6327f49721b425dd9fa76015f0ad39c4b5ce5d63030a9"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/remote_participant.rs",
+        "sha256": "deacb3d1f77fa394e8d9474e54b6b136e757a777e346dbb60b4a0a0ee32c5afb"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/remote_participant_tests.rs",
+        "sha256": "c80cdecbe917d803db1a2b7b16f40247b9f0efd10ce52aa9773addb82ca22501"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/remote_pass_b.rs",
+        "sha256": "783a752e9669c8805c179b62256c6e4b2829d0fef9c21e475323dfe8a64b13aa"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/session_report.rs",
+        "sha256": "bf970eb2685082204d8bdc206d47b32934a380ae5578ab5beac17de6130d31c0"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/session_report_tests.rs",
+        "sha256": "74d4bd568ad7ef682fa26775dbb5a903b4637f91575e90a32369abfcc97aee1f"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/session_report_xlsx.rs",
+        "sha256": "97a8438e25b5f2561e75b03134eff3ee49374ad1575ca6d166fc4f9990f989a9"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/statistics.rs",
+        "sha256": "0a5804beec0b5ec9a9fdcccf4e9e4ef3630ab290a592893cd5db80a8938645ae"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/application/student_assets.rs",
+        "sha256": "a6f77f65f6efb0577e2f2503c18a56c565721feb3099b5c27acdfc5ec4195abb"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/error.rs",
+        "sha256": "3ec60cbac562623af1ad3c9177bb18840cb0fa057c2412766e54675aefefbbb8"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/grading.rs",
+        "sha256": "e212741023ed554b787ae841e92e64a5ee2b9f8c7ae124f621d65a71732d5f0d"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/mod.rs",
+        "sha256": "b85d9aefeb93ad1afccf2d860d4bb983effe7524887f2c5912a277e32af633ac"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/database.rs",
+        "sha256": "3fc0324120a3fa2f8a9ed11d70ee4b399a631fc32a5e80801609f6ef3207b230"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/migrations.rs",
+        "sha256": "2fba1e5f6e6e46524a856257d7385b3ee8974020229500064c46be6e26e808b8"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/mod.rs",
+        "sha256": "a2bd4d690ef16c2029e8d819bd9d45314ef3ad8da9dbdd9fcb1f5ddf47dfadf1"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/classroom.rs",
+        "sha256": "10276eeb14801f42b257cae8487b4a4122338d4e58958682eaffc7d7561e4b9b"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/course.rs",
+        "sha256": "8553640c0b0ef675e2a63ba30fd1cbff61f353ee7d043bbd0a2de274efff5afc"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/grouping.rs",
+        "sha256": "1b46f92e559124fc512105f9b6a11561f9bcb369afb089a67a1f5997386c8ffb"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/lesson.rs",
+        "sha256": "c93e9c4e0fd9831adced8e94e8eb77a4ae5559343edbdcba8e778da0e2a12f44"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/live_quiz.rs",
+        "sha256": "62a156bd335950c67cbe2c4cdd65ec1af2ec672babc2cfc2297ef90050338a53"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/local_session.rs",
+        "sha256": "6d68dcbf5b955704740694c367f29a87846f8d259b110677dc094a56aea5ee33"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/mod.rs",
+        "sha256": "0c87dd49c66f9ed4e075adba434409629989cd91c17f5fc1e77c392e3596e2d7"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/peer_review.rs",
+        "sha256": "b6c69a11bd966414d0a929a7e7f655f48af88b098ff3c244c4f4a9a07bf49f2c"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/peer_review_monitor.rs",
+        "sha256": "71aa90b783c1f9996ab9807b38e6f1010e98b0a8d5abadb6949b8e1ebc29f3f4"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/peer_review_monitor_tests.rs",
+        "sha256": "5bfadeac1667080e405a6d2de57dafea3f19fc41714817f2d623803f6bb903b7"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/peer_review_setup.rs",
+        "sha256": "71c0b0907e432b5bbff6dc7c8398cd47d2a2aae6dc0f853501c8acc659d01924"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/peer_review_setup_tests.rs",
+        "sha256": "f79a5c54fda4fe0a36f09d99111abcb4cded66286c7576b98398a59c56ff0196"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/peer_review_student.rs",
+        "sha256": "a9187d79e8288afbdc54a6473fba1cf75fa4cfab8f75ecae27c7bb8d8f237609"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/peer_review_student_tests.rs",
+        "sha256": "e05c0940ff08e8144826091e27c3df5a1c042574cd5efbaca3bfbcee53125fde"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/peer_review_tests.rs",
+        "sha256": "6f50c18c91bc02b76a4267b4bd420a2ce330f8c1d43cb7527dc57d7eef1ea1f7"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/question.rs",
+        "sha256": "e2bece3ce040a1ab1c3899b739cd2798fd3a1133f2f9697711e186b84dbf2429"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/question_asset.rs",
+        "sha256": "25e28e73c6a424f5da163ecf409e7ed793e6480c723884360d6e2c6a82ac80bf"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/question_set.rs",
+        "sha256": "4b9046f2eb6f7927804b7b2e696775965c70ce0f3fc221a99817c18db34e6f97"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/session_report.rs",
+        "sha256": "a38307904885ce4aeee2b53fe303808d5da95071362da2ad10e50665e66e8dd3"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/statistics.rs",
+        "sha256": "3873f2434afee9e545a013a3547b1e9e1badc2d16df5604a043fb12f8ebdaee8"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/infrastructure/persistence/repositories/student.rs",
+        "sha256": "5ecd3938269871bc24716e50add5b934b78b46748a6a652cf70ac5a189fe7b27"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/lib.rs",
+        "sha256": "bb578ec7ebf9e06c6d43533bdeaceadf533bfb63b0d8eeb4955fcaace687533a"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/main.rs",
+        "sha256": "5798cc1bd4c0b313d520d8412cae16457295b50d3fa99d0266eef79851fd4bd6"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/peer_review_commands.rs",
+        "sha256": "b86c598329037f537f1fac09d578da5edb792d87ceb11be397f533264bd0ea42"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/peer_review_domain.rs",
+        "sha256": "f8798884c78f95f0a0ef60e1bc676496a2a08fa80ba73d1de643800a0887e1ac"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/peer_review_monitor_commands.rs",
+        "sha256": "2cd842ae4f62341db23df5946181664f1113e775f1d2f902541a5b817799ac17"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/question_domain.rs",
+        "sha256": "02e2275a6f4b988b6382c557de5303772590501910004551d34ac22469732801"
+      },
+      {
+        "file": "apps/teacher/src-tauri/src/session_report_commands.rs",
+        "sha256": "389580c948c8fc8910b4e47415873a57324d9eba4ea15eb7a351b61c34e03e18"
+      },
+      {
+        "file": "apps/teacher/src-tauri/tauri.conf.json",
+        "sha256": "11d26f0b02f9122d29924a4f9e2c5a5486e651670b23834ceb4486f19c3c03b5"
+      },
+      {
+        "file": "apps/teacher/src/App.test.tsx",
+        "sha256": "db2db7187d028ee9210cdbdbfdb56e38897d5c3015d44b5366e1c2d91f8b7166"
+      },
+      {
+        "file": "apps/teacher/src/App.tsx",
+        "sha256": "6394e4187a8b147ec90c7972a34966d6ff12dd28724bc0230fd1fc4861005058"
+      },
+      {
+        "file": "apps/teacher/src/app/.gitkeep",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "file": "apps/teacher/src/components/.gitkeep",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "file": "apps/teacher/src/features/grouping/GroupPresetPage.test.tsx",
+        "sha256": "869be5545f8e362ecfcdfd5189e9fdad4bd8c4ecf5e7c169cfd09edbc759a72a"
+      },
+      {
+        "file": "apps/teacher/src/features/grouping/GroupPresetPage.tsx",
+        "sha256": "2d5f2c596d1d81d5211744789ea0d00da7105717cf0b822fe776e78935497652"
+      },
+      {
+        "file": "apps/teacher/src/features/grouping/SessionGroupingPage.test.tsx",
+        "sha256": "09f212ab9899658a6e47954478f28c1159190e04595db6186822ee5d67698b7e"
+      },
+      {
+        "file": "apps/teacher/src/features/grouping/SessionGroupingPage.tsx",
+        "sha256": "7f94e08f187df227ec538f165cf45a2354d9ddcb46d2c0b975e475b9cdef5e98"
+      },
+      {
+        "file": "apps/teacher/src/features/live-quiz/LiveQuestionStatisticsPanel.test.tsx",
+        "sha256": "39d64df407ef3ca975d41094628c6230fe46e831d61d74c965670d665b25bd39"
+      },
+      {
+        "file": "apps/teacher/src/features/live-quiz/LiveQuestionStatisticsPanel.tsx",
+        "sha256": "00ca474f22dec36ba1bc0876b9e4dff4ba4cf56abac0663cab98467a87078fc2"
+      },
+      {
+        "file": "apps/teacher/src/features/live-quiz/LiveQuizPage.test.tsx",
+        "sha256": "63768dbe6f50640792161d5bc9466844bdee87ce2a2da8c572616974b970adf0"
+      },
+      {
+        "file": "apps/teacher/src/features/live-quiz/LiveQuizPage.tsx",
+        "sha256": "16875ef17bb392ba1b7e71f05105d4eda735a9e03febd631ee04b9c9e686e67d"
+      },
+      {
+        "file": "apps/teacher/src/features/live-quiz/statisticsFormatting.test.ts",
+        "sha256": "cb01f5b1cc83012460555073eeee8657300775da1e827069f241eb2d2533bc69"
+      },
+      {
+        "file": "apps/teacher/src/features/live-quiz/statisticsFormatting.ts",
+        "sha256": "27273dee1d8313ba2dbc77ee8ab627083b4a8224a06faefc381b52d63be760a2"
+      },
+      {
+        "file": "apps/teacher/src/features/live-quiz/useQuestionStatistics.test.tsx",
+        "sha256": "c24df056e3c7c14b29b8d16a873510cbc33e525d97f67b6735feae30c77c9166"
+      },
+      {
+        "file": "apps/teacher/src/features/live-quiz/useQuestionStatistics.ts",
+        "sha256": "a2bcb74be9a0aed386493c0e2a8c2cba2a76eea9b6bbef6b520ff0fcca6e8543"
+      },
+      {
+        "file": "apps/teacher/src/features/local-server/LocalServerPanel.test.tsx",
+        "sha256": "d71094a28ecec6ea6995bfe8facebb6cd76424cd271cdd7339d03d6a0517498c"
+      },
+      {
+        "file": "apps/teacher/src/features/local-server/LocalServerPanel.tsx",
+        "sha256": "78f8d5e701f264d719ff885a781b4f631d5780b4c52ed0148c07e23d95f4245a"
+      },
+      {
+        "file": "apps/teacher/src/features/local-session/LocalSessionLobbyPage.test.tsx",
+        "sha256": "b5b2090df58e027a85ba954a1c3028bdd77bdb4cf28722689db4b508ac9c605c"
+      },
+      {
+        "file": "apps/teacher/src/features/local-session/LocalSessionLobbyPage.tsx",
+        "sha256": "122043ee83a0a1c9a192afb447ecbb75c5155917a86b8fdae95dd7b4fde394b9"
+      },
+      {
+        "file": "apps/teacher/src/features/peer-review/PeerReviewMonitor.test.tsx",
+        "sha256": "fd6f4af45eb46cd082d84a4729f23b8b0f054f2c9f73a3f8a943dddc99e999f1"
+      },
+      {
+        "file": "apps/teacher/src/features/peer-review/PeerReviewMonitor.tsx",
+        "sha256": "f86644d14de1439e60bf1b7fc6dd488701f505380bd0b3ee8e702158113d7b82"
+      },
+      {
+        "file": "apps/teacher/src/features/peer-review/PeerReviewPage.test.tsx",
+        "sha256": "6a0c19f771021847aa26481fa3c93108268ff9ff667ab5cb72fd1a9eeb7ae6bf"
+      },
+      {
+        "file": "apps/teacher/src/features/peer-review/PeerReviewPage.tsx",
+        "sha256": "9cab62112ab31f0608f7a0d74f2ec2a7532e8f39bcd215ec49fe61ffeb84da7a"
+      },
+      {
+        "file": "apps/teacher/src/features/peer-review/testFixtures.ts",
+        "sha256": "4ee827c33b1124bf85462fde8899901e29c3e691e326ce2613e9e28a6fb32b4d"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/QuestionBankPage.test.tsx",
+        "sha256": "29c75c97d51f252409ecd1cbd8292f43830768ab39d2b2224e55fed9d4581f1b"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/QuestionBankPage.tsx",
+        "sha256": "db5f668c733d63f429a7b58e5a8d028edb2334bf5b181919ebed78fa515180de"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/QuestionList.tsx",
+        "sha256": "f44d98908c72a35715c492ed82b74c880d7c8fac0cac72cbb48ec259b4e51040"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/QuestionPreview.tsx",
+        "sha256": "cbb2b6786384b025a653adb3d1235367ce67ab414e653933b2724235244c4f2f"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/QuestionSetList.tsx",
+        "sha256": "9164a6fbf09e3b21c6fbd49dcd65139ba9648afa3593544faf9c9d1c6612c455"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/editors/ChoiceEditor.tsx",
+        "sha256": "ec50d1ff0e54606b9b0213abfa20ddddb6e72983b7392a252bdd1134a9012672"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/editors/FillBlankEditor.tsx",
+        "sha256": "fc1fe6f316d93568823536c6dfb1b3b8853fbecd1e157926c61186031471a8c2"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/editors/QuestionAssetEditor.test.tsx",
+        "sha256": "2724b8c52feb5284211319fcb3787b9e49f60c40d7a386b140536a729fd997a3"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/editors/QuestionAssetEditor.tsx",
+        "sha256": "39c818f42f785288c2f23f8ed37589cdc38d4e00cc817388dc4d39be5112cc8a"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/editors/QuestionEditor.test.tsx",
+        "sha256": "e9e8bf1be2e1135c33be1282ee8b5fe1b7b671b501b7ede3f97f55a97ac47ee5"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/editors/QuestionEditor.tsx",
+        "sha256": "198fb6f54aaf142d87ac50e85256ae25228205314e5b659622cfff822c566e37"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/editors/TrueFalseEditor.tsx",
+        "sha256": "fd57531295323651f2c7963c03025bacf7426dab1957a7f886670719b872153a"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/helpers.test.ts",
+        "sha256": "9abda1dc3d964197a8f1512d538db865825ede37cfa9f0f79b6a5ba56f9d4910"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/helpers.ts",
+        "sha256": "0ec986ee69b8e7f447a4ed8b16a3278406faa4f3fd5e72ea42910320347401da"
+      },
+      {
+        "file": "apps/teacher/src/features/question-bank/ids.ts",
+        "sha256": "e3d17b2ac4d59dea61dd4309fda1f0dcf1cdc3d4d11c57949261e7aa159baf02"
+      },
+      {
+        "file": "apps/teacher/src/features/remote-session/RemoteSessionPage.test.tsx",
+        "sha256": "7247634282a7ccbbd36b1f6e8c7992d25bebcf9f8ebbaae0835965c727e0fff7"
+      },
+      {
+        "file": "apps/teacher/src/features/remote-session/RemoteSessionPage.tsx",
+        "sha256": "43ca2f50c772778827ec6e39a501e96dd4a1d44a6914a07e6da0d2b172c96bc5"
+      },
+      {
+        "file": "apps/teacher/src/features/session-analysis/SessionAnalysisPage.test.tsx",
+        "sha256": "4a2b6eb38b4d2e4ff55224fb1576966a84d13b950f55e04abbb7dbf227465461"
+      },
+      {
+        "file": "apps/teacher/src/features/session-analysis/SessionAnalysisPage.tsx",
+        "sha256": "66b58dc99701ea2b176e76faa8dbe10d1c9fc6e7693fbd690ae086fecc86aca4"
+      },
+      {
+        "file": "apps/teacher/src/features/session-analysis/SessionHistoryPage.test.tsx",
+        "sha256": "5cb77508de772e8614a6b6b2e0c6a5d5b6b25d6df71545a3049ce8ea86c4de19"
+      },
+      {
+        "file": "apps/teacher/src/features/session-analysis/SessionHistoryPage.tsx",
+        "sha256": "510f316a0ff08e9b9ceda598abd785f78b2d1f647ad67d492c1ea71af59e05b9"
+      },
+      {
+        "file": "apps/teacher/src/features/session-analysis/SessionReportExport.test.tsx",
+        "sha256": "d787f67688e4b12ac1e4e77ea409d675a739fee680d4785a1219c15c8ac0bcf8"
+      },
+      {
+        "file": "apps/teacher/src/features/session-analysis/SessionReportExport.tsx",
+        "sha256": "0851fcdb525515b27e2bff182bd560229a71ce90dc9bade3cd83960f1032d5d6"
+      },
+      {
+        "file": "apps/teacher/src/features/session-analysis/useSessionAnalysis.test.tsx",
+        "sha256": "3378c37acc64a74bfe84bbac6ce60e50b8ae3fbbec423f70e8c30f4800ccee2f"
+      },
+      {
+        "file": "apps/teacher/src/features/session-analysis/useSessionAnalysis.ts",
+        "sha256": "d3369b5da2474cdfe72a48ce265e06d00ccf3dc28bffe0b03d782ad0abf98eaf"
+      },
+      {
+        "file": "apps/teacher/src/hooks/.gitkeep",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "file": "apps/teacher/src/main.tsx",
+        "sha256": "656f0a2c965f9ec3c79d12b3e40b63c8198d336be1cf134a3a18856077e188b4"
+      },
+      {
+        "file": "apps/teacher/src/services/.gitkeep",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "file": "apps/teacher/src/services/peerReviewApi.test.ts",
+        "sha256": "da2f7677b1ee72b360de6778ea06fada3c26204d8e6855c71abed7b09e3013c3"
+      },
+      {
+        "file": "apps/teacher/src/services/peerReviewApi.ts",
+        "sha256": "d7c1461d71df4cb199fc6dbcbb93fc7324a2be4fbd2a64f6c507e612e797ece8"
+      },
+      {
+        "file": "apps/teacher/src/services/peerReviewMonitorApi.test.ts",
+        "sha256": "42e4e024b6b4302e135618d75359d96c4936a6b13130bbacefdf0ddc624ac1ed"
+      },
+      {
+        "file": "apps/teacher/src/services/peerReviewMonitorApi.ts",
+        "sha256": "c37b0526f89791bc42801d0dca70ac46b9e0ee6590da0f9767a826343476ea12"
+      },
+      {
+        "file": "apps/teacher/src/services/remoteTeacherApi.ts",
+        "sha256": "5609bd6d65a95cd352cb8407e5610b4d18cc689e099dcbe62e854903f697a17c"
+      },
+      {
+        "file": "apps/teacher/src/services/sessionReportApi.test.ts",
+        "sha256": "12cc84204c1b3b8d387585ea91d41b33e6945857e908fb3d583f49d5061e2669"
+      },
+      {
+        "file": "apps/teacher/src/services/sessionReportApi.ts",
+        "sha256": "d1533008ffca3db51b6645c7f577e94e9cde38a0b82c9a8a8e07d3241168576e"
+      },
+      {
+        "file": "apps/teacher/src/services/teacherApi.statistics.test.ts",
+        "sha256": "17d1eda07742b5a4bbaea65ae09eaadd9b1952d51a57acd5d12a7bab7bf09181"
+      },
+      {
+        "file": "apps/teacher/src/services/teacherApi.ts",
+        "sha256": "d0c823cec080097841393407ee5936a47d74f12fe53d6bf1e8e3b6f6461ec8b0"
+      },
+      {
+        "file": "apps/teacher/src/styles.css",
+        "sha256": "64244cfc9338246336546591703057f8d654bbc5ac60acd412d4f785d072869a"
+      },
+      {
+        "file": "apps/teacher/src/test-setup.ts",
+        "sha256": "9408a30df297f52f573665036d4dd2b8f0b324c7b5ed37e2bd83fa6587065ae5"
+      },
+      {
+        "file": "apps/teacher/src/types/teacher.ts",
+        "sha256": "299d8066bef1a9a0b3e9eecaff97aacef245128b0aa8955023f7455e99494464"
+      },
+      {
+        "file": "apps/teacher/tsconfig.json",
+        "sha256": "133929728c61dcfbfa89b4b52da920b70e80a1eff0a35c4d80039a29fa8d4370"
+      },
+      {
+        "file": "apps/teacher/vite.config.ts",
+        "sha256": "f73a8f76e105a9defdedf7c8b69e64632b21ea3ce74e4c93df4567ace99ff4b8"
+      },
+      {
+        "file": "package.json",
+        "sha256": "e112ecd56c7420ee88a9cf881d3878388baad6f9116cd4008b8036325b61b724"
+      },
+      {
+        "file": "packages/backend-contract/package.json",
+        "sha256": "9d168c396b416a6d1c07994ca04019feeae986250f9334d884ecf7d06def0482"
+      },
+      {
+        "file": "packages/backend-contract/src/index.test.ts",
+        "sha256": "f13db8bf072eb9a5de076dac99a59059bfa384f3665e20bff6d04a0a20542f40"
+      },
+      {
+        "file": "packages/backend-contract/src/index.ts",
+        "sha256": "8062ac7133df91ec0cee29900eaf39d08ba1befcfcdd0fb5204d0ccf43cd0a37"
+      },
+      {
+        "file": "packages/backend-contract/src/peer-review.test.ts",
+        "sha256": "0bb4408a6cb3f03515a830475fc2a015a39e93eed5db47f167adff1d777075ec"
+      },
+      {
+        "file": "packages/backend-contract/src/peer-review.ts",
+        "sha256": "0f01663245b03ca732b3e8918740358d4a4414d88095a58aaf731c65677b4e1b"
+      },
+      {
+        "file": "packages/backend-contract/src/remote-http.test.ts",
+        "sha256": "5146bd917b3f161d2c1610248dbbffaa91c5f854f422bb9c42a1774ca95b25d3"
+      },
+      {
+        "file": "packages/backend-contract/src/remote.test.ts",
+        "sha256": "1f1d46485d885b83e3581aeb406bfab51609b00e374d5feebb18d1d599283d98"
+      },
+      {
+        "file": "packages/backend-contract/src/remote.ts",
+        "sha256": "ffb3889663077376e98f67a4eed045d80d30fdf7b93e958b2b2a073258995b77"
+      },
+      {
+        "file": "packages/backend-contract/test-vectors/local-protocol-vectors.json",
+        "sha256": "2d8436a50f293b523f1b91ed593543e18a18ac8652618bb205f0fe4740235727"
+      },
+      {
+        "file": "packages/backend-contract/tsconfig.json",
+        "sha256": "8f6e85eeaa8025fe7b2f01763e03f32540d3e2869ae857490d685098460f4e3a"
+      },
+      {
+        "file": "packages/domain/package.json",
+        "sha256": "528d1561335812343644500870b07d67169371edf5a4a19514b72d061711c231"
+      },
+      {
+        "file": "packages/domain/src/index.test.ts",
+        "sha256": "ac6a07e740c8d80a0c47f2350141abcb192055eb1b180f2760c4439b4ea80e30"
+      },
+      {
+        "file": "packages/domain/src/index.ts",
+        "sha256": "b5bf301047a60a13c6f066a83a09d2d7f7b94832c8c2f597ce8006d8df7060c9"
+      },
+      {
+        "file": "packages/domain/tsconfig.json",
+        "sha256": "8f6e85eeaa8025fe7b2f01763e03f32540d3e2869ae857490d685098460f4e3a"
+      },
+      {
+        "file": "packages/grading/package.json",
+        "sha256": "1b9506840729124689c0bb59af597b99fcae55875d91471f592601893b04e1fe"
+      },
+      {
+        "file": "packages/grading/src/index.test.ts",
+        "sha256": "f838a8549b1f6d42cbb90e586099e3703a310dfece7dd289788239bac1929931"
+      },
+      {
+        "file": "packages/grading/src/index.ts",
+        "sha256": "08cee9baea5317254e759b044fe9c37e4f931676c71cb047538187fe17846821"
+      },
+      {
+        "file": "packages/grading/test-vectors/grading-vectors.json",
+        "sha256": "616c6d01abdd34c75dfbe25ac8a18852979e178f10f467ca65edffda09e9581f"
+      },
+      {
+        "file": "packages/grading/tsconfig.json",
+        "sha256": "8f6e85eeaa8025fe7b2f01763e03f32540d3e2869ae857490d685098460f4e3a"
+      },
+      {
+        "file": "packages/shared/package.json",
+        "sha256": "45a0d049bcf5d60de9f02ac40dc48c631b9e9c165ef36eafc88c4f3e020bcaa6"
+      },
+      {
+        "file": "packages/shared/src/index.test.ts",
+        "sha256": "3e4f1cecde3c321a26977dd41df9bd9f604d1665bbcf6506dcd22024210aab69"
+      },
+      {
+        "file": "packages/shared/src/index.ts",
+        "sha256": "3bb074b340eef19fedcec9386dd1585e1ac75982289c0330091cb71ab86d9af5"
+      },
+      {
+        "file": "packages/shared/tsconfig.json",
+        "sha256": "8f6e85eeaa8025fe7b2f01763e03f32540d3e2869ae857490d685098460f4e3a"
+      },
+      {
+        "file": "packages/validation/package.json",
+        "sha256": "3416409b220d34cf007e571486a542929a8903b6144de5cae1afe17ff814ec0d"
+      },
+      {
+        "file": "packages/validation/src/index.test.ts",
+        "sha256": "0089b75db2a0770ace0d70d579145e66fd4fead664fae0566edc221f570b5db4"
+      },
+      {
+        "file": "packages/validation/src/index.ts",
+        "sha256": "088f43fcb22b5f3464ce9fdc8278546047c11d892d20f1964cd3b6feb7d28e74"
+      },
+      {
+        "file": "packages/validation/src/peer-review-monitor.ts",
+        "sha256": "348653d9a9d7736cbe1255bb0c791588f9e25ca635204cefbccdd1ec1947d713"
+      },
+      {
+        "file": "packages/validation/src/peer-review-setup.ts",
+        "sha256": "e2628959b367230806cf4bab3f18bfccbc39c2b388659733c810d804cc01ecf4"
+      },
+      {
+        "file": "packages/validation/src/session-report.ts",
+        "sha256": "6ee2942763747f5db7225299474ed15563c503547c5df383328762143b5f94c8"
+      },
+      {
+        "file": "packages/validation/tsconfig.json",
+        "sha256": "8f6e85eeaa8025fe7b2f01763e03f32540d3e2869ae857490d685098460f4e3a"
+      },
+      {
+        "file": "pnpm-lock.yaml",
+        "sha256": "3625cec123c43e0e7d48da847c4f5fa6e1b8f587d580482eb2e845e0d9e8d078"
+      },
+      {
+        "file": "pnpm-workspace.yaml",
+        "sha256": "a3ca4f689c9faba97c85a961d71605dcafb9c575d9531d9336ba3df2f26ac2d9"
+      }
+    ]
+  },
+  "sourceUnchangedDuringVerification": true,
+  "snapshots": {
+    "before": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/source-before.json",
+      "sha256": "a49df4414a7a0092c2655eec6a38f4ec881852d44e3200d02986b9f0735d6850",
+      "bytes": 42601,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "afterBuild": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/source-after-build.json",
+      "sha256": "a4675ce565e9027d5e11e184fae8e0d83e92fcf2e55ce2e79687fc13bb6c18b9",
+      "bytes": 42601,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "afterSmoke": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/source-after-smoke.json",
+      "sha256": "8a8b118ab33ebbad0dcc35b5a243716bba2455c1d7f6e1b4d8dc274a6cf6c88a",
+      "bytes": 42632,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    }
+  },
+  "sourceBeforeAfterAndBuildManifestIdentical": true,
+  "relaySourceDigest": "1323dac8b710a8a24b4cbf1c1bbc0db30a1beab8b65e03a396a5211f0b1c6799",
+  "studentSourceDigest": "259f753001d25f6c05679e31608b1c9cabcd97a3f2c34efcd4694e30108dbbca",
+  "buildManifest": {
+    "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/3fa348da-b4af-4631-9b1d-cde837cecf37/build-manifest.json",
+    "sha256": "3fa9e7e7e67c8cac6ae3cde4165db35d1567d431c33d333b313ca6b2de959ea5",
+    "bytes": 44083,
+    "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+  },
+  "historicalMismatch": {
+    "oldBuildSourceDigest": "6a01e4c12eedb9e91f3e01d20840d4d073bc4d8a5e44a73c4035307b5c03d830",
+    "currentRawDigest": "49b1da1ad0cd6f57ecb0908b32f7f61ee49cbf5a8bf639bd01bffa741a0b761e",
+    "changedRawFiles": 8,
+    "cause": "Previously diagnosed CRLF/LF difference; this task refreshes from current bytes without normalization",
+    "oldEvidenceUnmodified": true
+  }
+}

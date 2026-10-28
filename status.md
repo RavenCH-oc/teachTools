@@ -1,83 +1,31 @@
-# Current status — Phase 16F Pass B Windows verification
+# Current status — Phase 16F Pass B artifact refresh
 
-- 日期：2026-10-28（Asia/Taipei）；repository：RavenCH-oc/teachTools。
-- Branch：`codex/phase16f-pass-b-preparation`。
-- 本輪起點／實際 tested HEAD：`843aeab7d3a56aaaa427fcab7d5c5c64e6703f95`；開始時 working tree clean，review-fix commit 已匯入，沒有再次套用 bundle 或退回基線。
-- 原 task base／main／origin/main：`7db449392ed741ab1df1b15e3cb67f02c730392f`。
-- **WINDOWS_TARGETED_VERIFICATION_PASS / WINDOWS_NATIVE_LOOPBACK_PASS**；等待人工 push 至同一 [Draft PR #3](https://github.com/RavenCH-oc/teachTools/pull/3) 與新的固定 head SHA 複審。
-- Pilot：**1 Teacher／1 classroom／最多 30 Students**；完整 media-reader 階梯 `1／4／5／10／20／30`。本輪真實 smoke 為 **2 人、1／2 readers**，30 人流程僅由 mocks 驗證。
-- Production、final RC、installed Human QA **NOT_EXECUTED**；Phase 16F release **HOLD**，Pass C **NOT_STARTED**。
+- 日期：2026-10-28（Asia/Taipei）；branch：`codex/phase16f-pass-b-artifact-refresh`。
+- 使用者已人工合併 PR #3；本輪 base／實際 build 與 smoke 的 testedHead：`330b93ee1c7f86b01fddc5d6899bf6eed5d2676a`。起始 main／origin/main 相同，working tree clean；歷史 taskBase 保持 `7db449392ed741ab1df1b15e3cb67f02c730392f`。
+- **ARTIFACT_REFRESH_PASS / TWO_STUDENT_LOOPBACK_PASS**；完成本輪文件後建立一個 local commit，交由使用者人工 push／建立 Draft PR，再依固定 head SHA 審查。
+- Pilot：1 Teacher／1 classroom／最多 30 Students；本輪唯一 smoke 僅 **2 Students、1／2 media readers**。
+- Production／deployment／installer／final RC／installed QA **NOT_EXECUTED**；release **HOLD**、Pass C **NOT_STARTED**。
 
-## 本輪範圍與結果
+## 本輪結果
 
-保留已匯入的三項 review findings、control timing 與 run-abort 修正；本輪只補 Windows 本機驗證、更新本檔／[runbook](docs/phase16f-pass-b-preparation.md)，並新增 [Windows evidence](docs/review-evidence/phase16f-pass-b-preparation/windows-review-fixes.md)。沒有修改 source、runtime、dependencies、schema 或既有 evidence。
+因 checkout 八檔 CRLF／LF raw bytes 與舊 manifest 不同而 refresh；未修改 source、tests、dependencies、lockfiles、Wrangler config、migrations、換行設定或 runner 契約。舊 artifacts／manifest／evidence 全部保留。詳見 [本輪 evidence](docs/review-evidence/phase16f-pass-b-artifact-refresh/README.md)、[verification](docs/review-evidence/phase16f-pass-b-artifact-refresh/verification.json) 與 [完整 source manifest](docs/review-evidence/phase16f-pass-b-artifact-refresh/source-manifest.json)。
 
-沿用 Node supervisor、真實 Rust application services、實際 Student HTTP bundle、隔離 per-run Credential Manager target、native pre-send budgets 與 exact-ID ledger cleanup。1 GiB raw／2 GiB Teacher UTF-8、含 setup 的 30 分鐘上限與 2 分鐘 cleanup reserve 不變；不代表帳單 hard cap。
+- 實際 build：20:34:14–20:34:25（Asia/Taipei），一次、exit 0。新 build UUID：`3fa348da-b4af-4631-9b1d-cde837cecf37`。
+- 247 筆完整 source records／raw digest 在 before、manifest、after-build、after-smoke 一致：`49b1da1ad0cd6f57ecb0908b32f7f61ee49cbf5a8bf639bd01bffa741a0b761e`。三 artifacts hashes 與既有 readBuildManifest() 核對 PASS。
+- 唯一兩人 loopback smoke：20:35:38–20:35:44，exit 0；run `0b7bd155-a537-4020-99c9-c8b97f7df669`；**22/22 gates PASS**、runner elapsed **6372.1358 ms**。
+- 六類 owned resources cleanup 均 CONFIRMED_CLEANED，unresolved 空、ledger persistence confirmed；owned native app data 不存在，active readers／media／credit waiters 全為 0。
+- Raw reserved **13,093,802 bytes**、Teacher UTF-8 reserved **17,574,852 bytes**；沒有 budget stop 或 denied-before-send，非平台計費數。
+- Generation：STREAM_INTERRUPTED；first byte 2245.1714 ≤ trigger 2245.2632 ≤ interruption 2277.7725 ms，歸因僅 TEMPORAL_CORRELATION_ONLY。
+- Build／smoke 無失敗、無重試。Build 內 cargo test --lib --no-run 僅編譯，不是 Rust runtime tests；Vite 僅建 Student HTTP library，沒有建 browser dist-remote。
 
-Windows x64、Node v24.19.0；完整命令、時間、exit code、raw logs hashes、gates／cleanup 見 [verification JSON](docs/review-evidence/phase16f-pass-b-preparation/windows-review-fixes-verification.json)。
+原 binary、fixture、logs、report、ledger 與 build manifest 留在 ignored target。公開 evidence 保存必要摘要、247 source hashes 與原件 hashes；文件 commit 不倒填 testedHead。架構與 dependencies 無變更。
 
-```powershell
-node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap apps/relay/scripts/pass-b-safety.test.js apps/relay/scripts/pass-b-ledger.test.js apps/relay/scripts/pass-b-supervisor.test.js apps/relay/scripts/pass-b-adapters.test.js apps/relay/scripts/pass-b-process.test.js apps/relay/scripts/pass-b-workload.test.js apps/relay/scripts/capacity-local.safety.test.js apps/relay/scripts/capacity-local-server.test.js
-```
+## 歷史與待完成事項
 
-**138/138 PASS**，0 failed／cancelled／skipped／todo，完整 TAP summary，stderr 空。Production authorization、unknown provisioning ordering、client timeout／run abort 等負面情境使用 mocks；不是 production execution。
+[歷史 Windows verification](docs/review-evidence/phase16f-pass-b-preparation/windows-review-fixes.md) 的 138 Node／9 native tests／22 smoke gates 屬於 `843aeab7…`；本輪沒有重跑這些 tests、A2、broad suite、30 人容量或 WAN／手機驗證。舊 evidence 未改寫。
 
-在 `apps/teacher/src-tauri` 實際執行以下命令，全部 exit 0：
+2026-10-28 19:22–19:38 的歷史 live 盤點曾確認正常 OAuth、active `13424a84-25a3-409d-a0b6-1371f6b270d4` 100%、bindings 與 D1 schema；本輪沒有重新查詢 Cloudflare 或 production。該 active 是未來部署的優先 rollback 候選，相容性仍待部署準備審查；更早 `613f3f40…` 不代替此候選。
 
-```powershell
-cargo fmt --check
-cargo check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --lib pass_b -- --test-threads=1
-```
+Billing／Builds／來源映射、rollback readiness、五項 riskAcceptance 與 maintenance window 仍未完成。歷史公開 Student browser bundle 缺少 main 的 bounded 429 retry，差異尚未解決；runner library 與 browser dist-remote 是不同產物。後續 deployment 與單次 production verification 均需另行授權，見 [runbook](docs/phase16f-pass-b-preparation.md)。
 
-Focused tests **9 PASS、1 ignored、134 filtered**；隔離 Windows Credential Manager regression 通過。Ignored 項為 opt-in native runner，之後由新 smoke supervisor 明確啟動。Rust source 相對 `5ffb7d6…` 未變，但本輪仍實際執行以上 checks；不是搬用舊結果。
-
-在 repository root 實際執行：
-
-```powershell
-node apps/relay/scripts/pass-b.js
-node apps/relay/scripts/pass-b-build.js
-node apps/relay/scripts/pass-b.js loopback-smoke --manifest apps/teacher/src-tauri/target/phase16f-pass-b-build/1e45243e-5919-4fe9-a534-d28edee99369/build-manifest.json --students 2
-```
-
-- Default plan PASS：30 人完整階梯、`productionEffects: NONE`、未授權 production。
-- 新 native／Student artifacts 與 2,094,909-byte PNG fixture build PASS，使用新 manifest，build 前後 source 相同。
-- 新 run：`d54a9e70-cd76-4ff3-9e3a-ee35421f9c15`；**22 gates PASS**，耗時 **6463.9508 ms**，runner／workload 完成。
-- Media stage 1：control 完成 530.3678 ms，media 完成 734.6976 ms；stage 2：control 完成 971.5494 ms，media 完成 1225.3903／1281.3713 ms。兩次 probe 均確有 active media；control timestamp 不再等待 media。
-- Generation 舊流為 `STREAM_INTERRUPTED`：first byte 2214.3708 ≤ trigger 2214.4551 ≤ interruption 2246.6038 ms；重新 AUTH／sync 完成。只宣稱 **TEMPORAL_CORRELATION_ONLY**，不將 client deadline／abort 或 generic failure 當作 server-attested cause。
-- 六類 resources cleanup 均 `CONFIRMED_CLEANED`；unresolved 空，ledger persistence confirmed，Student cleanup 完成，owned native app data 已不存在，active readers／media／credit waiters 全為 0。
-- Raw reserved **13,093,802 bytes**、Teacher UTF-8 reserved **17,576,201 bytes**；沒有 budget stop 或 denied-before-send。這些不是平台計費數。
-
-本輪每個 build／test／smoke command 均首次通過，**失敗紀錄為空、重試 0 次**；完整輸出仍保留。僅有 I: incremental cache 無法 hard-link 而改為 copy 的環境警告。先前 Linux／sandbox／development failures 保留於原紀錄，沒有用本次 PASS 覆蓋。
-
-## Source 與歷史身分
-
-新的 [完整 Windows manifest](docs/review-evidence/phase16f-pass-b-preparation/windows-review-fixes-source-manifest.json)包含 247 筆 raw SHA-256，與實際 build／smoke source 相同：
-
-```text
-6a01e4c12eedb9e91f3e01d20840d4d073bc4d8a5e44a73c4035307b5c03d830
-```
-
-Windows 與 [Linux review-fix snapshot](docs/review-evidence/phase16f-pass-b-preparation/pr3-fixes-source-manifest.json)有 35 筆 raw hash 差異，已逐位元組確認全部是 CRLF／LF，內容與 `843aeab7…` Git blobs 一致；沒有改寫換行，沒有將正規化 digest 當 artifact identity。
-
-本輪也找回初版原完整 Windows build manifest，確認它與 Git `5ffb7d6…` 的 27 筆差異均可由換行解釋，沒有未解差異。新 evidence 記錄核對方法與限制；[舊 smoke summary](docs/review-evidence/phase16f-pass-b-preparation/smoke-summary.json)、[Linux review fixes](docs/review-evidence/phase16f-pass-b-preparation/pr3-fixes.md)及其 verification／source manifests 均保持原樣。舊 `testedHead`／run ID 不回寫；新 evidence 綁定本輪測試時的 `843aeab7…`，不回填之後的文件 commit。
-
-Previous results 分開保留：初版 Windows 124 Node PASS／9 native PASS／22 smoke gates PASS；Linux 修正後 138 Node PASS；本輪 Windows 138 Node PASS／9 native PASS／22 新 smoke gates PASS。Phase 16E COMPLETE，PR #1／#2 已整合；[A2 evidence](docs/review-evidence/phase16f-pass-a-a2/README.md)與完整歷史 workloads 未重跑或改寫。
-
-## 剩餘 gates 與停止點
-
-| Gate | 狀態 |
-| --- | --- |
-| 修正後 Windows artifacts／兩人 native integration | PASS；新的 source／build／run evidence |
-| 新 commit 的固定 head review | 待人工 push 至既有 Draft PR #3 後複審 |
-| Production plan／usage／Worker／Student deployment identity | UNKNOWN；未執行 production 管理或負載操作 |
-| Bindings／vars／rollback candidate／maintenance window | 待 operator 核對 |
-| Shared NAT／local admission／global quota／roster-bearer identity／revocation exposure | 風險接受未決，單班規模不等於已接受 |
-| Production deployment／verification | NOT_EXECUTED；仍需另行明確授權 |
-| WAN／真實手機 render／installer／final RC／installed Human QA | NOT_EXECUTED |
-| Phase 16F release／Pass C | HOLD／NOT_STARTED |
-
-交付前檢查相對連結、claims／SHA、完整 source／artifact hashes、各 gates／cleanup、public evidence、allowlist、歷史 evidence 未修改，以及 `git status --short`／`git diff --check`／`git diff --stat`／staged diff。大型 artifacts、原始 report／ledger／logs 留在 ignored target；公開摘要不包含 credentials 或 exact operational IDs，也不宣稱 reviewer 已取得本機原件。
-
-沒有新增 dependency；未 push／修改 PR／merge、production D1／負載／部署或 installer，SSH key／passphrase／remote 均未變更。完成一個 local evidence commit 後停止，由使用者人工 push 至同一 Draft PR，依新固定 head 複審。
+只提交本輪五檔 allowlist；不 push、不建立或修改 PR、不 merge。完成 local commit 後停止。
