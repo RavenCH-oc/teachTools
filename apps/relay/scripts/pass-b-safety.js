@@ -41,7 +41,7 @@ export function validateProfile(input = {}) {
   const students = input.students ?? LIMITS.students;
   const stages = imageStages(students);
   if ((input.teachers ?? 1) !== 1 || (input.classrooms ?? 1) !== 1) reject("INVALID_PILOT_SCOPE");
-  const runId = validateRunId(input.runId ?? randomUUID());
+  const runId = validateRunId(mode === "production" ? input.runId : input.runId ?? randomUUID());
   return Object.freeze({ mode, origin, runId, students, teachers: 1, classrooms: 1,
     stages: Object.freeze(stages), rawBytes: LIMITS.rawBytes,
     teacherUtf8Bytes: LIMITS.teacherUtf8Bytes, wallMs: LIMITS.wallMs, cleanupMs: LIMITS.cleanupMs });

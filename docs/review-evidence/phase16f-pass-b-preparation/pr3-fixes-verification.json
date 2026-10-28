@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-28",
+  "timezone": "Asia/Taipei",
+  "taskBase": "7db449392ed741ab1df1b15e3cb67f02c730392f",
+  "revisionBase": "5ffb7d6e4a339b523d135115d764c78eb4a84971",
+  "headAtVerification": "5ffb7d6e4a339b523d135115d764c78eb4a84971",
+  "branch": "codex/phase16f-pass-b-preparation",
+  "environment": {
+    "node": "v24.22.1",
+    "platform": "linux",
+    "arch": "x64"
+  },
+  "evidenceKind": "LOCAL_NODE_REVIEW_FIX_VERIFICATION",
+  "scope": "Pass B preparation review fixes; one Teacher, one classroom, up to 30 synthetic Students; all native/D1/transport effects in these tests are mocks",
+  "sourceDigest": "af0d6cf0a3eadb1e92edeeae9f797f52d8a842e875018944b2135f1f133da7c1",
+  "sourceFileCount": 247,
+  "sourceManifest": "pr3-fixes-source-manifest.json",
+  "sourceUnchangedDuringVerification": true,
+  "dependencySetup": {
+    "command": "npm exec --yes --package=pnpm@9.15.0 -- pnpm install --frozen-lockfile --ignore-scripts --filter @classtools/relay",
+    "result": "PASS",
+    "packageManifestsAndLockfileChanged": false,
+    "newDependencies": 0
+  },
+  "targetedTests": {
+    "command": "node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap apps/relay/scripts/pass-b-safety.test.js apps/relay/scripts/pass-b-ledger.test.js apps/relay/scripts/pass-b-supervisor.test.js apps/relay/scripts/pass-b-adapters.test.js apps/relay/scripts/pass-b-process.test.js apps/relay/scripts/pass-b-workload.test.js apps/relay/scripts/capacity-local.safety.test.js apps/relay/scripts/capacity-local-server.test.js",
+    "result": "PASS",
+    "exitCode": 0,
+    "tests": 138,
+    "pass": 138,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "durationMs": 2516.811098,
+    "testFiles": [
+      "apps/relay/scripts/pass-b-safety.test.js",
+      "apps/relay/scripts/pass-b-ledger.test.js",
+      "apps/relay/scripts/pass-b-supervisor.test.js",
+      "apps/relay/scripts/pass-b-adapters.test.js",
+      "apps/relay/scripts/pass-b-process.test.js",
+      "apps/relay/scripts/pass-b-workload.test.js",
+      "apps/relay/scripts/capacity-local.safety.test.js",
+      "apps/relay/scripts/capacity-local-server.test.js"
+    ],
+    "logSha256": "ee76c7e5c4e5216d2d1b072e9027afce2719d6755264515a77e73c8209fef926",
+    "logLocation": "Ignored local target; raw log is not included in public evidence"
+  },
+  "initialReporter": {
+    "command": "node --test --test-reporter=tap --test-reporter-destination=<ignored-target>/node-tests.tap apps/relay/scripts/pass-b-safety.test.js apps/relay/scripts/pass-b-ledger.test.js apps/relay/scripts/pass-b-supervisor.test.js apps/relay/scripts/pass-b-adapters.test.js apps/relay/scripts/pass-b-process.test.js apps/relay/scripts/pass-b-workload.test.js apps/relay/scripts/capacity-local.safety.test.js apps/relay/scripts/capacity-local-server.test.js",
+    "exitCode": 0,
+    "result": "REPORT_INCOMPLETE",
+    "observedTopLevelPasses": 135,
+    "reason": "The process-isolated reporter file ended before its final TAP plan/summary. The same test scope was rerun with isolation=none to obtain the complete 138-test result."
+  },
+  "initialSandboxRestriction": {
+    "result": "ENVIRONMENT_BLOCKED",
+    "code": "EPERM",
+    "syscall": "spawnSync git",
+    "resolution": "The same local focused checks were run with approved subprocess access. No production command was run."
+  },
+  "defaultPlan": {
+    "command": "node apps/relay/scripts/pass-b.js",
+    "result": "PASS",
+    "exitCode": 0,
+    "students": 30,
+    "teachers": 1,
+    "classrooms": 1,
+    "stages": [
+      1,
+      4,
+      5,
+      10,
+      20,
+      30
+    ],
+    "productionEffects": "NONE",
+    "executionAuthorized": false,
+    "release": "HOLD"
+  },
+  "independentDiffAudit": {
+    "scope": "Eight changed runner and test files",
+    "result": "NO_REMAINING_FINDINGS_IN_WORKING_DIFF",
+    "fixedHeadReview": "REQUIRED_AFTER_DELIVERY_COMMIT"
+  },
+  "notExecuted": {
+    "rustChecks": "NOT_EXECUTED_NO_RUST_TOOLCHAIN",
+    "nativeArtifactBuild": "NOT_EXECUTED_REQUIRES_WINDOWS_ENVIRONMENT",
+    "studentBundleBuild": "NOT_EXECUTED",
+    "twoStudentNativeLoopbackSmoke": "NOT_EXECUTED_REQUIRES_WINDOWS_ENVIRONMENT",
+    "productionExecution": "NOT_EXECUTED",
+    "deployment": "NOT_EXECUTED",
+    "installer": "NOT_EXECUTED",
+    "finalRc": "NOT_EXECUTED",
+    "installedHumanQa": "NOT_EXECUTED",
+    "passC": "NOT_STARTED"
+  },
+  "historicalEvidence": {
+    "file": "smoke-summary.json",
+    "modified": false,
+    "meaning": "Previous Windows two-Student loopback evidence only; not evidence for these review fixes. The historical full source digest mismatch remains unexplained without the original full manifest."
+  },
+  "release": "HOLD",
+  "developmentRegression": {
+    "case": "Run abort during stalled recovery read",
+    "initialResult": "An unhandled SUBMIT_FAILED rejection was exposed while adding the regression",
+    "fix": "ensureRunning() before creating recovery ACK promises",
+    "finalResult": "Included in the complete 138/138 PASS run with no asynchronous warnings"
+  },
+  "repositoryChecks": {
+    "relativeDocumentationLinks": {
+      "checked": 25,
+      "broken": 0,
+      "result": "PASS"
+    },
+    "sourceManifest": {
+      "files": 247,
+      "mismatches": 0,
+      "digest": "af0d6cf0a3eadb1e92edeeae9f797f52d8a842e875018944b2135f1f133da7c1",
+      "result": "PASS"
+    },
+    "gitDiffCheck": "PASS",
+    "historicalSmokeAndA2Evidence": "UNCHANGED",
+    "rustWorkerStudentAndDependencyFiles": "UNCHANGED"
+  }
+}

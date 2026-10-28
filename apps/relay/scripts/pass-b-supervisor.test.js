@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { parseArguments, plan, executeCommand, supervise, validateAuthorization, readBuildManifest } from "./pass-b.js";
 import { artifactRoot, sourceIdentity, sha256 } from "./pass-b-build.js";
+import { createProductionAdapter } from "./pass-b-adapters.js";
 import { RunLedger } from "./pass-b-ledger.js";
 import { validateProfile, createDeadline, CANONICAL_ORIGIN, LIMITS } from "./pass-b-safety.js";
 
@@ -92,6 +93,77 @@ test("successful orchestration uses exact owned IDs, closes before revoke and cl
   assert.equal(f.calls.find(row => row.operation === "provision").id, f.calls.find(row => row.operation === "activation-cleanup").id);
   assert.ok(names.indexOf("cleanup") < names.indexOf("stop-child"));
   assert.ok(names.includes("dispose-adapter"));
+});
+
+test("a provisioning INSERT that commits after exact DELETE cannot be reported cleaned", async () => {
+  const f = fixture({ effectiveUrl: CANONICAL_ORIGIN });
+  const profile = validateProfile({ mode: "production", students: 2, runId: f.profile.runId });
+  const effects = [];
+  let activationExists = false, insertHash, commitInsert;
+  const confirmed = changes => ({ code: 0, signal: null, stdout: JSON.stringify([{ success: true, meta: { changes } }]) });
+  const pendingInsert = new Promise(resolve => {
+    commitInsert = () => { activationExists = true; effects.push("insert-committed"); resolve(confirmed(1)); };
+  });
+  const adapter = createProductionAdapter({ execute: async args => {
+    const sql = args.at(-1);
+    if (sql.startsWith("INSERT")) {
+      insertHash = sql.match(/VALUES \('([a-f0-9]{64})'/)?.[1];
+      effects.push("insert-dispatched");
+      return pendingInsert;
+    }
+    assert.equal(sql, `DELETE FROM activation_codes WHERE code_hash = '${insertHash}'`);
+    assert.equal(activationExists, false);
+    effects.push("delete-confirmed-absent");
+    return confirmed(0);
+  } });
+  const report = await supervise({ ...f.options, profile, createAdapter: async () => adapter,
+    deadline: createDeadline({ totalMs: 2000, cleanupMs: 1900 }) });
+  assert.deepEqual(effects, ["insert-dispatched", "delete-confirmed-absent"]);
+  assert.equal(report.overall, "FAIL");
+  assert.equal(report.failureCode, "DEADLINE");
+  assert.equal(report.cleanupDisposition, "CLEANUP_INCOMPLETE");
+  assert.equal(report.cleanupComplete, false);
+  assert.deepEqual(report.unresolved, ["activation"]);
+  assert.equal(report.resources.activation.cleanup, "EFFECT_UNKNOWN");
+  assert.equal(report.resources.activation.cleanupCode, "CREATE_OUTCOME_UNKNOWN");
+  assert.equal(f.calls.some(row => ["enroll", "create", "workload"].includes(row.operation)), false);
+  commitInsert();
+  await pendingInsert;
+  assert.equal(activationExists, true);
+  assert.equal(f.ledger.publicReport().cleanupComplete, false);
+  assert.deepEqual(effects, ["insert-dispatched", "delete-confirmed-absent", "insert-committed"]);
+});
+
+test("a lost provisioning response remains unknown after successful best-effort cleanup", async () => {
+  const f = fixture({ effectiveUrl: CANONICAL_ORIGIN });
+  const profile = validateProfile({ mode: "production", students: 2, runId: f.profile.runId });
+  const effects = [];
+  let commitRemoteInsert, activationExists = false, insertHash;
+  const adapter = createProductionAdapter({ execute: async args => {
+    const sql = args.at(-1);
+    if (sql.startsWith("INSERT")) {
+      insertHash = sql.match(/VALUES \('([a-f0-9]{64})'/)?.[1];
+      effects.push("insert-response-lost");
+      commitRemoteInsert = () => { activationExists = true; effects.push("remote-insert-committed"); };
+      // The client/child is already done; the remote effect is still unknown.
+      return { code: 0, signal: null, stdout: "" };
+    }
+    assert.equal(sql, `DELETE FROM activation_codes WHERE code_hash = '${insertHash}'`);
+    effects.push("delete-confirmed-absent");
+    return { code: 0, signal: null, stdout: JSON.stringify([{ success: true, meta: { changes: 0 } }]) };
+  } });
+  const report = await supervise({ ...f.options, profile, createAdapter: async () => adapter });
+  assert.deepEqual(effects, ["insert-response-lost", "delete-confirmed-absent"]);
+  assert.equal(report.cleanupComplete, false);
+  assert.equal(report.resources.activation.state, "EFFECT_UNKNOWN");
+  assert.equal(report.resources.activation.cleanup, "EFFECT_UNKNOWN");
+  assert.equal(report.resources.activation.cleanupCode, "CREATE_OUTCOME_UNKNOWN");
+  assert.equal(report.overall, "FAIL");
+  assert.equal(f.calls.some(row => ["enroll", "create", "workload"].includes(row.operation)), false);
+  commitRemoteInsert();
+  assert.equal(activationExists, true);
+  assert.equal(f.ledger.publicReport().cleanupComplete, false);
+  assert.equal(effects.filter(value => value.startsWith("insert-")).length, 1);
 });
 
 test("native effective URL mismatch is rejected before provision, enrollment or workload", async () => {
@@ -308,6 +380,17 @@ test("production authorization binds scope, expiry, artifact identities and expl
   }
 });
 
+test("production authorization requires an explicit UUID and preserves its single-run identity", () => {
+  const { manifest, now, authorization } = authorizationFixture();
+  for (const runId of [undefined, null, 1, false, "", "not-a-uuid", [], {}, "123e4567-e89b-42d3-A456-426614174000"]) {
+    const invalid = { ...authorization, runId };
+    if (runId === undefined) delete invalid.runId;
+    assert.throws(() => validateAuthorization(invalid, manifest, now), /AUTHORIZATION_MISMATCH/);
+  }
+  assert.equal(validateAuthorization(authorization, manifest, now).runId, authorization.runId);
+  assert.equal(validateAuthorization(authorization, manifest, now).runId, authorization.runId);
+});
+
 test("missing source subset identities cannot satisfy authorization via undefined equality", () => {
   const { manifest, now, authorization } = authorizationFixture();
   delete manifest.relaySourceDigest;
@@ -334,6 +417,50 @@ function buildManifestFixture(t) {
   write();
   return { manifest, filename, write };
 }
+
+function executionAuthorizationFixture(t) {
+  const f = buildManifestFixture(t);
+  const { authorization } = authorizationFixture();
+  Object.assign(authorization, { students: 2, expiresAt: Date.now() + 300000, sourceDigest: f.manifest.source.digest,
+    nativeSha256: f.manifest.native.sha256, clientSha256: f.manifest.client.sha256, imageSha256: f.manifest.image.sha256 });
+  Object.assign(authorization.environment, { workerSourceDigest: f.manifest.relaySourceDigest,
+    studentSourceDigest: f.manifest.studentSourceDigest });
+  const authorizationPath = path.join(path.dirname(f.filename), "authorization.json");
+  const write = () => fs.writeFileSync(authorizationPath, JSON.stringify(authorization));
+  write();
+  return { ...f, authorization, writeAuthorization: write,
+    parsed: parseArguments(["execute-production", "--manifest", f.filename, "--authorization", authorizationPath]) };
+}
+
+test("invalid production run IDs stop before adapter, native or workload construction", async t => {
+  const f = executionAuthorizationFixture(t);
+  let effects = 0;
+  const forbidden = () => { effects++; throw new Error("FORBIDDEN_TEST_EFFECT"); };
+  for (const runId of [undefined, null]) {
+    if (runId === undefined) delete f.authorization.runId;
+    else f.authorization.runId = runId;
+    f.writeAuthorization();
+    await assert.rejects(executeCommand(f.parsed, { createAdapter: forbidden, nativeFactory: forbidden, workload: forbidden }),
+      /AUTHORIZATION_MISMATCH/);
+  }
+  assert.equal(effects, 0);
+});
+
+test("reusing a valid authorization is rejected before any second-run effects", async t => {
+  const f = executionAuthorizationFixture(t);
+  const runDirectory = path.join(artifactRoot, "phase16f-pass-b", f.authorization.runId);
+  t.after(() => fs.rmSync(runDirectory, { recursive: true, force: true }));
+  const owned = fixture({ effectiveUrl: CANONICAL_ORIGIN });
+  const dependencies = { createAdapter: owned.options.createAdapter, nativeFactory: owned.options.nativeFactory,
+    workload: owned.options.workload };
+  const first = await executeCommand(f.parsed, dependencies);
+  assert.equal(first.runId, f.authorization.runId);
+  assert.equal(first.overall, "PASS");
+  const effects = owned.calls.length;
+  await assert.rejects(executeCommand(f.parsed, dependencies), { code: "EEXIST" });
+  assert.equal(owned.calls.length, effects);
+  assert.equal(owned.calls.filter(row => row.operation === "provision").length, 1);
+});
 
 test("build manifest validates exact native, Student bundle and fixture bytes", t => {
   const f = buildManifestFixture(t);

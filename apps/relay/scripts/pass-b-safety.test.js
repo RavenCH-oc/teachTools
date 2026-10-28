@@ -29,6 +29,21 @@ test("default validation is a plan, with fixed scope and an explicit 30-reader e
   assert.ok(Object.isFrozen(profile.stages));
 });
 
+test("only plan and loopback profiles may generate a fresh run ID", () => {
+  for (const mode of ["plan", "loopback"]) {
+    const first = validateProfile({ mode });
+    assert.notEqual(validateProfile({ mode }).runId, first.runId);
+    assert.equal(validateProfile({ mode, runId: first.runId }).runId, first.runId);
+  }
+});
+
+test("production profiles require an explicit run ID before authorization can use them", () => {
+  rejectsCode(() => validateProfile({ mode: "production" }), "INVALID_RUN_ID");
+  rejectsCode(() => validateProfile({ mode: "production", runId: null }), "INVALID_RUN_ID");
+  const runId = randomUUID();
+  assert.equal(validateProfile({ mode: "production", runId }).runId, runId);
+});
+
 test("import and default plan call no fetch or spawn even if adapters would fail", async () => {
   const originalFetch = globalThis.fetch;
   let fetched = false;
@@ -83,7 +98,7 @@ test("loopback mode only accepts its fixed address and effective native URL must
 });
 
 test("HTTP and WS effective destinations share the approved origin, allowing typed HTTP query args", () => {
-  const profile = validateProfile({ mode: "production" });
+  const profile = validateProfile({ mode: "production", runId: randomUUID() });
   const pathName = "/v1/sessions/" + "s".repeat(32) + "/http/SESSION_ASSET_GET?assetId=" + randomUUID();
   assert.equal(guardHttpTarget(profile, pathName).origin, new URL(CANONICAL_ORIGIN).origin);
   assert.equal(guardWebSocketTarget(profile, CANONICAL_ORIGIN.replace("https:", "wss:") + "v1/sessions/" + "s".repeat(32) + "/ws").protocol, "wss:");

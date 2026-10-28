@@ -6,7 +6,7 @@ const KINDS = Object.freeze(["activation", "installation", "session", "credentia
 const STATES = new Set(["NOT_EXECUTED", "INTENT_RECORDED", "CONFIRMED_CREATED", "FAILED", "EFFECT_UNKNOWN"]);
 const CLEANUPS = new Set(["NOT_EXECUTED", "INTENT_RECORDED", "CONFIRMED_CLEANED", "FAILED", "EFFECT_UNKNOWN"]);
 const CODES = new Set(["OPERATION_FAILED", "RESPONSE_LOST", "DEADLINE", "CANCELLED", "CHILD_CRASH",
-  "INVALID_RESPONSE", "CLEANUP_FAILED", "CLEANUP_DEADLINE", "NO_EXACT_ID", "RECOVERED_PENDING_INTENT"]);
+  "INVALID_RESPONSE", "CLEANUP_FAILED", "CLEANUP_DEADLINE", "NO_EXACT_ID", "RECOVERED_PENDING_INTENT", "CREATE_OUTCOME_UNKNOWN"]);
 const clone = value => structuredClone(value);
 function fail(code) { throw new SafetyError(code); }
 function resourceId(kind, id, runId) {
@@ -93,13 +93,27 @@ export class RunLedger {
       if (["INTENT_RECORDED", "CONFIRMED_CREATED"].includes(session.state)
         && ["NOT_EXECUTED", "INTENT_RECORDED"].includes(session.cleanup)) fail("CLOSE_BEFORE_REVOKE_REQUIRED");
     }
-    return this.#change(next => { next.stopped = true; next.resources[kind].cleanup = "INTENT_RECORDED"; });
+    return this.#change(next => {
+      next.stopped = true;
+      next.resources[kind].cleanup = "INTENT_RECORDED";
+      // An exact activation hash proves ownership, not that its INSERT has
+      // finished. A best-effort DELETE can run before that INSERT commits.
+      // Preserve this ordering uncertainty even if a create reply arrives later.
+      if (kind === "activation" && row.state !== "CONFIRMED_CREATED") {
+        next.resources[kind].cleanupCode = "CREATE_OUTCOME_UNKNOWN";
+      }
+    });
   }
   confirmCleaned(kind, id) {
     const row = this.#row(kind);
     if (row.cleanup !== "INTENT_RECORDED") fail("NO_PENDING_CLEANUP");
     if (this.exactId(kind) !== id) fail("RESOURCE_OWNERSHIP_MISMATCH");
-    return this.#change(next => { next.resources[kind].cleanup = "CONFIRMED_CLEANED"; });
+    return this.#change(next => {
+      // A confirmed DELETE only proves absence at that instant; it cannot
+      // settle a create that was still unknown when cleanup was dispatched.
+      next.resources[kind].cleanup = row.cleanupCode === "CREATE_OUTCOME_UNKNOWN"
+        ? "EFFECT_UNKNOWN" : "CONFIRMED_CLEANED";
+    });
   }
   cleanupFailed(kind, code = "CLEANUP_FAILED", { unknown = false } = {}) {
     const row = this.#row(kind);
@@ -120,7 +134,9 @@ export class RunLedger {
     const unresolved = KINDS.filter(kind => {
       const row = this.#row(kind);
       // Unknown server-generated effects cannot be cured by unrelated cleanup.
-      return row.state === "INTENT_RECORDED" || (row.state === "EFFECT_UNKNOWN" && !this.exactId(kind))
+      // Also retain unknown activation creation from older snapshots that may
+      // have mistaken a momentary absence for final cleanup confirmation.
+      return row.state === "INTENT_RECORDED" || (row.state === "EFFECT_UNKNOWN" && (kind === "activation" || !this.exactId(kind)))
         || (["CONFIRMED_CREATED", "EFFECT_UNKNOWN"].includes(row.state) && row.cleanup !== "CONFIRMED_CLEANED");
     });
     const cleanupComplete = unresolved.length === 0;
@@ -151,9 +167,12 @@ export class RunLedger {
     ledger.#state = clone(snapshot);
     ledger.#change(next => {
       next.stopped = true;
-      for (const row of Object.values(next.resources)) {
+      for (const [kind, row] of Object.entries(next.resources)) {
         if (row.state === "INTENT_RECORDED") Object.assign(row, { state: "EFFECT_UNKNOWN", code: "RECOVERED_PENDING_INTENT" });
         if (row.cleanup === "INTENT_RECORDED") Object.assign(row, { cleanup: "EFFECT_UNKNOWN", cleanupCode: "RECOVERED_PENDING_INTENT" });
+        if (kind === "activation" && row.state === "EFFECT_UNKNOWN" && row.cleanup === "CONFIRMED_CLEANED") {
+          Object.assign(row, { cleanup: "EFFECT_UNKNOWN", cleanupCode: "CREATE_OUTCOME_UNKNOWN" });
+        }
       }
     });
     return ledger;

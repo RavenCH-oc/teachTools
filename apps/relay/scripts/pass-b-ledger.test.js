@@ -101,15 +101,61 @@ test("a trustworthy late create confirmation recovers exact cleanup identity but
   assert.equal(report.overall, "FAIL");
 });
 
-test("known activation hash allows exact cleanup after provisioning response loss", () => {
+test("known activation hash permits best-effort cleanup but does not settle unknown provisioning", () => {
   const { ledger } = fixture();
   ledger.begin("activation", hash);
   ledger.fail("activation", { unknown: true, code: "RESPONSE_LOST" });
   assert.equal(ledger.exactId("activation"), hash);
   clean(ledger, "activation", hash);
-  assert.equal(ledger.publicReport().cleanupComplete, true);
+  assert.equal(ledger.publicReport().cleanupComplete, false);
+  assert.deepEqual(ledger.publicReport().unresolved, ["activation"]);
+  assert.equal(ledger.publicReport().resources.activation.cleanup, "EFFECT_UNKNOWN");
+  assert.equal(ledger.publicReport().resources.activation.cleanupCode, "CREATE_OUTCOME_UNKNOWN");
   assert.equal(ledger.publicReport().overall, "FAIL");
   assert.equal(ledger.publicReport({ workloadPassed: true, runnerCompleted: true }).overall, "FAIL");
+});
+
+test("confirmed activation creation before cleanup permits exact cleanup without erasing the original failure", () => {
+  const { ledger } = fixture();
+  ledger.begin("activation", hash);
+  ledger.fail("activation", { unknown: true, code: "RESPONSE_LOST" });
+  ledger.confirmCreated("activation", hash);
+  clean(ledger, "activation", hash);
+  const report = ledger.publicReport({ workloadPassed: true, runnerCompleted: true });
+  assert.equal(report.cleanupComplete, true);
+  assert.equal(report.resources.activation.cleanup, "CONFIRMED_CLEANED");
+  assert.equal(report.resources.activation.code, "RESPONSE_LOST");
+  assert.equal(report.overall, "FAIL");
+});
+
+test("activation confirmation after cleanup dispatch cannot clear the uncertain operation ordering", () => {
+  const { ledger, writes } = fixture();
+  ledger.begin("activation", hash);
+  ledger.fail("activation", { unknown: true, code: "DEADLINE" });
+  ledger.beginCleanup("activation", hash);
+  assert.equal(writes.at(-1).resources.activation.cleanupCode, "CREATE_OUTCOME_UNKNOWN");
+  ledger.confirmCreated("activation", hash);
+  ledger.confirmCleaned("activation", hash);
+  const report = ledger.publicReport();
+  assert.equal(report.cleanupComplete, false);
+  assert.equal(report.resources.activation.state, "CONFIRMED_CREATED");
+  assert.equal(report.resources.activation.cleanup, "EFFECT_UNKNOWN");
+  rejectsCode(() => ledger.beginCleanup("activation", hash), "CLEANUP_RETRY_FORBIDDEN");
+  assert.equal(RunLedger.recover(ledger.snapshot()).publicReport().cleanupComplete, false);
+});
+
+test("recovery retains unknown activation from an older snapshot that marked cleanup confirmed", () => {
+  const { ledger } = fixture();
+  ledger.begin("activation", hash);
+  ledger.fail("activation", { unknown: true, code: "RESPONSE_LOST" });
+  const snapshot = ledger.snapshot();
+  snapshot.resources.activation.cleanup = "CONFIRMED_CLEANED";
+  const recovered = RunLedger.recover(snapshot);
+  assert.equal(recovered.publicReport().cleanupComplete, false);
+  assert.deepEqual(recovered.publicReport().unresolved, ["activation"]);
+  assert.equal(recovered.publicReport().resources.activation.cleanup, "EFFECT_UNKNOWN");
+  assert.equal(recovered.publicReport().resources.activation.cleanupCode, "CREATE_OUTCOME_UNKNOWN");
+  assert.equal(recovered.publicReport().overall, "FAIL");
 });
 
 test("a known create failure cannot be hidden by successful workload flags", () => {

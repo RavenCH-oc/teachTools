@@ -342,22 +342,28 @@ export async function runWorkload({ origin, remoteSessionId, students, clientMod
     const attemptStart = (attempts.get(key) ?? []).length;
     const began = performance.now();
     const abort = new AbortController();
-    const cancelRead = () => abort.abort();
+    const row = { client: client.index, startedAtMs: now(), firstByteAtMs: null, completedAtMs: null,
+      status: "FETCH_ERROR", bytes: 0, terminationCause: null };
+    // Record our own cause before aborting: fetch/read may reject with a generic
+    // AbortError, which must not become evidence of generation interruption.
+    const abortRead = cause => { row.terminationCause ??= cause; abort.abort(); };
+    const cancelRead = () => abortRead("RUN_ABORT");
     runAbort.signal.addEventListener("abort", cancelRead, { once: true });
     activeReads.add(abort);
-    const timer = setTimeout(cancelRead, Math.min(detail ? 15000 : 60000, remainingMs()));
+    const timer = setTimeout(() => abortRead("TOTAL_READ_DEADLINE"), Math.min(detail ? 15000 : 60000, remainingMs()));
+    const readWait = (promise, timeoutMs, code) => boundedWait(promise,
+      { signal: abort.signal, remainingMs, timeoutMs, code });
     let reader;
     let responseBody;
     let terminalRead = false;
     let bytes = 0;
-    const row = { client: client.index, startedAtMs: now(), firstByteAtMs: null, completedAtMs: null,
-      status: "FETCH_ERROR", bytes: 0 };
     try {
-      const response = await wait(module.studentHttpRead(client.participant, request, abort.signal),
+      const response = await readWait(module.studentHttpRead(client.participant, request, abort.signal),
         detail ? 15000 : 60000, "HTTP_DEADLINE");
       responseBody = response.body;
       row.status = response.status;
       if (!response.ok) {
+        row.terminationCause = "HTTP_STATUS";
         cancelOwnedBody(response.body);
         return row;
       }
@@ -367,7 +373,7 @@ export async function runWorkload({ origin, remoteSessionId, students, clientMod
       reader = response.body.getReader();
       while (true) {
         let part;
-        try { part = await wait(reader.read(), detail ? 15000 : 60000, "BODY_DEADLINE"); }
+        try { part = await readWait(reader.read(), detail ? 15000 : 60000, "BODY_DEADLINE"); }
         catch (error) {
           // A reader rejection means the stream is already terminal. A losing
           // deadline race still needs explicit cancellation of the pending read.
@@ -384,17 +390,26 @@ export async function runWorkload({ origin, remoteSessionId, students, clientMod
           onFirstByte?.();
         }
         if (cancel) {
+          row.terminationCause = "CALLER_CANCELLED";
           cancelOwnedBody(reader);
           abort.abort();
           row.status = "CANCELLED";
           return row;
         }
       }
+      if (row.terminationCause) throw failure(row.terminationCause);
       row.hashOk = detail || hash.digest("hex") === imageHash;
+      row.terminationCause = row.hashOk ? "COMPLETED" : "INTEGRITY_FAILED";
       if (!row.hashOk) row.status = "INTEGRITY_FAILED";
       return row;
-    } catch {
-      row.status = row.firstByteAtMs === null ? "FETCH_ERROR" : "INTERRUPTED";
+    } catch (error) {
+      row.terminationCause ??= runAbort.signal.aborted || error?.code === "WORK_STOPPED" ? "RUN_ABORT"
+        : ["HTTP_DEADLINE", "BODY_DEADLINE", "HTTP_SIZE_LIMIT", "HTTP_SHAPE"].includes(error?.code) ? error.code
+          : row.firstByteAtMs === null ? "FETCH_ERROR" : "STREAM_INTERRUPTED";
+      row.status = row.terminationCause.endsWith("_DEADLINE") ? "TIMED_OUT"
+        : row.terminationCause === "RUN_ABORT" ? "ABORTED"
+          : row.terminationCause === "HTTP_SIZE_LIMIT" ? "SIZE_LIMIT"
+            : row.terminationCause === "STREAM_INTERRUPTED" ? "INTERRUPTED" : "FETCH_ERROR";
       if (!terminalRead) cancelOwnedBody(reader ?? responseBody);
       abort.abort();
       return row;
@@ -462,8 +477,11 @@ export async function runWorkload({ origin, remoteSessionId, students, clientMod
       const ackPromise = Promise.all(clients.map(client => client.submit(details.questionId)));
       const detailPromise = read(clients.at(-1), { detail: true });
       const presencePromise = native("presence");
-      const [acks, detail, presence, rows] = await Promise.all([ackPromise, detailPromise, presencePromise, media]);
-      timing.controlCompletedAtMs = now();
+      const controls = Promise.all([ackPromise, detailPromise, presencePromise]).then(values => {
+        timing.controlCompletedAtMs = now();
+        return values;
+      });
+      const [[acks, detail, presence], rows] = await Promise.all([controls, media]);
       const progress = await native("progress");
       const metrics = await resourcesReleased();
       observations.push({ label: "image_readers", ...timing, rows, acks,
@@ -512,25 +530,34 @@ export async function runWorkload({ origin, remoteSessionId, students, clientMod
     const recovery = { startedAtMs: now(), activeMediaBodiesAtStart: bodyReads.size };
     const old = clients.map(client => ({ auth: client.authCount, sync: client.syncCount }));
     plannedRecovery = true;
+    recovery.reconnectTriggeredAtMs = now();
     await native("reconnect");
     await until(() => clients.every((client, index) => client.ready && client.synced
       && client.authCount > old[index].auth && client.syncCount > old[index].sync), 30000);
     recovery.authSyncCompletedAtMs = now();
     plannedRecovery = false;
     const interrupted = await inFlight;
+    ensureRunning();
     const recoveryAcks = await Promise.all(clients.map(client => client.submit(details.questionId)));
     const recoveredImage = await read(clients[0]);
     const recoveryProgress = await native("progress");
     const finalMetrics = await resourcesReleased();
     const finalPresence = await native("presence");
+    const interruptionObserved = recovery.activeMediaBodiesAtStart > 0
+      && interrupted.status === "INTERRUPTED" && interrupted.terminationCause === "STREAM_INTERRUPTED"
+      && interrupted.firstByteAtMs <= recovery.reconnectTriggeredAtMs
+      && interrupted.completedAtMs >= recovery.reconnectTriggeredAtMs;
     observations.push({ label: "generation_recovery", ...recovery, interrupted,
+      interruptionObservedAfterTrigger: interruptionObserved, interruptionAttribution: "TEMPORAL_CORRELATION_ONLY",
       interruptedBodyReplayed: false, generationsCombined: false,
       acks: recoveryAcks, authoritativeAnsweredCount: recoveryProgress.answeredCount,
       recoveredImage, native: finalMetrics, presence: { online: finalPresence.online } });
     gate("generation_auth_sync", true);
-    // A fast image may complete before replacement reaches the relay; never
-    // mislabel that observation as an interrupted-stream verification.
-    gate("generation_inflight_interruption", interrupted.status === "INTERRUPTED" ? "PASS" : "NOT_OBSERVED");
+    // This observes transport interruption after the reconnect trigger, not a
+    // server-attested cause. Client deadlines/aborts/guards and fast completion
+    // must never satisfy the gate, even when subsequent AUTH/sync succeeds.
+    gate("generation_inflight_interruption", interruptionObserved ? "PASS"
+      : interrupted.terminationCause === "COMPLETED" ? "NOT_OBSERVED" : "FAIL");
     gate("generation_answers", allAcks(recoveryAcks, 2000) && recoveryProgress.answeredCount === students);
     gate("generation_image", recoveredImage.status === 200 && recoveredImage.hashOk);
     gate("final_release", released(finalMetrics));

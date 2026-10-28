@@ -1,13 +1,15 @@
 # Phase 16F Pass B preparation
 
-日期：2026-10-27（Asia/Taipei）。Task base：`7db449392ed741ab1df1b15e3cb67f02c730392f`。
+初版日期：2026-10-27（Asia/Taipei）；PR #3 review fixes：2026-10-28。Task base：`7db449392ed741ab1df1b15e3cb67f02c730392f`。
 本任務實作獨立 runner、focused tests 與本機整合驗證；production execution **NOT_EXECUTED**，Phase 16F release **HOLD**。
 PR #1 的 A／A2 與 PR #2 的交接已整合；[既有交接](handoff/phase16f-after-pr1.md)與[A2 evidence](review-evidence/phase16f-pass-a-a2/README.md)保持歷史內容。
+
+[PR #3](https://github.com/RavenCH-oc/teachTools/pull/3) 已人工 push 並建立 Draft，尚未合併。固定 head `5ffb7d6e4a339b523d135115d764c78eb4a84971` 審查後，本次增量修正單次授權 run identity、unknown provisioning 的 cleanup 判定、generation interruption 的原因分類及 control completion timestamp。新的 [review-fix evidence](review-evidence/phase16f-pass-b-preparation/pr3-fixes.md) 與初版 Windows smoke 分開；修正後 Windows native build／兩人真實 loopback smoke 仍待執行。
 
 ## Pilot 與驗證範圍
 
 使用者目前只確認 **1 Teacher／1 classroom／約 30 位學生**的試用規模。Runner 預設與最大值都是 30，允許明確縮小至 1–30 的 synthetic profile；沒有第二位 Teacher、第二個 classroom 或提高上限的設定。
-本機整合 smoke 使用 2 位學生及約 2 MiB synthetic PNG；30 人的完整階梯由 focused adapter tests 驗證排程，沒有將它寫成 30 人 WAN／手機容量驗收。
+初版 Windows 本機整合 smoke 使用 2 位學生及約 2 MiB synthetic PNG；30 人的完整階梯由 focused adapter tests 驗證排程，沒有將它寫成 30 人 WAN／手機容量驗收。
 
 所有 participants 先在 LOBBY 完成一次 join、AUTH、personalized sync，才啟動課堂。其後增加的是 **concurrent media readers**，完整階梯為 `1／4／5／10／20／30`；較小 profile 保留不超過人數的階梯並加入其終點，例如 2 人為 `1／2`。這不是逐級增加 sockets，也沒有放寬 ACTIVE 課堂的加入契約。
 
@@ -78,6 +80,8 @@ Enroll 與 Session create **各最多一次**。Worker 在 server 端產生 ID�
 
 Native 在可信 server ID 通過驗證後、credential 保存／本機 setup 等後續失敗點之前送出 confirmation。若較晚收到可信 ID，ledger 可補回 cleanup identity，但原 failure 仍保留，不能恢復工作或把該 run 改成 PASS。Crash recovery helper 只把 pending intents 轉為 unknown，不自動 resume／重新 provision。
 
+Activation hash 已知也不能證明 provisioning 已結束。若開始 activation cleanup 時 INSERT 尚未確認完成，先保存 `CREATE_OUTCOME_UNKNOWN`；本次精確 DELETE 即使成功，也只能作 best-effort cleanup，仍保留 `EFFECT_UNKNOWN`／`CLEANUP_INCOMPLETE`。這避免 DELETE 回傳當下 0 rows、原 INSERT 隨後才完成時誤報清理成功；cleanup 開始後才收到 create confirmation 也不消除先後順序的不確定性。既有已確認 INSERT、之後再精確 DELETE 的正常路徑保持可確認完成。停止 child 不等於遠端寫入已取消。
+
 正常順序：
 
 1. 停止新 workload、取消 owned HTTP／Student sockets／pending controls。
@@ -98,9 +102,11 @@ Native 在 socket send **之前**保守預留 cumulative raw `HTTP_RESPONSE_CHUN
 
 既有 64 KiB envelope、32 KiB chunks、four-credit window、Session 四條 media、participant 一條、AUTH／media timeout 保持不變。Reached limit 即停止後續工作，沒有放大 credits、停用 re-auth、延長產品 timeout 或 retry-to-green。
 
-每個 media stage 記錄 first byte、control probe 開始時仍在讀取的 bodies、完成時間、每次 HTTP attempts／first-attempt rejection、concurrent ACK／detail／presence、Rust authoritative answered count。Lock/reveal 另記其開始時 active media 數；沒有 overlap 時不宣稱在 streaming 中完成。Generation recovery 記錄舊 response interruption、重新 AUTH＋sync、後續作答與圖片；未觀察到 interruption 為 `NOT_OBSERVED`，不重播成功後中斷的 body、不拼接 generations。
+每個 media stage 記錄 first byte、control probe 開始時仍在讀取的 bodies、完成時間、每次 HTTP attempts／first-attempt rejection、concurrent ACK／detail／presence、Rust authoritative answered count。`controlCompletedAtMs` 只等待 ACK／detail／presence，media rows 各自保存完成時間。Lock/reveal 另記其開始時 active media 數；沒有 overlap 時不宣稱在 streaming 中完成。
 
-執行完成、各 product gate、cleanup、synthetic protocol evidence 分開記錄。真實手機 Blob／decode／render、WAN、installed build、學校 outbound WSS 均未由本輪 smoke 驗證。
+Generation recovery 記錄舊 response 的 `terminationCause`、`reconnectTriggeredAtMs`、重新 AUTH＋sync、後續作答與圖片。Runner 自己的 total-read／body deadline、run abort、主動 cancel 或 size guard 都不能滿足 generation interruption gate；舊流若一直卡到 client timeout 才結束，該 gate 與整體 product gates 不得 PASS。只有 trigger 時仍在讀取、其後觀察到的 stream interruption 才能作為該觀察證據，並標示 `TEMPORAL_CORRELATION_ONLY`，不能從 generic transport failure 推論更強的 server-side 原因。舊 read 正常完成而未觀察到 interruption 時為 `NOT_OBSERVED`；deadline／abort／guard 或其他不符合條件的失敗為 `FAIL`。不重播成功後中斷的 body、不拼接 generations。
+
+執行完成、各 product gate、cleanup、synthetic protocol evidence 分開記錄。真實手機 Blob／decode／render、WAN、installed build、學校 outbound WSS 均未由初版 smoke 驗證。
 
 ## 後續 production 操作前仍待核對
 
@@ -113,7 +119,7 @@ Native 在 socket send **之前**保守預留 cumulative raw `HTTP_RESPONSE_CHUN
 | 無真實課堂或核准 maintenance window | 待確認 |
 | Shared NAT、局部 admission 重置、global quota availability/cost | 風險接受未決 |
 | Roster／bearer identity 強度、revocation exposure | 風險接受未決；試用規模確認不等於接受風險 |
-| Fixed-head runner review／production 授權 | 待人工 push、Draft PR 與固定 head 審查 |
+| Fixed-head runner review／production 授權 | PR #3 已是 Draft；`5ffb7d6…` review 要求修正，新 commit 待人工 push 與固定 head 複審；production 尚未授權 |
 | Final RC／installed Human QA／Pass C | NOT_EXECUTED |
 
 仍保留 Local-first／Rust authoritative／DO relay／LAN 獨立邊界。沒有新增 R2、Range、登入／OTP、全域限流服務或 cloud domain DB。歷史五位 Teacher 成本模型不是目前單班實際帳單。
@@ -128,14 +134,18 @@ node apps/relay/scripts/pass-b.js execute-production --manifest <reviewed-build-
 
 授權 JSON 必須位於 ignored target，且包含 `schemaVersion: 1`、新的 `runId`、整數 `students`、canonical `target`、明確的 `statement: AUTHORIZE_ONE_PASS_B_PRODUCTION_RUN`、未來一小時內的 `expiresAt` Unix milliseconds、exact `sourceDigest`／`nativeSha256`／`clientSha256`／`imageSha256`，以及依序的 `operations: [provision, enroll, create, workload, close, revoke, activation-cleanup]`。
 
+Production authorization 的 `runId` 必須是明確且有效的 UUID 字串；缺少、`null`、非字串或格式錯誤都拒絕，不替授權文件補產生 ID。同一份合法授權每次核對得到同一 run identity，既有執行目錄存在時仍拒絕重用。
+
 `environment` 必須提供 `workerVersion`、`workerSourceDigest`、`studentSourceDigest`、`deployedStudentBundleSha256`、`maintenanceWindow`；`planReviewed`、`usageReviewed`、`bindingsReviewed`、`rollbackReviewed`、`maintenanceWindowConfirmed` 必須經確認為 true。`riskAcceptance` 的 `sharedNat`、`localAdmission`、`globalQuota`、`rosterBearer`、`revocationExposure` 也需各自明確接受。缺值、UNKNOWN、artifact 不符或過期都拒絕。
 
 這些是 operator-supplied assertions，runner 不把它們當獨立 live API proof。授權涵蓋一次 synthetic activation INSERT、enrollment、Session 建立、負載、exact close／revoke／activation cleanup；**不包含 deployment、rollback、migration、方案變更或真實資料操作**。需要部署 A/A2 source 與包含 bounded retry 的 Student bundle 時，必須另有精確部署授權；runner 不會部署。
 
-## 本輪驗證與來源
+## 驗證與來源
 
-實際命令、結果與停止點見 [status.md](../status.md)。新的小型 [smoke summary](review-evidence/phase16f-pass-b-preparation/smoke-summary.json)保存 run ID、tested source／build／bundle／fixture identity、gates 與 cleanup；原始 report、operation ledger、build manifest、binary、fixtures 留在 ignored target，沒有把 hash 當作 reviewer 已取得原件。
+本次實際命令、結果與停止點見 [status.md](../status.md)。初版 [smoke summary](review-evidence/phase16f-pass-b-preparation/smoke-summary.json)保存歷史 run ID、tested source／build／bundle／fixture identity、gates 與 cleanup；原始 report、operation ledger、build manifest、binary、fixtures 留在原 Windows ignored target，沒有把 hash 當作 reviewer 已取得原件。
 
-Tested source digest 按 build 時實際 working bytes 保存，`testedHead` 是當時的 task base，不能用之後的 commit SHA 倒填。Docs 不參與 source digest；build 前後核對相同，執行前再對目前 source 核對。Git 的既有換行正規化可能改變 checkout bytes，新的環境需重新 build／建立新的 manifest，不沿用不符合 bytes 的 artifact。
+初版 tested source digest 按 build 時實際 working bytes 保存，`testedHead` 是當時的 task base，不能用之後的 commit SHA 倒填。Docs 不參與 source digest；build 前後核對相同，執行前再對目前 source 核對。Git 的既有換行正規化可能改變 checkout bytes，新的環境需重新 build／建立新的 manifest，不沿用不符合 bytes 的 artifact。
 
-本輪 targeted tests／loopback 結果與 A2 previous PASS 分開，未重跑 A2 完整 workload 或 repo broad suites。停止在 local commit；人工 push／Draft PR／固定 head review 後，仍需新的 production execution 授權。Phase 16F release 維持 HOLD。
+PR #3 review 的 16 個變更 source hashes 與固定 head 一致，但 review checkout 的完整 digest 與初版 Windows smoke 不同；沒有原完整 manifest，尚不能判定差異原因。修正證據另外公開完整 source-only per-file hash 清單，按目前 checkout 原始 bytes 計算，不正規化換行、不補造歷史 Windows manifest，也不把 source snapshot 當 native／Student artifact build 證據。
+
+初版 targeted tests／loopback 結果與 A2 previous PASS 分開，未重跑 A2 完整 workload 或 repo broad suites。PR #3 增量修正停止於新的 local commit；人工 push 至同一 Draft PR、補足修正後 Windows 驗證並完成新的固定 head review 後，仍需新的 production execution 授權。Phase 16F release 維持 HOLD。

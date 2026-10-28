@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import WebSocket from "ws";
 import { validateProfile, assertNativeTarget, assertContainedPath, verifyFileIdentity, createDeadline,
-  guardHttpTarget, guardWebSocketTarget, CANONICAL_ORIGIN, LIMITS, SHA256_PATTERN } from "./pass-b-safety.js";
+  guardHttpTarget, guardWebSocketTarget, CANONICAL_ORIGIN, LIMITS, RUN_ID_PATTERN, SHA256_PATTERN } from "./pass-b-safety.js";
 import { RunLedger } from "./pass-b-ledger.js";
 import { artifactRoot, repositoryRoot, sourceIdentity, sha256 } from "./pass-b-build.js";
 import { createLoopbackAdapter, createProductionAdapter, wranglerEntry } from "./pass-b-adapters.js";
@@ -48,6 +48,7 @@ export function validateAuthorization(value, manifest, now = Date.now()) {
   const allowed = ["schemaVersion", "runId", "students", "target", "statement", "operations", "expiresAt", "sourceDigest",
     "nativeSha256", "clientSha256", "imageSha256", "environment", "riskAcceptance"];
   if (!plain(value) || Object.keys(value).some(key => !allowed.includes(key)) || value.schemaVersion !== 1
+    || !Object.hasOwn(value, "runId") || typeof value.runId !== "string" || !RUN_ID_PATTERN.test(value.runId)
     || !Number.isInteger(value.students) || value.students < 1 || value.students > 30
     || value.statement !== "AUTHORIZE_ONE_PASS_B_PRODUCTION_RUN" || value.target !== CANONICAL_ORIGIN
     || JSON.stringify(value.operations) !== JSON.stringify(operations)
