@@ -1,0 +1,1107 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-28",
+  "timezone": "Asia/Taipei",
+  "taskBase": "7db449392ed741ab1df1b15e3cb67f02c730392f",
+  "revisionBase": "330b93ee1c7f86b01fddc5d6899bf6eed5d2676a",
+  "headAtVerification": "330b93ee1c7f86b01fddc5d6899bf6eed5d2676a",
+  "branch": "codex/phase16f-pass-b-artifact-refresh",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.19.0",
+    "pnpm": "9.15.0",
+    "wrangler": "4.141.0",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+  },
+  "toolVersionCommands": {
+    "node": {
+      "command": "node --version",
+      "arguments": [
+        "--version"
+      ],
+      "cwd": ".",
+      "startedAt": "2026-10-28T12:34:08.3187053+00:00",
+      "finishedAt": "2026-10-28T12:34:08.3678548+00:00",
+      "exitCode": 0,
+      "attempts": 1,
+      "stdout": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/01-node-version.stdout.txt",
+        "sha256": "bc697de995dc791df53d688ef69c08994cdffc8ce30c906b1ffc65b131ccd0eb",
+        "bytes": 10,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      },
+      "stderr": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/01-node-version.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      }
+    },
+    "pnpm": {
+      "command": "pnpm --version",
+      "arguments": [
+        "--version"
+      ],
+      "cwd": ".",
+      "startedAt": "2026-10-28T12:34:08.3123722+00:00",
+      "finishedAt": "2026-10-28T12:34:08.9040842+00:00",
+      "exitCode": 0,
+      "attempts": 1,
+      "stdout": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/02-pnpm-version.stdout.txt",
+        "sha256": "8cae3d38f02a2c0db6c3b5b71cd977df1e93a4ee1360485cb0eb3e6fdd184675",
+        "bytes": 8,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      },
+      "stderr": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/02-pnpm-version.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      }
+    },
+    "wrangler": {
+      "command": "pnpm --dir apps/relay exec wrangler --version",
+      "arguments": [
+        "--dir",
+        "apps/relay",
+        "exec",
+        "wrangler",
+        "--version"
+      ],
+      "cwd": ".",
+      "startedAt": "2026-10-28T12:34:08.3209523+00:00",
+      "finishedAt": "2026-10-28T12:34:09.4468566+00:00",
+      "exitCode": 0,
+      "attempts": 1,
+      "stdout": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/03-wrangler-version.stdout.txt",
+        "sha256": "e993d4b419a6eee84b291a819405613edcb036eef3be55ef3b1011d358c6bd0b",
+        "bytes": 9,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      },
+      "stderr": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/03-wrangler-version.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      }
+    },
+    "cargo": {
+      "command": "cargo --version",
+      "arguments": [
+        "--version"
+      ],
+      "cwd": ".",
+      "startedAt": "2026-10-28T12:34:08.3121490+00:00",
+      "finishedAt": "2026-10-28T12:34:08.4223191+00:00",
+      "exitCode": 0,
+      "attempts": 1,
+      "stdout": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/04-cargo-version.stdout.txt",
+        "sha256": "1aedaa9cce116919d39b1eb303a58865771582bc24fc259aa8e26cb212e0f59e",
+        "bytes": 36,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      },
+      "stderr": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/04-cargo-version.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      }
+    },
+    "rustc": {
+      "command": "rustc --version",
+      "arguments": [
+        "--version"
+      ],
+      "cwd": ".",
+      "startedAt": "2026-10-28T12:34:08.3194863+00:00",
+      "finishedAt": "2026-10-28T12:34:09.2831210+00:00",
+      "exitCode": 0,
+      "attempts": 1,
+      "stdout": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/05-rustc-version.stdout.txt",
+        "sha256": "4ad84f16acc2f3bdcfbc7b0788f1e74a4e649b962154a585b8f8d0b28eb0dd06",
+        "bytes": 36,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      },
+      "stderr": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/05-rustc-version.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      }
+    }
+  },
+  "evidenceKind": "WINDOWS_ARTIFACT_REFRESH_AND_SINGLE_TWO_STUDENT_LOOPBACK",
+  "scope": {
+    "pilot": {
+      "teachers": 1,
+      "classrooms": 1,
+      "maximumStudents": 30
+    },
+    "executedSmoke": {
+      "teachers": 1,
+      "classrooms": 1,
+      "students": 2,
+      "readerStages": [
+        1,
+        2
+      ]
+    },
+    "production": "NOT_EXECUTED",
+    "syntheticProtocolOnly": true
+  },
+  "sourceDigest": "49b1da1ad0cd6f57ecb0908b32f7f61ee49cbf5a8bf639bd01bffa741a0b761e",
+  "sourceFileCount": 247,
+  "sourceManifest": "source-manifest.json",
+  "sourceUnchangedDuringVerification": true,
+  "artifactBuild": {
+    "command": "node apps/relay/scripts/pass-b-build.js",
+    "arguments": [
+      "apps/relay/scripts/pass-b-build.js"
+    ],
+    "cwd": ".",
+    "startedAt": "2026-10-28T12:34:14.9184496+00:00",
+    "finishedAt": "2026-10-28T12:34:25.7170351+00:00",
+    "exitCode": 0,
+    "attempts": 1,
+    "stdout": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/06-artifact-build.stdout.txt",
+      "sha256": "378acd5600544513f0929c01c035a2ccc6ffa81470428e17dc1994be4e46a18c",
+      "bytes": 187,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "stderr": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/06-artifact-build.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "result": "PASS",
+    "createdAt": "2026-10-28T12:34:25.617Z",
+    "manifest": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/3fa348da-b4af-4631-9b1d-cde837cecf37/build-manifest.json",
+      "sha256": "3fa9e7e7e67c8cac6ae3cde4165db35d1567d431c33d333b313ca6b2de959ea5",
+      "bytes": 44083,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "native": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/3fa348da-b4af-4631-9b1d-cde837cecf37/teacher-pass-b-test.exe",
+      "sha256": "d38847ca8e54fc5d1ce394496e41b5ed815d0aaca4addb6821d140888bd82d53",
+      "bytes": 29455360,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED",
+      "manifestSha256": "d38847ca8e54fc5d1ce394496e41b5ed815d0aaca4addb6821d140888bd82d53",
+      "actualHashMatchesManifest": true
+    },
+    "studentHttpBundle": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/3fa348da-b4af-4631-9b1d-cde837cecf37/student-http-client.mjs",
+      "sha256": "3d182db18ce6ee238761e0e8bac4b094e73bad9f28a3506f8181b719fd0a487d",
+      "bytes": 140303,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED",
+      "manifestSha256": "3d182db18ce6ee238761e0e8bac4b094e73bad9f28a3506f8181b719fd0a487d",
+      "actualHashMatchesManifest": true
+    },
+    "fixture": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/3fa348da-b4af-4631-9b1d-cde837cecf37/image.png",
+      "sha256": "54133374f4fd61dbb47f9fe61cfe479d172159188c6b10d9c4a79265e2aebbaa",
+      "bytes": 2094909,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED",
+      "manifestSha256": "54133374f4fd61dbb47f9fe61cfe479d172159188c6b10d9c4a79265e2aebbaa",
+      "actualHashMatchesManifest": true,
+      "mime": "image/png"
+    },
+    "nativeBuildCommand": [
+      "cargo",
+      "test",
+      "--manifest-path",
+      "apps/teacher/src-tauri/Cargo.toml",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "nativeBuildMeaning": "Compilation only: cargo test --lib --no-run does not execute Rust runtime tests",
+    "studentBuild": "Vite library build of current studentHttpApi.ts, no policy substitution",
+    "browserDistRemoteBuilt": false
+  },
+  "manifestValidation": {
+    "result": "PASS",
+    "readBuildManifest": "PASS",
+    "testedHeadMatchesBuildHead": true,
+    "startedAt": "2026-10-28T12:35:21.031Z",
+    "finishedAt": "2026-10-28T12:35:21.166Z",
+    "manifestPath": "apps/teacher/src-tauri/target/phase16f-pass-b-build/3fa348da-b4af-4631-9b1d-cde837cecf37/build-manifest.json",
+    "manifestSha256": "3fa9e7e7e67c8cac6ae3cde4165db35d1567d431c33d333b313ca6b2de959ea5",
+    "sourceBeforeAfterAndManifestIdentical": true,
+    "headMatched": true,
+    "testedHead": "330b93ee1c7f86b01fddc5d6899bf6eed5d2676a",
+    "taskBase": "7db449392ed741ab1df1b15e3cb67f02c730392f",
+    "sourceDigest": "49b1da1ad0cd6f57ecb0908b32f7f61ee49cbf5a8bf639bd01bffa741a0b761e",
+    "sourceFileCount": 247,
+    "artifacts": [
+      {
+        "kind": "native",
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/3fa348da-b4af-4631-9b1d-cde837cecf37/teacher-pass-b-test.exe",
+        "sha256": "d38847ca8e54fc5d1ce394496e41b5ed815d0aaca4addb6821d140888bd82d53",
+        "bytes": 29455360,
+        "match": true
+      },
+      {
+        "kind": "client",
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/3fa348da-b4af-4631-9b1d-cde837cecf37/student-http-client.mjs",
+        "sha256": "3d182db18ce6ee238761e0e8bac4b094e73bad9f28a3506f8181b719fd0a487d",
+        "bytes": 140303,
+        "match": true
+      },
+      {
+        "kind": "image",
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-build/3fa348da-b4af-4631-9b1d-cde837cecf37/image.png",
+        "sha256": "54133374f4fd61dbb47f9fe61cfe479d172159188c6b10d9c4a79265e2aebbaa",
+        "bytes": 2094909,
+        "match": true
+      }
+    ],
+    "toolchain": {
+      "node": "v24.19.0",
+      "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+      "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+    },
+    "original": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/manifest-verification.json",
+      "sha256": "444d4ec6727f3f2ec81f70e83816830c9d5f0729aceb1056a48e0f614ff5fe02",
+      "bytes": 1825,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    }
+  },
+  "smoke": {
+    "command": "node apps/relay/scripts/pass-b.js loopback-smoke --manifest apps/teacher/src-tauri/target/phase16f-pass-b-build/3fa348da-b4af-4631-9b1d-cde837cecf37/build-manifest.json --students 2",
+    "arguments": [
+      "apps/relay/scripts/pass-b.js",
+      "loopback-smoke",
+      "--manifest",
+      "apps/teacher/src-tauri/target/phase16f-pass-b-build/3fa348da-b4af-4631-9b1d-cde837cecf37/build-manifest.json",
+      "--students",
+      "2"
+    ],
+    "cwd": ".",
+    "startedAt": "2026-10-28T12:35:38.5024576+00:00",
+    "finishedAt": "2026-10-28T12:35:44.9608974+00:00",
+    "exitCode": 0,
+    "attempts": 1,
+    "stdout": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/07-loopback-smoke.stdout.txt",
+      "sha256": "65d27c964480bd9fa7834a3088d399b055ad95ec7adccacc77a391d3267ca9c6",
+      "bytes": 327,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "stderr": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b-artifact-refresh/b3e6f42b-bb46-424c-886b-29d86c8dad00/07-loopback-smoke.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "runId": "0b7bd155-a537-4020-99c9-c8b97f7df669",
+    "overall": "PASS",
+    "runnerCompleted": true,
+    "workloadPassed": true,
+    "workloadCompleted": true,
+    "productGatesPass": true,
+    "failureCode": null,
+    "stopReason": null,
+    "elapsedMs": 6372.1358,
+    "workloadElapsedMs": 4648.593699999999,
+    "profile": {
+      "mode": "loopback",
+      "origin": "http://127.0.0.1:8794/",
+      "runId": "0b7bd155-a537-4020-99c9-c8b97f7df669",
+      "students": 2,
+      "teachers": 1,
+      "classrooms": 1,
+      "stages": [
+        1,
+        2
+      ],
+      "rawBytes": 1073741824,
+      "teacherUtf8Bytes": 2147483648,
+      "wallMs": 1800000,
+      "cleanupMs": 120000
+    },
+    "participantAdmission": "ALL_JOIN_AUTH_SYNC_IN_LOBBY_BEFORE_MEDIA_LADDER",
+    "thresholds": {
+      "textAckP95Ms": 2000,
+      "mediaAckP95Ms": 3000,
+      "image95PercentMs": 30000,
+      "imageAllMs": 60000
+    },
+    "gates": [
+      {
+        "name": "text_ack",
+        "status": "PASS"
+      },
+      {
+        "name": "text_authoritative_answers",
+        "status": "PASS"
+      },
+      {
+        "name": "image_completion_1",
+        "status": "PASS"
+      },
+      {
+        "name": "media_overlap_1",
+        "status": "PASS"
+      },
+      {
+        "name": "media_ack_1",
+        "status": "PASS"
+      },
+      {
+        "name": "media_detail_1",
+        "status": "PASS"
+      },
+      {
+        "name": "media_answers_presence_1",
+        "status": "PASS"
+      },
+      {
+        "name": "media_release_1",
+        "status": "PASS"
+      },
+      {
+        "name": "image_completion_2",
+        "status": "PASS"
+      },
+      {
+        "name": "media_overlap_2",
+        "status": "PASS"
+      },
+      {
+        "name": "media_ack_2",
+        "status": "PASS"
+      },
+      {
+        "name": "media_detail_2",
+        "status": "PASS"
+      },
+      {
+        "name": "media_answers_presence_2",
+        "status": "PASS"
+      },
+      {
+        "name": "media_release_2",
+        "status": "PASS"
+      },
+      {
+        "name": "lock_reveal",
+        "status": "PASS"
+      },
+      {
+        "name": "cancel_release",
+        "status": "PASS"
+      },
+      {
+        "name": "generation_auth_sync",
+        "status": "PASS"
+      },
+      {
+        "name": "generation_inflight_interruption",
+        "status": "PASS"
+      },
+      {
+        "name": "generation_answers",
+        "status": "PASS"
+      },
+      {
+        "name": "generation_image",
+        "status": "PASS"
+      },
+      {
+        "name": "final_release",
+        "status": "PASS"
+      },
+      {
+        "name": "final_liveness",
+        "status": "PASS"
+      }
+    ],
+    "textAck": {
+      "label": "text_ack",
+      "rows": [
+        {
+          "client": 1,
+          "ms": 22.70399999999995,
+          "accepted": true
+        },
+        {
+          "client": 2,
+          "ms": 29.16009999999983,
+          "accepted": true
+        }
+      ],
+      "summary": {
+        "n": 2,
+        "p50": 22.70399999999995,
+        "p95": 29.16009999999983,
+        "max": 29.16009999999983
+      },
+      "authoritativeAnsweredCount": 2
+    },
+    "imageStages": [
+      {
+        "label": "image_readers",
+        "probeStartedAtMs": 463.0221999999999,
+        "activeMediaBodiesAtProbe": 1,
+        "connectedParticipants": 2,
+        "concurrentReaders": 1,
+        "controlCompletedAtMs": 510.9841999999999,
+        "rows": [
+          {
+            "client": 1,
+            "startedAtMs": 399.6975,
+            "firstByteAtMs": 462.9787000000001,
+            "completedAtMs": 701.4998999999998,
+            "status": 200,
+            "bytes": 2094909,
+            "terminationCause": "COMPLETED",
+            "mime": "image/png",
+            "hashOk": true,
+            "totalMs": 301.8105000000003,
+            "attempts": [
+              {
+                "status": 200,
+                "atMs": 400.45529999999985,
+                "completedAtMs": 458.02239999999983
+              }
+            ],
+            "firstAttemptStatus": 200
+          }
+        ],
+        "acks": [
+          {
+            "client": 1,
+            "ms": 26.02079999999978,
+            "accepted": true
+          },
+          {
+            "client": 2,
+            "ms": 27.108200000000124,
+            "accepted": true
+          }
+        ],
+        "ack": {
+          "n": 2,
+          "p50": 26.02079999999978,
+          "p95": 27.108200000000124,
+          "max": 27.108200000000124
+        },
+        "detail": {
+          "client": 2,
+          "startedAtMs": 463.1383000000001,
+          "firstByteAtMs": 510.89429999999993,
+          "completedAtMs": 510.9481999999998,
+          "status": 200,
+          "bytes": 30,
+          "terminationCause": "COMPLETED",
+          "mime": "application/json",
+          "hashOk": true,
+          "totalMs": 47.81439999999975,
+          "attempts": [
+            {
+              "status": 200,
+              "atMs": 463.3696,
+              "completedAtMs": 502.97130000000016
+            }
+          ],
+          "firstAttemptStatus": 200
+        },
+        "presence": {
+          "online": 2
+        },
+        "authoritativeAnsweredCount": 2,
+        "native": {
+          "activeMedia": 0,
+          "activeReaders": 0,
+          "budgetStopped": false,
+          "creditWaiters": 0,
+          "deniedBeforeSend": 0,
+          "nativeRawBytesReserved": 2094939,
+          "pendingHigh": 2,
+          "sendWaitMaxMs": 0.09280000000000001,
+          "sendWaitMs": 3.4368999999999996,
+          "teacherFrames": {
+            "AUTH:participant_authenticated": 2,
+            "CONTROL:join_result": 2,
+            "CONTROL:ping": 1,
+            "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 65,
+            "HTTP_RELAY:HTTP_RESPONSE_END": 2,
+            "HTTP_RELAY:HTTP_RESPONSE_START": 2,
+            "REALTIME:question_revealed": 4,
+            "REALTIME:question_state_changed": 8,
+            "REALTIME:session_state_changed": 2,
+            "REALTIME:session_sync": 10,
+            "REALTIME:submission_acknowledged": 4,
+            "REALTIME:submission_result": 4
+          },
+          "teacherWsUtf8BytesReserved": 2826927
+        },
+        "firstAttemptRejected": 0
+      },
+      {
+        "label": "image_readers",
+        "probeStartedAtMs": 904.3053999999997,
+        "activeMediaBodiesAtProbe": 1,
+        "connectedParticipants": 2,
+        "concurrentReaders": 2,
+        "controlCompletedAtMs": 942.4175999999998,
+        "rows": [
+          {
+            "client": 1,
+            "startedAtMs": 834.7957999999999,
+            "firstByteAtMs": 904.2736,
+            "completedAtMs": 1278.7718,
+            "status": 200,
+            "bytes": 2094909,
+            "terminationCause": "COMPLETED",
+            "mime": "image/png",
+            "hashOk": true,
+            "totalMs": 443.9821999999999,
+            "attempts": [
+              {
+                "status": 200,
+                "atMs": 835.0706,
+                "completedAtMs": 901.0877999999998
+              }
+            ],
+            "firstAttemptStatus": 200
+          },
+          {
+            "client": 2,
+            "startedAtMs": 835.3559999999998,
+            "firstByteAtMs": 936.7467000000001,
+            "completedAtMs": 1325.524,
+            "status": 200,
+            "bytes": 2094909,
+            "terminationCause": "COMPLETED",
+            "mime": "image/png",
+            "hashOk": true,
+            "totalMs": 490.1709000000001,
+            "attempts": [
+              {
+                "status": 200,
+                "atMs": 835.4254999999998,
+                "completedAtMs": 920.2712000000001
+              }
+            ],
+            "firstAttemptStatus": 200
+          }
+        ],
+        "acks": [
+          {
+            "client": 1,
+            "ms": 15.694899999999961,
+            "accepted": true
+          },
+          {
+            "client": 2,
+            "ms": 21.985999999999876,
+            "accepted": true
+          }
+        ],
+        "ack": {
+          "n": 2,
+          "p50": 15.694899999999961,
+          "p95": 21.985999999999876,
+          "max": 21.985999999999876
+        },
+        "detail": {
+          "client": 2,
+          "startedAtMs": 904.4112999999998,
+          "firstByteAtMs": 942.3588,
+          "completedAtMs": 942.4132,
+          "status": 200,
+          "bytes": 30,
+          "terminationCause": "COMPLETED",
+          "mime": "application/json",
+          "hashOk": true,
+          "totalMs": 38.00310000000036,
+          "attempts": [
+            {
+              "status": 200,
+              "atMs": 904.4978000000001,
+              "completedAtMs": 942.2080999999998
+            }
+          ],
+          "firstAttemptStatus": 200
+        },
+        "presence": {
+          "online": 2
+        },
+        "authoritativeAnsweredCount": 2,
+        "native": {
+          "activeMedia": 0,
+          "activeReaders": 0,
+          "budgetStopped": false,
+          "creditWaiters": 0,
+          "deniedBeforeSend": 0,
+          "nativeRawBytesReserved": 6284787,
+          "pendingHigh": 3,
+          "sendWaitMaxMs": 0.09280000000000001,
+          "sendWaitMs": 8.711800000000002,
+          "teacherFrames": {
+            "AUTH:participant_authenticated": 2,
+            "CONTROL:join_result": 2,
+            "CONTROL:ping": 1,
+            "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 194,
+            "HTTP_RELAY:HTTP_RESPONSE_END": 5,
+            "HTTP_RELAY:HTTP_RESPONSE_START": 5,
+            "REALTIME:question_revealed": 7,
+            "REALTIME:question_state_changed": 14,
+            "REALTIME:session_state_changed": 2,
+            "REALTIME:session_sync": 16,
+            "REALTIME:submission_acknowledged": 6,
+            "REALTIME:submission_result": 7
+          },
+          "teacherWsUtf8BytesReserved": 8447974
+        },
+        "firstAttemptRejected": 0
+      }
+    ],
+    "lockReveal": {
+      "label": "lock_reveal",
+      "lock": {
+        "startedAtMs": 1385.9573,
+        "activeMediaBodiesAtStart": 1,
+        "completedAtMs": 1427.6570000000002
+      },
+      "reveal": {
+        "startedAtMs": 1427.6664999999998,
+        "activeMediaBodiesAtStart": 1,
+        "completedAtMs": 1474.4989
+      },
+      "media": {
+        "client": 1,
+        "startedAtMs": 1327.7086,
+        "firstByteAtMs": 1385.9252999999999,
+        "completedAtMs": 1655.0011,
+        "status": 200,
+        "bytes": 2094909,
+        "terminationCause": "COMPLETED",
+        "mime": "image/png",
+        "hashOk": true,
+        "totalMs": 327.2946999999999,
+        "attempts": [
+          {
+            "status": 200,
+            "atMs": 1327.8346000000001,
+            "completedAtMs": 1383.2019999999998
+          }
+        ],
+        "firstAttemptStatus": 200
+      }
+    },
+    "cancelRelease": {
+      "label": "cancel_release",
+      "cancelled": {
+        "client": 1,
+        "startedAtMs": 1655.0294,
+        "firstByteAtMs": 1707.6396999999997,
+        "completedAtMs": 1709.5886999999998,
+        "status": "CANCELLED",
+        "bytes": 32768,
+        "terminationCause": "CALLER_CANCELLED",
+        "mime": "image/png",
+        "totalMs": 54.56179999999995,
+        "attempts": [
+          {
+            "status": 200,
+            "atMs": 1655.1961999999999,
+            "completedAtMs": 1704.7831999999999
+          }
+        ],
+        "firstAttemptStatus": 200
+      },
+      "nativeAfterCancel": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "deniedBeforeSend": 0,
+        "nativeRawBytesReserved": 8510768,
+        "pendingHigh": 3,
+        "sendWaitMaxMs": 0.09280000000000001,
+        "sendWaitMs": 11.677599999999998,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 2,
+          "CONTROL:join_result": 2,
+          "CONTROL:ping": 1,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 262,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 6,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 7,
+          "REALTIME:question_revealed": 9,
+          "REALTIME:question_state_changed": 18,
+          "REALTIME:session_state_changed": 2,
+          "REALTIME:session_sync": 20,
+          "REALTIME:submission_acknowledged": 6,
+          "REALTIME:submission_result": 9
+        },
+        "teacherWsUtf8BytesReserved": 11435795
+      },
+      "replacement": {
+        "client": 1,
+        "startedAtMs": 1770.4618999999998,
+        "firstByteAtMs": 1826.2345999999998,
+        "completedAtMs": 2060.5018999999998,
+        "status": 200,
+        "bytes": 2094909,
+        "terminationCause": "COMPLETED",
+        "mime": "image/png",
+        "hashOk": true,
+        "totalMs": 290.0433000000003,
+        "attempts": [
+          {
+            "status": 200,
+            "atMs": 1770.661,
+            "completedAtMs": 1823.6562
+          }
+        ],
+        "firstAttemptStatus": 200
+      }
+    },
+    "generationRecovery": {
+      "label": "generation_recovery",
+      "startedAtMs": 2245.2034,
+      "activeMediaBodiesAtStart": 1,
+      "reconnectTriggeredAtMs": 2245.2632,
+      "authSyncCompletedAtMs": 4340.300799999999,
+      "interrupted": {
+        "client": 1,
+        "startedAtMs": 2188.3750999999997,
+        "firstByteAtMs": 2245.1713999999997,
+        "completedAtMs": 2277.7725,
+        "status": "INTERRUPTED",
+        "bytes": 262144,
+        "terminationCause": "STREAM_INTERRUPTED",
+        "mime": "image/png",
+        "totalMs": 89.40139999999974,
+        "attempts": [
+          {
+            "status": 200,
+            "atMs": 2188.6701,
+            "completedAtMs": 2242.4565
+          }
+        ],
+        "firstAttemptStatus": 200
+      },
+      "interruptionObservedAfterTrigger": true,
+      "interruptionAttribution": "TEMPORAL_CORRELATION_ONLY",
+      "interruptedBodyReplayed": false,
+      "generationsCombined": false,
+      "acks": [
+        {
+          "client": 1,
+          "ms": 7.797199999999975,
+          "accepted": true
+        },
+        {
+          "client": 2,
+          "ms": 15.207500000000437,
+          "accepted": true
+        }
+      ],
+      "authoritativeAnsweredCount": 2,
+      "recoveredImage": {
+        "client": 1,
+        "startedAtMs": 4355.7901999999995,
+        "firstByteAtMs": 4402.5633,
+        "completedAtMs": 4643.211499999999,
+        "status": 200,
+        "bytes": 2094909,
+        "terminationCause": "COMPLETED",
+        "mime": "image/png",
+        "hashOk": true,
+        "totalMs": 287.4245000000001,
+        "attempts": [
+          {
+            "status": 200,
+            "atMs": 4355.954599999999,
+            "completedAtMs": 4398.848099999999
+          }
+        ],
+        "firstAttemptStatus": 200
+      },
+      "native": {
+        "activeMedia": 0,
+        "activeReaders": 0,
+        "budgetStopped": false,
+        "creditWaiters": 0,
+        "deniedBeforeSend": 0,
+        "nativeRawBytesReserved": 13093802,
+        "pendingHigh": 3,
+        "sendWaitMaxMs": 0.1178,
+        "sendWaitMs": 18.425099999999997,
+        "teacherFrames": {
+          "AUTH:participant_authenticated": 4,
+          "CONTROL:join_result": 2,
+          "CONTROL:ping": 2,
+          "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 402,
+          "HTTP_RELAY:HTTP_RESPONSE_END": 8,
+          "HTTP_RELAY:HTTP_RESPONSE_START": 10,
+          "REALTIME:question_revealed": 9,
+          "REALTIME:question_state_changed": 20,
+          "REALTIME:session_state_changed": 2,
+          "REALTIME:session_sync": 24,
+          "REALTIME:submission_acknowledged": 8,
+          "REALTIME:submission_result": 9
+        },
+        "teacherWsUtf8BytesReserved": 17574852
+      },
+      "presence": {
+        "online": 2
+      }
+    },
+    "cleanupComplete": true,
+    "cleanupDisposition": "CONFIRMED_CLEANED",
+    "resources": {
+      "activation": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      },
+      "installation": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      },
+      "session": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      },
+      "credential": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      },
+      "child": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      },
+      "temporaryData": {
+        "state": "CONFIRMED_CREATED",
+        "cleanup": "CONFIRMED_CLEANED"
+      }
+    },
+    "unresolved": [],
+    "workloadCleanup": {
+      "complete": true,
+      "ownedSocketsClosed": true,
+      "httpCancellationConfirmed": true,
+      "cancellationFailures": 0,
+      "pendingOperationsCleared": true,
+      "timersCleared": true
+    },
+    "ledgerPersistence": "CONFIRMED",
+    "emergencyStopRequested": false,
+    "lateAdapterCleanup": "NOT_NEEDED",
+    "nativeAppDataAbsent": true,
+    "nativeMetrics": {
+      "activeMedia": 0,
+      "activeReaders": 0,
+      "budgetStopped": false,
+      "creditWaiters": 0,
+      "deniedBeforeSend": 0,
+      "nativeRawBytesReserved": 13093802,
+      "pendingHigh": 3,
+      "sendWaitMaxMs": 0.1178,
+      "sendWaitMs": 18.425099999999997,
+      "teacherFrames": {
+        "AUTH:participant_authenticated": 4,
+        "CONTROL:join_result": 2,
+        "CONTROL:ping": 2,
+        "HTTP_RELAY:HTTP_RESPONSE_CHUNK": 402,
+        "HTTP_RELAY:HTTP_RESPONSE_END": 8,
+        "HTTP_RELAY:HTTP_RESPONSE_START": 10,
+        "REALTIME:question_revealed": 9,
+        "REALTIME:question_state_changed": 20,
+        "REALTIME:session_state_changed": 2,
+        "REALTIME:session_sync": 24,
+        "REALTIME:submission_acknowledged": 8,
+        "REALTIME:submission_result": 9
+      },
+      "teacherWsUtf8BytesReserved": 17574852
+    },
+    "transport": {
+      "joins": 2,
+      "authenticated": 4,
+      "syncs": 24,
+      "reauth": 4,
+      "unexpectedOffline": 0,
+      "socketErrors": 0,
+      "protocolErrors": 0,
+      "pongs": 0
+    },
+    "report": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b/0b7bd155-a537-4020-99c9-c8b97f7df669/report.json",
+      "sha256": "8fdeb1a30f7bf0d9e9a0aea5c2ef6a8c40a18fb08fbc1f03c26de1ba2b813572",
+      "bytes": 21825,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "operationLedger": {
+      "path": "apps/teacher/src-tauri/target/phase16f-pass-b/0b7bd155-a537-4020-99c9-c8b97f7df669/operation-ledger.json",
+      "sha256": "1816f87174b2f8b6704339a5d54aa53223ff70384d58ed6c7fa1b6149ae4edce",
+      "bytes": 1329,
+      "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+    },
+    "runCopyIdentity": {
+      "client": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b/0b7bd155-a537-4020-99c9-c8b97f7df669/student-http-client.mjs",
+        "sha256": "3d182db18ce6ee238761e0e8bac4b094e73bad9f28a3506f8181b719fd0a487d",
+        "bytes": 140303,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      },
+      "fixture": {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b/0b7bd155-a537-4020-99c9-c8b97f7df669/image.png",
+        "sha256": "54133374f4fd61dbb47f9fe61cfe479d172159188c6b10d9c4a79265e2aebbaa",
+        "bytes": 2094909,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      }
+    },
+    "productionExecution": "NOT_EXECUTED"
+  },
+  "failureRecords": [],
+  "retryCount": 0,
+  "warnings": [
+    {
+      "scope": "Documentation Git inspection/staging",
+      "message": "warning: in the working copy of 'status.md', LF will be replaced by CRLF the next time Git touches it",
+      "meaning": "Existing Git EOL behavior; no Git settings, attributes, or product source normalization performed"
+    },
+    {
+      "scope": "Documentation Git inspection/staging",
+      "message": "warning: in the working copy of 'docs/review-evidence/phase16f-pass-b-artifact-refresh/README.md', LF will be replaced by CRLF the next time Git touches it",
+      "meaning": "Existing Git EOL behavior; no Git settings, attributes, or product source normalization performed"
+    },
+    {
+      "scope": "Documentation Git inspection/staging",
+      "message": "warning: in the working copy of 'docs/review-evidence/phase16f-pass-b-artifact-refresh/source-manifest.json', LF will be replaced by CRLF the next time Git touches it",
+      "meaning": "Existing Git EOL behavior; no Git settings, attributes, or product source normalization performed"
+    },
+    {
+      "scope": "Documentation Git inspection/staging",
+      "message": "warning: in the working copy of 'docs/review-evidence/phase16f-pass-b-artifact-refresh/verification.json', LF will be replaced by CRLF the next time Git touches it",
+      "meaning": "Existing Git EOL behavior; no Git settings, attributes, or product source normalization performed"
+    }
+  ],
+  "logCaptureLimitations": [
+    "Build entry stdout/stderr captured; existing builder does not publish its internally captured cargo JSON/stderr.",
+    "Native raw stderr/non-protocol stdout are intentionally not retained by the existing runner; no claim that full native child logs are available."
+  ],
+  "historicalEvidence": {
+    "windowsNodeTests": 138,
+    "windowsNativeFocusedTests": 9,
+    "windowsSmokeGates": 22,
+    "testedHead": "843aeab7d3a56aaaa427fcab7d5c5c64e6703f95",
+    "evidence": "../phase16f-pass-b-preparation/windows-review-fixes.md",
+    "notRerun": true
+  },
+  "historicalReadiness": {
+    "date": "2026-10-28",
+    "timezone": "Asia/Taipei",
+    "notRequeriedThisTask": true,
+    "reports": [
+      {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-readiness/0f8c3516-a643-4a0d-bedd-8cb5fc26c12c/readiness-report.md",
+        "sha256": "86037f562288869ed236842ceef4762d3dd4e81f79d1a46b99c5e3f346706396",
+        "bytes": 17443,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      },
+      {
+        "path": "apps/teacher/src-tauri/target/phase16f-pass-b-readiness/a9ac7d65-9648-47dc-9ca5-919fd6bddd4e/live-metadata-report.md",
+        "sha256": "f6f1b8a6d9b99928a26b70da90ac4485d5a5c8f83f003714b402837195d8bca7",
+        "bytes": 20077,
+        "availability": "LOCAL_IGNORED_NOT_PUBLISHED"
+      }
+    ],
+    "deploymentObservationWindow": {
+      "initial": "2026-10-28T11:22:24.6291367Z",
+      "final": "2026-10-28T11:38:13.0196124Z"
+    },
+    "observedActiveVersion": "13424a84-25a3-409d-a0b6-1371f6b270d4",
+    "trafficPercentage": 100,
+    "futureDeploymentPreferredRollbackCandidate": "13424a84-25a3-409d-a0b6-1371f6b270d4",
+    "rollbackCompatibility": "NEEDS_DEPLOYMENT_PREPARATION_REVIEW",
+    "earlierCandidateFromHistoricalReport": "613f3f40-f192-4626-9561-a188dcdc5502",
+    "normalOAuthAndLiveBindingsSchema": "CONFIRMED_IN_HISTORICAL_SNAPSHOT_ONLY",
+    "billingAndBuilds": "UNKNOWN_HTTP_403_10000_IN_HISTORICAL_SNAPSHOT",
+    "sourceMapping": "UNKNOWN",
+    "productionBrowser": {
+      "observedAt": "2026-10-28T09:49:13.463Z",
+      "sha256": "b4a136c42628ff193bd2d1ec01ba2de1d74983ac8971667825fa4c0fe287e789",
+      "bytes": 265911,
+      "gap": "Missing main bounded 429 retry; not rebuilt, fetched, or deployed in this task"
+    }
+  },
+  "remainingProductionGates": {
+    "billing": true,
+    "builds": true,
+    "sourceMapping": true,
+    "rollbackCompatibility": true,
+    "productionBrowserGap": true,
+    "riskAcceptance": [
+      "sharedNat",
+      "localAdmission",
+      "globalQuota",
+      "rosterBearer",
+      "revocationExposure"
+    ],
+    "maintenanceWindow": "NOT_CONFIRMED"
+  },
+  "notExecuted": [
+    "Historical 138 Node tests",
+    "Rust runtime test suite",
+    "Repository broad suite",
+    "A2",
+    "30-student workload",
+    "WAN",
+    "Physical phone rendering",
+    "Installed QA",
+    "Browser dist-remote build",
+    "Cloudflare management APIs",
+    "Production URLs",
+    "Production D1",
+    "Deployment/upload/rollback",
+    "Installer",
+    "Pass C"
+  ],
+  "release": {
+    "phase16f": "HOLD",
+    "passC": "NOT_STARTED"
+  },
+  "repositoryChecks": {
+    "status": "PASS",
+    "checkedAt": "2026-10-28T12:46:30.554Z",
+    "relativeDocumentationLinks": {
+      "checked": 27,
+      "broken": 0,
+      "result": "PASS"
+    },
+    "sourceFilesVerified": 247,
+    "sourceDigest": "49b1da1ad0cd6f57ecb0908b32f7f61ee49cbf5a8bf639bd01bffa741a0b761e",
+    "sourceBeforeAfterAndBuildManifestIdentical": true,
+    "readBuildManifest": "PASS",
+    "artifactAndOriginalHashReferencesChecked": 32,
+    "distinctOriginalFilesChecked": 28,
+    "publicProjection": "NO_CREDENTIALS_OR_EXACT_OPERATIONAL_IDS",
+    "nativeAppDataAbsent": true,
+    "expectedChangedFiles": 5,
+    "actualChangedFiles": [
+      "docs/phase16f-pass-b-preparation.md",
+      "docs/review-evidence/phase16f-pass-b-artifact-refresh/README.md",
+      "docs/review-evidence/phase16f-pass-b-artifact-refresh/source-manifest.json",
+      "docs/review-evidence/phase16f-pass-b-artifact-refresh/verification.json",
+      "status.md"
+    ],
+    "historicalEvidence": "UNCHANGED",
+    "sourceRuntimeDependencies": "UNCHANGED",
+    "gitDiffCheck": "PASS",
+    "mainAndOriginMainAtBase": true
+  }
+}
